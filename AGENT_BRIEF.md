@@ -1,34 +1,45 @@
-# Agent brief
+# Бриф для агента
 
-You are joining an active design/implementation process.
+Ты подключаешься к активному design/implementation процессу.
 
-You are not here to merely execute a finished specification.
-You are here to help turn the current ProcessCards design into a small runnable Lua simulator and surface what breaks.
+Ты не здесь, чтобы исполнять готовую спецификацию.
+Ты здесь, чтобы помогать превращать текущий дизайн `ProcessCards` в маленький runnable Lua-прототип и показывать, что ломается.
 
-## Working attitude
+## Язык документации
 
-Prefer:
+Документацию в этом репозитории ведём на русском.
 
-- small executable steps
-- clear state tables
-- simple tests
-- explicit uncertainty
-- reporting design gaps
-- asking for decision only when the code cannot proceed safely
+Допустимы английские термины, если они являются:
 
-Avoid:
+- именами зон в коде: `deck`, `hand`, `grave`;
+- canonical ProcessCards terms;
+- ProcessLang / Lua identifiers;
+- короткими формулами из исходных design-доков.
 
-- redesigning the whole game alone
-- treating every document sentence as final law
-- importing the whole slastack into this repo
-- philosophical expansion unrelated to implementation
-- Python
-- external dependencies
-- UI work before the rules engine exists
+## Рабочее отношение
 
-## What to build first
+Предпочитать:
 
-Start with a Lua table-machine that can represent current game state:
+- маленькие исполняемые шаги;
+- ясные state tables;
+- простые тесты;
+- явную неопределённость;
+- отчёт о design gaps;
+- вопросы к пользователю только когда код не может безопасно двигаться дальше.
+
+Избегать:
+
+- самостоятельного полного редизайна игры;
+- отношения к каждому предложению markdown как к финальному закону;
+- импорта всего `slastack` в этот репозиторий;
+- философского расширения без связи с реализацией;
+- Python;
+- внешних зависимостей;
+- UI раньше rules engine.
+
+## Что строить первым
+
+Начать с Lua table-machine, которая представляет состояние игры:
 
 ```text
 deck
@@ -42,66 +53,91 @@ trump_zone
 log
 ```
 
-Then implement enough mechanics to test the current design:
+Затем реализовать достаточно механик, чтобы проверить текущий дизайн:
 
-- construct a deck
-- initialize board state
-- check weak / strong / mirror relations
-- preserve 5 manifest + 5 latent slots
-- resolve `RECAST`
-- model trump zone capacity 2
-- write tests around invariants
+- собрать deck;
+- инициализировать board state;
+- проверить weak / strong / mirror relations;
+- сохранять 5 manifest + 5 latent slots;
+- resolve `RECAST`;
+- смоделировать trump zone capacity 2;
+- написать tests around invariants.
 
-## What is allowed to be provisional
+## Прототип, в который можно играть
 
-The following are still design surfaces, not finished law:
+Первый playable milestone должен дать человеку возможность пройти ходовой цикл, пусть даже в CLI.
 
-- exact setup procedure
-- target compiler details
-- all card texts
-- full trump set
-- balance numbers
-- final CLI format
+CLI допустим как первый интерфейс, потому что он быстро проверяет rules engine.
+GUI желателен как следующий слой: кликабельный карточный стол, выбор карт мышкой, понятные зоны, функциональность важнее красоты.
 
-If a provisional choice is needed, make the smallest local assumption and write it down.
+Архитектурно важно:
+
+```text
+rules engine не должен зависеть от CLI или GUI
+```
+
+Мы будем часто менять игру на логическом уровне.
+Lua выбран именно потому, что такие правки должны быть быстрыми, локальными и прозрачными.
+
+## Что можно считать provisional
+
+Это ещё design surfaces, не окончательный закон:
+
+- exact setup procedure;
+- target compiler details;
+- all card texts;
+- full trump set;
+- balance numbers;
+- final CLI format;
+- GUI framework / rendering layer.
+
+Если нужен provisional choice, делай минимальное локальное предположение и записывай его.
 
 ## Canonical topology
 
-Use ProcessLang topology from:
+Использовать ProcessLang topology из:
 
 ```text
 /home/slasten/Документы/stack/stack-core/ProcessLang/canon.lua
 ```
 
-Topology is not provisional.
+Топология не provisional.
 
-## First useful milestone
+## Первый полезный milestone
 
-A good first milestone is:
+Хороший первый milestone:
 
 ```text
 lua tests/run.lua
 ```
 
-passing tests that prove:
+passing tests должны доказывать:
 
-- setup creates valid zones
-- relation checks work
-- RECAST preserves board shape
-- old manifest becomes new hand
-- old latent becomes manifest
-- old hand becomes latent / overflow grave
-- third resolved trump resets trump zone into deck
+- setup создаёт валидные зоны;
+- relation checks работают;
+- `RECAST` сохраняет board shape;
+- old manifest становится new hand;
+- old latent становится manifest;
+- old hand становится latent / overflow grave;
+- third resolved trump resets trump zone into deck.
 
-machines only. not for humans.
+После этого следующий milestone:
+
+```text
+lua src/cli.lua
+```
+
+минимально позволяет играть ходами и видеть зоны.
 
 ## Optional skill
 
-When working with ProcessLang traces, use the local ProcessLang skill:
+При работе с ProcessLang traces можно использовать локальный ProcessLang skill:
 
 ```text
 /home/slasten/Документы/stack/protocols/skills/processlang/SKILL.md
 ```
 
-Use it for glyph reading, trace validation, and ProcessLang state-packet interpretation.
-Do not use it as a replacement for ProcessCards rules documents.
+Он помогает читать glyphs, валидировать traces и интерпретировать ProcessLang state-packets.
+Он не заменяет ProcessCards rules documents.
+
+machines only. not for humans.

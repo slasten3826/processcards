@@ -1,39 +1,49 @@
 # ProcessCards dev
 
-This is a working implementation space for `ProcessCards`.
+Рабочее пространство для реализации `ProcessCards`.
 
-We are not starting from a finished ruleset.
-We are turning a living design into executable Lua tables so the game can push back.
+Мы не начинаем с готового rulesheet.
+Мы превращаем живой дизайн в исполняемые Lua-таблицы, чтобы игра начала сопротивляться и показывать, где правила ещё дырявые.
 
-The goal is not to obey a frozen spec.
-The goal is to help discover the game by making its current structure runnable.
+Главная цель сейчас:
 
-Read first:
+```text
+сделать первый прототип, в который можно играть
+```
+
+Скорее всего первый слой будет CLI, потому что он быстрее всего проверит правила.
+Желаемый следующий слой - функциональный GUI: кликабельный карточный стол, где карты можно выбирать мышкой, примерно по духу как удобный карточный интерфейс, а не как финальная красивая игра.
+
+Читайте сначала:
 
 1. `CONTEXT.md`
 2. `AGENT_BRIEF.md`
 3. `LOCAL_SOURCES.md`
 4. `IMPLEMENTATION_PLAN.md`
+5. `docs/LEGEND.md`
 
-Main local design source:
+Главный локальный источник дизайна:
 
 ```text
 /home/slasten/Документы/stack/projects/processcards/
 ```
 
-ProcessLang topology source:
+Источник топологии ProcessLang:
 
 ```text
 /home/slasten/Документы/stack/stack-core/ProcessLang/canon.lua
 ```
 
-Working posture:
+Рабочая поза:
 
 ```text
-implement -> observe -> report tension -> adjust with user
+реализовать -> поиграть/наблюдать -> назвать напряжение -> поправить вместе с пользователем
 ```
 
-Do not treat markdown as sacred law.
-Do treat it as the best current map.
+Документацию в этом репозитории ведём на русском.
+Английский допустим в кодовых идентификаторах, canonical terms и коротких технических формулах.
+
+Markdown не священный закон.
+Markdown - текущая карта местности.
 
 machines only. not for humans.

@@ -1,9 +1,9 @@
-# Local sources
+# Локальные источники
 
-These files are the design handoff from `slastack`.
+Эти файлы - design handoff из `slastack`.
 
-Read enough to implement the current prototype.
-Do not bulk-import the whole stack.
+Читать достаточно, чтобы реализовать текущий прототип.
+Не импортировать весь stack в этот репозиторий.
 
 ## Primary sources
 
@@ -23,8 +23,8 @@ Do not bulk-import the whole stack.
 /home/slasten/Документы/stack/projects/processcards/YELLOWPRINT.md
 ```
 
-Use context sources to understand how the design formed.
-Do not treat old yellowprints as current rules when they conflict with v4.
+Context sources нужны, чтобы понимать путь идеи.
+Старые yellowprints не считать текущими rules, если они конфликтуют с v4.
 
 ## Priority if sources conflict
 
@@ -39,29 +39,54 @@ older yellowprints             -> history
 
 ## Vocabulary
 
-The user may say `library` in conversation.
-In code and docs use canonical term:
+Пользователь может говорить `library`.
+В коде и документации использовать canonical term:
 
 ```text
 deck
 ```
 
-machines only. not for humans.
+Документацию репозитория вести на русском.
+Термины зон в коде оставлять стабильными: `deck`, `hand`, `grave`, `manifest`, `latent`, `targets`, `runtime`, `trump_zone`.
+
+## Хроника
+
+Историю идеи вести отдельно:
+
+```text
+docs/LEGEND.md
+```
+
+Это не rulesheet.
+Это летопись/легенда/сказка о том, каким путём идея прошла.
+
+Важно сохранять хронологию:
+
+- что было раньше;
+- что изменилось;
+- почему старое решение перестало подходить;
+- какой слой появился следующим;
+- какие tension points привели к новому правилу.
+
+Стиль может быть свободным.
+Факт хронологии важнее строгой формы.
 
 ## Optional ProcessLang skill
 
-Use this skill when reading, validating, or writing ProcessLang glyph traces:
+Использовать этот skill при чтении, валидации или записи ProcessLang glyph traces:
 
 ```text
 /home/slasten/Документы/stack/protocols/skills/processlang/SKILL.md
 ```
 
-The skill helps with:
+Skill помогает с:
 
-- PL glyph meanings
-- adjacency validation
-- state-packet reading
-- PLANGOS-style structured headers when requested
+- PL glyph meanings;
+- adjacency validation;
+- state-packet reading;
+- PLANGOS-style structured headers when requested.
 
-The skill does not replace ProcessCards source documents.
-It only helps interpret ProcessLang traces and process-state notation.
+Skill не заменяет ProcessCards source documents.
+Он только помогает интерпретировать ProcessLang traces и process-state notation.
+
+machines only. not for humans.

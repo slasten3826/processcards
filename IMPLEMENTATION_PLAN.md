@@ -1,11 +1,11 @@
-# Implementation plan
+# План реализации
 
-This is a suggested path, not a frozen commandment.
-If code reveals a better small step, take it and explain why.
+Это suggested path, не замороженная заповедь.
+Если код показывает лучший маленький шаг, надо брать его и объяснять почему.
 
 ## Phase 0: Minimal skeleton
 
-Create plain Lua modules such as:
+Создать простые Lua-модули:
 
 ```text
 src/processcards.lua
@@ -18,18 +18,18 @@ src/trumps.lua
 tests/run.lua
 ```
 
-If fewer files are better at first, use fewer.
-Keep it table-first.
+Если на старте лучше меньше файлов - использовать меньше.
+Главное: table-first, без тяжёлых abstractions.
 
 ## Phase 1: Canon adapter
 
-Load:
+Загрузить:
 
 ```text
 /home/slasten/Документы/stack/stack-core/ProcessLang/canon.lua
 ```
 
-Expose a small interface:
+Дать маленький interface:
 
 ```lua
 is_adjacent(left, right)
@@ -40,7 +40,7 @@ operators
 
 ## Phase 2: Card representation
 
-Use simple Lua tables.
+Использовать простые Lua tables.
 
 Minor example:
 
@@ -54,17 +54,17 @@ Trump example:
 { kind = "trump", edge = { "☳", "☶" }, name = "RECAST" }
 ```
 
-These formats can change if implementation pressure shows a better table shape.
+Форматы могут поменяться, если implementation pressure покажет более удобную форму.
 
 ## Phase 3: Setup prototype
 
-Build a prototype deck:
+Собрать prototype deck:
 
-- 100 minors = all ordered number/suit pairs
-- enough trump placeholders to test trump handling
-- named `RECAST` for edge `☳ -> ☶`
+- 100 minors = все ordered number/suit pairs;
+- enough trump placeholders для проверки trump handling;
+- named `RECAST` для edge `☳ -> ☶`.
 
-Prototype setup should create:
+Prototype setup должен создавать:
 
 ```text
 3 targets face-down
@@ -74,13 +74,14 @@ hand cards
 grave empty
 runtime nil
 trump_zone empty
+log empty
 ```
 
-If exact initial hand size is uncertain, start with 5 and make it configurable.
+Если exact initial hand size неизвестен, стартовать с 5 и сделать configurable.
 
 ## Phase 4: Relation checks
 
-Implement:
+Реализовать:
 
 ```lua
 is_weak(a, b)
@@ -112,7 +113,7 @@ number_A == suit_B and suit_A == number_B
 
 ## Phase 5: RECAST
 
-Implement current RECAST behavior from source docs.
+Реализовать текущий `RECAST` из source docs.
 
 Expected behavior:
 
@@ -128,29 +129,84 @@ if trump_zone already has 2 trumps, third trump resets chamber into deck
 
 ## Phase 6: Tests as design pressure
 
-Write tests for invariants and edge cases that matter now:
+Написать tests для инвариантов и edge cases:
 
-- deck construction count
-- setup board shape
-- weak/strong/mirror examples
-- RECAST with old hand size 0
-- RECAST with old hand size 5
-- RECAST with old hand size > 5
-- grave order after overflow
-- third trump reset
+- deck construction count;
+- setup board shape;
+- weak/strong/mirror examples;
+- RECAST with old hand size 0;
+- RECAST with old hand size 5;
+- RECAST with old hand size > 5;
+- grave order after overflow;
+- third trump reset.
 
-Run with:
+Запуск:
 
 ```bash
 lua tests/run.lua
 ```
 
+## Phase 7: Playable CLI
+
+После rules tests сделать первый playable loop:
+
+```bash
+lua src/cli.lua
+```
+
+Минимальный CLI должен уметь:
+
+- показать zones;
+- показать manifest row;
+- показать hand;
+- выбрать action;
+- выбрать карты/слоты по индексам;
+- выполнить weak / strong / discard / pass;
+- показать log текущего хода;
+- сохранить bounded resolution tail.
+
+CLI не обязан быть красивым.
+Он должен быть честным test harness, в который можно играть.
+
+## Phase 8: Functional GUI
+
+GUI делать только поверх уже работающего rules engine.
+
+Цель GUI:
+
+```text
+кликабельный карточный стол
+```
+
+Желаемый feel:
+
+- карты можно выбирать мышкой;
+- зоны читаются визуально;
+- latent/manifest slots видны как 5 columns x 2 layers;
+- hand и grave доступны без лишнего текста;
+- trump zone виден как two-event pressure chamber;
+- интерфейс помогает играть, а не объясняет игру.
+
+Стиль может быть простым.
+Важнее функциональность и скорость правок.
+
+Возможные направления:
+
+- Love2D, если хочется нативный Lua GUI;
+- web UI поверх Lua rules bridge, если это окажется быстрее;
+- terminal UI как промежуточный слой, если GUI рано.
+
+Решение не фиксировать до появления playable CLI.
+
 ## Non-goals now
 
-Do not build UI yet.
-Do not implement all card texts.
-Do not implement full target compiler yet.
-Do not create a balancing simulator yet.
-Do not rewrite the design into another philosophy document.
+Сейчас не делать:
+
+- полный polished GUI;
+- все card texts;
+- full target compiler;
+- balancing simulator;
+- переписывание дизайна в новый философский трактат;
+- внешние зависимости без явной необходимости.
 
 machines only. not for humans.

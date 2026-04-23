@@ -1,38 +1,64 @@
-# Context
+# Контекст
 
-`ProcessCards` is a card-game manifestation of ProcessLang topology.
+`ProcessCards` - карточное проявление топологии ProcessLang.
 
-It is being designed as a closed-system solitaire / engine game.
-It is inspired by the combo-engine pleasure of Magic: The Gathering, but without the duel shell.
+Это закрытая solitaire / engine-игра: 122 карты, один фиксированный набор, без противника, HP, маны, существ, союзников и внешних токенов.
 
-Important distinction:
+Вдохновение приходит из одного слоя `Magic: The Gathering`:
+
+```text
+combo-engine pleasure
+```
+
+Но без duel shell. Мы сохраняем зоны, sequencing, hidden information, grave как историю, deck manipulation и удовольствие сборки движка.
+
+Важное различие:
 
 ```text
 slastack = canon / ontology / machine surface
 ProcessCards = downstream playable artifact
 ```
 
-This directory is for the playable artifact.
-The main slastack repository remains the source of design documents and ProcessLang canon.
+Этот репозиторий - для играбельного артефакта.
+Главный `slastack` остаётся источником больших design-документов и ProcessLang canon.
 
-## Current design shape
+## Текущая форма игры
 
-The current design direction is roughly:
+Короткая формула:
 
 ```text
 ProcessCards = slot-based manifest-chain solitaire with bounded hidden state
 ```
 
-Core board image:
+Сейчас у нас:
 
 ```text
-5 columns × 2 layers
-
-manifest row = 5 face-up cards
-latent row   = 5 face-down cards
+122 карты
+100 minor-карт
+22 trump-карты
 ```
 
-Other zones:
+Из козырей механически проработан пока один:
+
+```text
+RECAST = ☳ -> ☶
+```
+
+Зато почти вся остальная игра уже держится на minor-картах.
+Первый прототип должен быть играбельным именно на minor-слое, с `RECAST` как первым проверочным событием trump-экологии.
+
+## Стол
+
+Ядро стола:
+
+```text
+5 columns x 2 layers
+
+manifest row = 5 открытых карт
+latent row   = 5 закрытых карт
+```
+
+Другие зоны:
 
 ```text
 deck
@@ -41,28 +67,29 @@ targets
 runtime lane
 grave
 trump zone
+log
 ```
 
-## Current important ideas
+## Важные идеи
 
-- `hand` is a player-side table of available interventions.
-- `manifest row` is the visible process chain.
-- `latent row` is hidden but already structured board-state.
-- `grave` is open ordered residue.
-- `targets` compile a victory grammar, not three unrelated goals.
+- `hand` - player-side table доступных вмешательств.
+- `manifest row` - видимая process chain.
+- `latent row` - скрытое, но уже структурированное состояние стола.
+- `grave` - открытый ordered residue, история потерь и последствий.
+- `targets` компилируют victory grammar, а не являются тремя независимыми целями.
 - `minor = state`.
 - `trump = event`.
-- `trump zone` is a two-event pressure chamber.
-- The first serious trump candidate is `RECAST`.
+- `trump zone` - two-event pressure chamber.
+- Первый серьёзный trump-кандидат - `RECAST`.
 
-## What we are doing now
+## Что мы делаем сейчас
 
-We want to write a Lua table-based simulator because natural-language design is starting to sprawl.
+Пишем Lua table-based simulator, потому что natural-language design начал расползаться.
 
-The simulator is a thinking tool.
-It should reveal contradictions, missing rules, and dead mechanics.
+Симулятор - не просто техника.
+Это thinking tool: он должен показывать противоречия, мёртвые механики, неявные дыры и места, где игра ещё не стала игрой.
 
-If implementation exposes a design problem, report it clearly.
-Do not silently invent a big rule unless it is necessary to keep the prototype running.
+Если реализация вскрывает design problem, нужно назвать его явно.
+Не надо молча изобретать большое правило, если без него можно сохранить маленький прототип.
 
 machines only. not for humans.
