@@ -9,15 +9,20 @@
 
 ```text
 /home/slasten/Документы/stack/projects/processcards/YELLOWPRINT_v4.md
+/home/slasten/Документы/stack/projects/processcards/TARGET_COMPILER_v1.md
 /home/slasten/Документы/stack/projects/processcards/trumps/README.md
 /home/slasten/Документы/stack/projects/processcards/trumps/TRUMP_ECOLOGY.md
+/home/slasten/Документы/stack/projects/processcards/trumps/TRUMP_RESOLUTION_ORDER.md
 /home/slasten/Документы/stack/projects/processcards/trumps/RECAST.md
+/home/slasten/Документы/stack/projects/processcards/trumps/SHUFFLE.md
+/home/slasten/Документы/stack/projects/processcards/trumps/EJECT.md
 /home/slasten/Документы/stack/stack-core/ProcessLang/canon.lua
 ```
 
 ## Context sources
 
 ```text
+/home/slasten/Документы/stack/projects/processcards/README.md
 /home/slasten/Документы/stack/projects/processcards/GAMEPLAY_LINEAGE.md
 /home/slasten/Документы/stack/projects/processcards/YELLOWPRINT_v3_5.md
 /home/slasten/Документы/stack/projects/processcards/YELLOWPRINT.md
@@ -31,10 +36,33 @@ Context sources нужны, чтобы понимать путь идеи.
 ```text
 canon.lua                      -> ProcessLang topology
 YELLOWPRINT_v4.md              -> current board model
+TARGET_COMPILER_v1.md          -> current target compiler law
 trumps/TRUMP_ECOLOGY.md        -> current trump ecology direction
+trumps/TRUMP_RESOLUTION_ORDER.md -> global trump ordering law
 trumps/RECAST.md               -> current RECAST behavior
+trumps/SHUFFLE.md              -> circulation trump draft
+trumps/EJECT.md                -> precision extraction trump draft
 this dev directory             -> local implementation notes
 older yellowprints             -> history
+```
+
+## Upstream mirror inside repo
+
+Чтобы не зависеть от внешней папки каждый раз при чтении,
+мы держим локальную зеркальную копию актуальных upstream docs здесь:
+
+```text
+docs/upstream/processcards/
+```
+
+Это mirror design sources, а не независимая ветка правил.
+
+Если upstream-док обновился, а mirror ещё нет, приоритет такой:
+
+```text
+оригинал в /home/slasten/Документы/... -> первичен
+docs/upstream/processcards/            -> локальная зафиксированная копия
+наши handoff docs                      -> рабочая интерпретация для реализации
 ```
 
 ## Vocabulary

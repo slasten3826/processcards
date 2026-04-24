@@ -146,6 +146,24 @@ if trump_zone already has 2 trumps, third trump resets chamber into deck
 lua tests/run.lua
 ```
 
+## Phase 6.5: Target compiler shell
+
+После базовой устойчивости board-state добавить минимальную версию target compiler:
+
+- 3 ordered target slots;
+- stable state slot = hidden candidate or installed trump;
+- `OBSERVE` target:
+  - non-trump -> becomes known, stays hidden;
+  - trump -> discharges as normal event, slot refills;
+- `MANIFEST` target:
+  - non-trump -> goes to grave, slot refills;
+  - trump -> installs as sealed law in that slot;
+- victory check only after post-phase resolution;
+- no full semantic payload for all target roles yet.
+
+Здесь задача не сделать финальную систему победы,
+а доказать, что target zone уже ведёт себя как compiler, а не как декорация.
+
 ## Phase 7: Playable CLI
 
 После rules tests сделать первый playable loop:
@@ -197,6 +215,21 @@ GUI делать только поверх уже работающего rules e
 - terminal UI как промежуточный слой, если GUI рано.
 
 Решение не фиксировать до появления playable CLI.
+
+## Phase 9: Staged trump expansion
+
+После playable CLI расширять trump-layer поэтапно:
+
+1. `RECAST` как обязательный rewrite trump;
+2. `SHUFFLE` как circulation trump;
+3. `EJECT` как precision trump;
+4. только потом расширять набор дальше.
+
+Порядок важен:
+
+- `RECAST` проверяет board rewrite;
+- `SHUFFLE` проверяет residue/deck ecology без переписывания сцены;
+- `EJECT` проверяет cross-zone pressure и может слишком рано расшатать всё, если дать его раньше.
 
 ## Non-goals now
 
