@@ -38,19 +38,15 @@ ProcessCards = slot-based manifest-chain solitaire with bounded hidden state
 22 trump-карты
 ```
 
-Из козырей механически детально проработаны:
+Козыри как design layer уже существуют в документах,
+но первый настоящий playable prototype теперь намеренно ограничен:
 
 ```text
-RECAST = ☳ -> ☶
-SHUFFLE = ☵ -> ☲
-EJECT   = ▽ -> ☷
+рабочая машина на 100 minor-карт
 ```
 
-`RECAST` остаётся первым обязательным trump для прототипа.
-`SHUFFLE` и `EJECT` уже достаточно оформлены как design docs, но их стоит подключать после того, как minor-loop и `RECAST` переживут первую играбельную сборку.
-
-Зато почти вся остальная игра уже держится на minor-картах.
-Первый прототип должен быть играбельным именно на minor-слое, с ограниченным trump-layer поверх него.
+То есть trump-layer не входит в первый playable scope.
+Сначала minor-loop должен стать реальной игрой сам по себе.
 
 ## Стол
 
@@ -63,7 +59,7 @@ manifest row = 5 открытых карт
 latent row   = 5 закрытых карт
 ```
 
-Другие зоны:
+Другие зоны первого playable слоя:
 
 ```text
 deck
@@ -71,7 +67,6 @@ hand
 targets
 runtime lane
 grave
-trump zone
 log
 ```
 
@@ -85,11 +80,9 @@ log
 - `minor = state`.
 - `trump = event`.
 - `target zone = victory compiler`.
-- `trump zone` - two-event pressure chamber.
-- trump resolution идёт через ordered queue, а не через stack.
-- `RECAST` - scene rewrite trump.
-- `SHUFFLE` - circulation trump.
-- `EJECT` - precision trump.
+
+Но в первом playable machinery layer активны только minor-карты.
+Trump ecology пока не кристаллизуется в коде.
 
 ## Что мы делаем сейчас
 
@@ -98,13 +91,28 @@ log
 Симулятор - не просто техника.
 Это thinking tool: он должен показывать противоречия, мёртвые механики, неявные дыры и места, где игра ещё не стала игрой.
 
+Перед кодом действует рабочий закон:
+
+```text
+table first
+crystall second
+```
+
+Смысл:
+
+- `table` = документы, где явно названы зоны, переходы, ходы, trigger order и локальные prototype допущения;
+- `crystall` = кодовая фиксация уже названной структуры.
+
+Это не значит, что документы должны быть “идеальными”.
+Это значит, что код не должен становиться местом, где внезапно рождается скрытый rulesheet.
+
 Текущий рабочий приоритет:
 
-1. сделать приятный и честный minor game loop;
-2. доказать, что `RECAST` не ломает board invariants;
-3. подключить простой working target compiler;
-4. потом аккуратно добавлять `SHUFFLE`;
-5. `EJECT` подключать позже, потому что он лезет почти во все онтологические слои игры.
+1. описать первый prototype table;
+2. сделать приятный и честный minor game loop;
+3. собрать рабочую машину на 100 minor-карт;
+4. подключить простой working target/compiler shell без active trump payloads;
+5. только потом возвращаться к trump-layer.
 
 Если реализация вскрывает design problem, нужно назвать его явно.
 Не надо молча изобретать большое правило, если без него можно сохранить маленький прототип.

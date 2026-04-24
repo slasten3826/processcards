@@ -52,7 +52,7 @@ older yellowprints             -> history
 мы держим локальную зеркальную копию актуальных upstream docs здесь:
 
 ```text
-docs/upstream/processcards/
+docs/chaos/upstream/processcards/
 ```
 
 Это mirror design sources, а не независимая ветка правил.
@@ -61,7 +61,7 @@ docs/upstream/processcards/
 
 ```text
 оригинал в /home/slasten/Документы/... -> первичен
-docs/upstream/processcards/            -> локальная зафиксированная копия
+docs/chaos/upstream/processcards/      -> локальная зафиксированная копия
 наши handoff docs                      -> рабочая интерпретация для реализации
 ```
 
@@ -82,7 +82,7 @@ deck
 Историю идеи вести отдельно:
 
 ```text
-docs/LEGEND.md
+docs/chaos/LEGEND.md
 ```
 
 Это не rulesheet.

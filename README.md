@@ -1,49 +1,24 @@
 # ProcessCards dev
 
-Рабочее пространство для реализации `ProcessCards`.
+Документация репозитория теперь разложена по 4 каталогам:
 
-Мы не начинаем с готового rulesheet.
-Мы превращаем живой дизайн в исполняемые Lua-таблицы, чтобы игра начала сопротивляться и показывать, где правила ещё дырявые.
+- [chaos](./docs/chaos/)
+- [table](./docs/table/)
+- [crystall](./docs/crystall/)
+- [manifest](./docs/manifest/)
 
-Главная цель сейчас:
+Быстрый вход:
 
-```text
-сделать первый прототип, в который можно играть
-```
+1. [docs/manifest/README.md](./docs/manifest/README.md)
+2. [docs/table/CONTEXT.md](./docs/table/CONTEXT.md)
+3. [docs/chaos/LOCAL_SOURCES.md](./docs/chaos/LOCAL_SOURCES.md)
+4. [docs/crystall/IMPLEMENTATION_PLAN.md](./docs/crystall/IMPLEMENTATION_PLAN.md)
 
-Скорее всего первый слой будет CLI, потому что он быстрее всего проверит правила.
-Желаемый следующий слой - функциональный GUI: кликабельный карточный стол, где карты можно выбирать мышкой, примерно по духу как удобный карточный интерфейс, а не как финальная красивая игра.
-
-Читайте сначала:
-
-1. `CONTEXT.md`
-2. `AGENT_BRIEF.md`
-3. `LOCAL_SOURCES.md`
-4. `IMPLEMENTATION_PLAN.md`
-5. `docs/LEGEND.md`
-
-Главный локальный источник дизайна:
+Рабочий закон остаётся прежним:
 
 ```text
-/home/slasten/Документы/stack/projects/processcards/
+table first
+crystall second
 ```
 
-Источник топологии ProcessLang:
-
-```text
-/home/slasten/Документы/stack/stack-core/ProcessLang/canon.lua
-```
-
-Рабочая поза:
-
-```text
-реализовать -> поиграть/наблюдать -> назвать напряжение -> поправить вместе с пользователем
-```
-
-Документацию в этом репозитории ведём на русском.
-Английский допустим в кодовых идентификаторах, canonical terms и коротких технических формулах.
-
-Markdown не священный закон.
-Markdown - текущая карта местности.
-
-machines only. not for humans.
+Первый playable machinery layer собираем только на 100 minor-картах.
