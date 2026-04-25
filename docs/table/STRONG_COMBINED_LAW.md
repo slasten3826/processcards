@@ -16,6 +16,33 @@ strong is a combined reading of the pair
 not two weak effects in sequence
 ```
 
+## 0. Source of truth
+
+Read this document as:
+
+```text
+how strong pairs are interpreted in principle
+```
+
+Read [STRONG_PAIR_TABLE.md](./STRONG_PAIR_TABLE.md) as:
+
+```text
+which pair families are currently documented with what maturity
+```
+
+## 0.5 Precedence
+
+When strong-reading sources collide, use this order:
+
+```text
+1. explicit pair entry in STRONG_PAIR_TABLE.md
+2. LOGIC override for pairs containing ☶
+3. CONNECT override for pairs containing ☰
+4. ordinary strong interpretation from STRONG_COMBINED_LAW.md
+```
+
+This order exists to prevent invented hybrid readings.
+
 ## 1. Core law
 
 Сильный ход не читает карту как:
@@ -129,6 +156,19 @@ Bridge rule:
 whenever a pair contains ☰,
 CONNECT_LAW has priority over ordinary strong-pair interpretation
 ```
+
+Special note:
+
+```text
+☶☰ / ☰☶ is not plain CONNECT
+it is CONNECT read under logic override
+```
+
+So:
+
+- connect identity remains primary as family
+- but the concrete reading is not ordinary pure connect
+- it must be treated as logic-modified connect-family behavior
 
 In single-card mode:
 

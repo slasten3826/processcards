@@ -48,6 +48,8 @@ Lua + LÖVE
 Минимальный executable scope:
 
 - board setup
+- full 122-card temporary deck ids
+- Start Game setup
 - deck
 - hand
 - manifest row

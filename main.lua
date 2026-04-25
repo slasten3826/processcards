@@ -1,1261 +1,981 @@
-local CANON_PATH = "/home/slasten/Документы/stack/stack-core/ProcessLang/canon.lua"
-local TEXT_FONT_CANDIDATES = {
-  "/usr/share/fonts/TTF/DejaVuSans.ttf",
-  "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-  "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
-}
-local SYMBOL_FONT_CANDIDATES = {
-  "/usr/share/fonts/noto/NotoSansSymbols2-Regular.ttf",
-  "/usr/share/fonts/TTF/DejaVuSans.ttf",
-  "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-}
+-- ProcessCards layer 1 runtime
+-- Documented sources:
+-- docs/crystall/LAYER1_BOARD_SKELETON_SPEC.md
+-- docs/crystall/BOARD_ENGINE_SKELETON_TZ.md
+-- docs/crystall/LAYERED_PROJECT_POLICY.md
+-- docs/crystall/PLATFORM_REQUIREMENTS.md
+-- docs/crystall/PORTABILITY_CONSTRAINTS.md
+-- docs/crystall/FIRST_PROTOTYPE_VISUAL_TARGET.md
+-- docs/table/DECK_AND_SETUP_LAW.md
+-- docs/crystall/START_GAME_FLOW.md
 
-local palette = {
-  bg = {0.07, 0.08, 0.09},
-  panel = {0.11, 0.12, 0.14},
-  panel2 = {0.13, 0.14, 0.16},
-  line = {0.24, 0.25, 0.28},
-  lineSoft = {0.18, 0.19, 0.22},
-  text = {0.88, 0.84, 0.79},
-  dim = {0.63, 0.61, 0.57},
-  accent = {0.84, 0.43, 0.22},
-  accentSoft = {0.84, 0.43, 0.22, 0.20},
-  bad = {0.74, 0.34, 0.29},
-  ok = {0.71, 0.61, 0.42},
-  card = {0.91, 0.88, 0.82},
-  ink = {0.10, 0.10, 0.10},
-  back = {0.10, 0.11, 0.12},
-}
+local BASE_W = 1280
+local BASE_H = 720
 
-local operators = {
-  { index = 1, glyph = "▽", name = "FLOW" },
-  { index = 2, glyph = "☰", name = "CONNECT" },
-  { index = 3, glyph = "☷", name = "DISSOLVE" },
-  { index = 4, glyph = "☵", name = "ENCODE" },
-  { index = 5, glyph = "☳", name = "CHOOSE" },
-  { index = 6, glyph = "☴", name = "OBSERVE" },
-  { index = 7, glyph = "☲", name = "CYCLE" },
-  { index = 8, glyph = "☶", name = "LOGIC" },
-  { index = 9, glyph = "☱", name = "RUNTIME" },
-  { index = 10, glyph = "△", name = "MANIFEST" },
+local COLORS = {
+    bg = {0.05, 0.08, 0.10},
+    panel = {0.09, 0.12, 0.15},
+    panel_alt = {0.11, 0.14, 0.17},
+    outline = {0.28, 0.31, 0.35},
+    muted = {0.55, 0.59, 0.63},
+    text = {0.92, 0.92, 0.90},
+    accent = {0.95, 0.46, 0.20},
+    accent_soft = {0.78, 0.47, 0.28},
+    success = {0.32, 0.72, 0.46},
+    danger = {0.80, 0.34, 0.30},
+    card = {0.90, 0.87, 0.80},
+    card_text = {0.14, 0.16, 0.18},
+    card_back = {0.13, 0.16, 0.18},
+    card_back_alt = {0.22, 0.26, 0.29},
+    select = {0.35, 0.68, 0.96},
+    drop = {0.92, 0.60, 0.24},
 }
 
-local operatorByGlyph = {}
-for _, operator in ipairs(operators) do
-  operatorByGlyph[operator.glyph] = operator
-end
-
-local actionDefs = {
-  { id = "play", title = "Play", description = "auto weak / strong" },
-  { id = "discard", title = "Discard", description = "hand -> grave" },
-  { id = "pass", title = "Pass", description = "end turn" },
-}
-
-local canon = nil
-local nextInstanceId = 1
-local ui = {
-  topbar = {},
-  actionButtons = {},
-  handCards = {},
-  manifestCards = {},
-  latentCards = {},
-  targetCards = {},
-  promptButtons = {},
-  deck = {},
-}
-
-local fonts = {}
-local state = nil
-
-local function loadFontWithFallback(size, candidates)
-  for _, path in ipairs(candidates or {}) do
-    local ok, font = pcall(love.graphics.newFont, path, size)
-    if ok and font then
-      return font
-    end
-  end
-  return love.graphics.newFont(size)
-end
-
-local function loadCanon()
-  local ok, result = pcall(dofile, CANON_PATH)
-  if ok and type(result) == "table" and type(result.is_adjacent) == "function" then
-    return result
-  end
-
-  local fallback = {
-    ["▽"] = {"☰", "☷", "☴"},
-    ["☰"] = {"▽", "☷", "☴", "☵"},
-    ["☷"] = {"▽", "☰", "☴", "☳"},
-    ["☴"] = {"▽", "☰", "☷", "☵", "☳", "☱"},
-    ["☵"] = {"☰", "☴", "☱", "☳", "☲"},
-    ["☳"] = {"☷", "☴", "☱", "☵", "☶"},
-    ["☶"] = {"☳", "☲", "☱", "△"},
-    ["☲"] = {"☵", "☶", "△", "☱"},
-    ["☱"] = {"☴", "△", "☵", "☳", "☶", "☲"},
-    ["△"] = {"☱", "☲", "☶"},
-  }
-
-  return {
-    is_adjacent = function(left, right)
-      local list = fallback[left]
-      if not list then
-        return false
-      end
-      for _, glyph in ipairs(list) do
-        if glyph == right then
-          return true
-        end
-      end
-      return false
-    end,
-  }
-end
-
-local function newCard(a, b)
-  local card = {
-    kind = "minor",
-    instanceId = nextInstanceId,
-    id = string.format("M-%03d", nextInstanceId),
-    a = a,
-    b = b,
-    title = a.glyph .. b.glyph,
-    label = a.name .. " + " .. b.name,
-  }
-  nextInstanceId = nextInstanceId + 1
-  return card
-end
-
-local function newHiddenSlot(card)
-  return {
-    card = card,
-    publicRevealed = false,
-    observed = false,
-  }
-end
-
-local function shuffle(array)
-  for i = #array, 2, -1 do
-    local j = love.math.random(i)
-    array[i], array[j] = array[j], array[i]
-  end
-  return array
-end
-
-local function buildDeck()
-  local deck = {}
-  for _, a in ipairs(operators) do
-    for _, b in ipairs(operators) do
-      deck[#deck + 1] = newCard(a, b)
-    end
-  end
-  return shuffle(deck)
-end
-
-local function addLog(text)
-  table.insert(state.log, 1, text)
-  while #state.log > 18 do
-    table.remove(state.log)
-  end
-end
-
-local function drawCard()
-  local card = table.remove(state.deck, 1)
-  state.deckObserved = false
-  return card
-end
-
-local function describeCard(card)
-  if not card then
-    return "empty"
-  end
-  return string.format("%s (%s)", card.title, card.label)
-end
-
-local function cardOperators(card)
-  return { card.a.glyph, card.b.glyph }
-end
-
-local function uniqueOperators(card)
-  local result = {}
-  local seen = {}
-  for _, glyph in ipairs(cardOperators(card)) do
-    if not seen[glyph] then
-      seen[glyph] = true
-      result[#result + 1] = glyph
-    end
-  end
-  return result
-end
-
-local function hasOperator(card, glyph)
-  return card.a.glyph == glyph or card.b.glyph == glyph
-end
-
-local function otherOperator(card, glyph)
-  if card.a.glyph == glyph then
-    return card.b.glyph
-  end
-  return card.a.glyph
-end
-
-local function isWeakRelation(left, right)
-  if not left or not right then
-    return false
-  end
-  if hasOperator(left, "☶") then
-    return false
-  end
-  return left.a.glyph == right.a.glyph or left.b.glyph == right.b.glyph
-end
-
-local function isStrongRelation(left, right)
-  if not left or not right then
-    return false
-  end
-  return canon.is_adjacent(left.b.glyph, right.a.glyph) or canon.is_adjacent(right.b.glyph, left.a.glyph)
-end
-
-local function isMirrorRelation(left, right)
-  if not left or not right then
-    return false
-  end
-  return left.a.glyph == right.b.glyph and left.b.glyph == right.a.glyph
-end
-
-local function countValidMoves(mode)
-  local count = 0
-  for _, handCard in ipairs(state.hand) do
-    for _, target in ipairs(state.manifest) do
-      if mode == "weak" and isWeakRelation(handCard, target) then
-        count = count + 1
-      end
-      if mode == "strong" and isStrongRelation(handCard, target) then
-        count = count + 1
-      end
-    end
-  end
-  return count
-end
-
-local function relationType(left, right)
-  if isStrongRelation(left, right) then
-    return "strong"
-  end
-  if isWeakRelation(left, right) then
-    return "weak"
-  end
-  return nil
-end
-
-local function selectedRelationStats()
-  if not state.selectedHandIndex then
-    return 0, 0
-  end
-  local card = state.hand[state.selectedHandIndex]
-  local weak = 0
-  local strong = 0
-  for _, target in ipairs(state.manifest) do
-    local relation = relationType(card, target)
-    if relation == "strong" then
-      strong = strong + 1
-    elseif relation == "weak" then
-      weak = weak + 1
-    end
-  end
-  return weak, strong
-end
-
-local function clearSelection()
-  state.selectedHandIndex = nil
-  state.selectedManifestIndex = nil
-end
-
-local function endTurn()
-  state.turn = state.turn + 1
-  state.actionMode = "play"
-  state.pending = nil
-  state.prompt = "Choose Play, then hand card, then manifest slot."
-  state.promptButtons = {}
-  state.effectSession = nil
-  clearSelection()
-end
-
-local function drawIntoHand(amount, reason)
-  for _ = 1, amount do
-    local card = drawCard()
-    if not card then
-      addLog(reason .. ": deck empty.")
-      return
-    end
-    state.hand[#state.hand + 1] = card
-    addLog(reason .. ": draw " .. describeCard(card) .. ".")
-  end
-end
-
-local function nextColumn(index)
-  return (index % 5) + 1
-end
-
-local function shiftHiddenLeft(slots)
-  local movable = {}
-  for index, slot in ipairs(slots) do
-    if slot.card and not slot.publicRevealed then
-      movable[#movable + 1] = index
-    end
-  end
-
-  if #movable <= 1 then
-    return false
-  end
-
-  local snapshot = {}
-  for _, index in ipairs(movable) do
-    local slot = slots[index]
-    snapshot[#snapshot + 1] = {
-      card = slot.card,
-      observed = slot.observed,
-    }
-  end
-
-  for i, index in ipairs(movable) do
-    local source = snapshot[(i % #snapshot) + 1]
-    slots[index].card = source.card
-    slots[index].observed = source.observed
-  end
-
-  return true
-end
-
-local function localObserve(columnIndex)
-  local slot = state.latent[columnIndex]
-  if not slot or not slot.card then
-    addLog("OBSERVE: no latent card in column " .. columnIndex .. ".")
-    return
-  end
-  slot.observed = true
-  addLog("OBSERVE: latent " .. columnIndex .. " inspected as " .. describeCard(slot.card) .. ".")
-end
-
-local function localManifest(columnIndex)
-  local slot = state.latent[columnIndex]
-  if not slot or not slot.card then
-    addLog("MANIFEST: no latent card in column " .. columnIndex .. ".")
-    return
-  end
-  slot.publicRevealed = true
-  slot.observed = false
-  addLog("MANIFEST: latent " .. columnIndex .. " became public.")
-end
-
-local function localDissolve(columnIndex)
-  local slot = state.latent[columnIndex]
-  if not slot or not slot.card then
-    addLog("DISSOLVE: no latent card in column " .. columnIndex .. ".")
-    return
-  end
-  table.insert(state.grave, 1, slot.card)
-  addLog("DISSOLVE: latent " .. columnIndex .. " -> grave (" .. describeCard(slot.card) .. ").")
-  slot.card = drawCard()
-  slot.publicRevealed = false
-  slot.observed = false
-end
-
-local function localEncode(columnIndex)
-  local j = nextColumn(columnIndex)
-  local left = state.latent[columnIndex]
-  local right = state.latent[j]
-  if not left.card or not right.card then
-    addLog("ENCODE: missing latent pair near column " .. columnIndex .. ".")
-    return
-  end
-  if left.publicRevealed or right.publicRevealed then
-    addLog("ENCODE: public anchor blocked the swap.")
-    return
-  end
-  state.latent[columnIndex], state.latent[j] = right, left
-  addLog("ENCODE: latent " .. columnIndex .. " swapped with latent " .. j .. ".")
-end
-
-local function localFlow()
-  if shiftHiddenLeft(state.latent) then
-    addLog("FLOW: latent ring shifted one step left.")
-  else
-    addLog("FLOW: legal but no hidden movement available.")
-  end
-end
-
-local function flowTargets()
-  if shiftHiddenLeft(state.targets) then
-    addLog("FLOW: target structure advanced one step.")
-  else
-    addLog("FLOW: target structure stayed anchored.")
-  end
-end
-
-local function flowDeck()
-  if #state.deck <= 1 then
-    addLog("FLOW: deck has no meaningful forward motion.")
-    return
-  end
-  local top = table.remove(state.deck, 1)
-  table.insert(state.deck, top)
-  state.deckObserved = false
-  addLog("FLOW: topdeck moved to bottom.")
-end
-
-local function beginCycleDiscard()
-  state.pending = { type = "cycle_discard" }
-  state.prompt = "CYCLE: choose one hand card to discard."
-  state.promptButtons = {}
-end
-
-local function applyCycle()
-  local card = drawCard()
-  if card then
-    state.hand[#state.hand + 1] = card
-    addLog("CYCLE: draw " .. describeCard(card) .. ".")
-  else
-    addLog("CYCLE: deck empty.")
-  end
-  beginCycleDiscard()
-end
-
-local function startEffectSession(context, options)
-  state.effectSession = {
-    context = context,
-    options = options,
-    used = {},
-    maxEffects = context.mode == "weak" and 1 or 2,
-  }
-end
-
-local function finishEffectIfDone()
-  local session = state.effectSession
-  if not session then
-    endTurn()
-    return
-  end
-  if #session.used >= session.maxEffects then
-    endTurn()
-    return
-  end
-
-  local remaining = {}
-  local usedMap = {}
-  for _, id in ipairs(session.used) do
-    usedMap[id] = true
-  end
-  for _, option in ipairs(session.options) do
-    if not usedMap[option.id] then
-      remaining[#remaining + 1] = option
-    end
-  end
-
-  if #remaining == 0 then
-    endTurn()
-    return
-  end
-
-  state.pending = { type = "choose_effect", options = remaining }
-  state.promptButtons = {}
-  for _, option in ipairs(remaining) do
-    state.promptButtons[#state.promptButtons + 1] = {
-      id = option.id,
-      label = option.label,
-      action = function()
-        session.used[#session.used + 1] = option.id
-        option.resolve()
-      end,
-    }
-  end
-
-  if #session.used > 0 then
-    state.promptButtons[#state.promptButtons + 1] = {
-      id = "skip",
-      label = "Skip",
-      action = function()
-        endTurn()
-      end,
-    }
-  end
-
-  state.prompt = #session.used == 0 and "Choose effect branch." or "Choose second effect or skip."
-end
-
-local function chooseHidden(prompt, allow, callback)
-  state.pending = { type = "choose_hidden", allow = allow, callback = callback }
-  state.prompt = prompt
-  state.promptButtons = {}
-end
-
-local function chooseFlowSpace()
-  state.pending = { type = "choose_flow_space" }
-  state.prompt = "Choose flow space."
-  state.promptButtons = {
-    { id = "flow_latent", label = "Flow Latent", action = function() localFlow(); finishEffectIfDone() end },
-    { id = "flow_targets", label = "Flow Targets", action = function() flowTargets(); finishEffectIfDone() end },
-    { id = "flow_deck", label = "Flow Deck", action = function() flowDeck(); finishEffectIfDone() end },
-  }
-end
-
-local function chooseDissolveLatent()
-  state.pending = { type = "choose_dissolve_latent" }
-  state.prompt = "Choose latent card to dissolve."
-  state.promptButtons = {}
-end
-
-local function chooseEncodePair(step, firstIndex)
-  state.pending = { type = step, firstIndex = firstIndex }
-  state.prompt = step == "choose_encode_first" and "Choose first latent slot." or "Choose second latent slot."
-  state.promptButtons = {}
-end
-
-local function operatorOptions(card, mode, columnIndex)
-  local options = {}
-  local seen = {}
-  local list = uniqueOperators(card)
-
-  if mode == "weak" then
-    if hasOperator(card, "☶") then
-      return {}
-    end
-    if hasOperator(card, "☰") and #list > 1 then
-      local filtered = {}
-      for _, glyph in ipairs(list) do
-        if glyph ~= "☰" then
-          filtered[#filtered + 1] = glyph
-        end
-      end
-      list = filtered
-    end
-  end
-
-  local function addOption(id, label, fn)
-    if seen[id] then
-      return
-    end
-    seen[id] = true
-    options[#options + 1] = { id = id, label = label, resolve = fn }
-  end
-
-  for _, glyph in ipairs(list) do
-    if mode == "strong" and glyph == "☶" then
-      local partner = otherOperator(card, "☶")
-      addOption("logic_" .. partner, "LOGIC + " .. operatorByGlyph[partner].name, function()
-        addLog("LOGIC branch -> " .. operatorByGlyph[partner].name .. ".")
-        if partner == "▽" then
-          chooseFlowSpace()
-        elseif partner == "☴" then
-          chooseHidden("LOGIC + OBSERVE: choose hidden card.", { latent = true, targets = true, deck = true }, function(zone, index)
-            if zone == "deck" then
-              state.deckObserved = true
-              addLog("LOGIC + OBSERVE: topdeck inspected.")
-            elseif zone == "latent" then
-              state.latent[index].observed = true
-              addLog("LOGIC + OBSERVE: latent " .. index .. " inspected.")
-            elseif zone == "targets" then
-              state.targets[index].observed = true
-              addLog("LOGIC + OBSERVE: target " .. index .. " inspected.")
-            end
-            finishEffectIfDone()
-          end)
-        elseif partner == "△" then
-          chooseHidden("LOGIC + MANIFEST: choose hidden card to reveal.", { latent = true, targets = true, deck = false }, function(zone, index)
-            local slots = zone == "latent" and state.latent or state.targets
-            slots[index].publicRevealed = true
-            slots[index].observed = false
-            addLog("LOGIC + MANIFEST: " .. zone .. " " .. index .. " became public.")
-            finishEffectIfDone()
-          end)
-        else
-          addLog("LOGIC + " .. operatorByGlyph[partner].name .. " is deferred in v0.")
-          finishEffectIfDone()
-        end
-      end)
-    elseif glyph ~= "☶" then
-      addOption("op_" .. glyph, operatorByGlyph[glyph].name, function()
-        addLog(string.upper(mode) .. " effect -> " .. operatorByGlyph[glyph].name .. ".")
-        if glyph == "▽" then
-          localFlow()
-          finishEffectIfDone()
-        elseif glyph == "☰" then
-          addLog("CONNECT multi-card assembly is deferred in v0.")
-          finishEffectIfDone()
-        elseif glyph == "☷" then
-          localDissolve(columnIndex)
-          finishEffectIfDone()
-        elseif glyph == "☵" then
-          localEncode(columnIndex)
-          finishEffectIfDone()
-        elseif glyph == "☳" then
-          addLog("CHOOSE safe mode: standalone no-op.")
-          finishEffectIfDone()
-        elseif glyph == "☴" then
-          localObserve(columnIndex)
-          finishEffectIfDone()
-        elseif glyph == "☲" then
-          applyCycle()
-        elseif glyph == "☱" then
-          addLog("RUNTIME install is documented but deferred in v0.")
-          finishEffectIfDone()
-        elseif glyph == "△" then
-          localManifest(columnIndex)
-          finishEffectIfDone()
-        end
-      end)
-    end
-  end
-
-  if mode == "strong" and hasOperator(card, "☳") and #list > 1 then
-    for _, glyph in ipairs(list) do
-      if glyph ~= "☳" and glyph ~= "☶" then
-        addOption("combo_" .. glyph, "CHOOSE + " .. operatorByGlyph[glyph].name, function()
-          addLog("STRONG effect -> CHOOSE + " .. operatorByGlyph[glyph].name .. ".")
-          if glyph == "▽" then
-            chooseFlowSpace()
-          elseif glyph == "☴" then
-            chooseHidden("CHOOSE + OBSERVE: choose hidden card.", { latent = true, targets = true, deck = true }, function(zone, index)
-              if zone == "deck" then
-                state.deckObserved = true
-                addLog("CHOOSE + OBSERVE: topdeck inspected.")
-              elseif zone == "latent" then
-                state.latent[index].observed = true
-                addLog("CHOOSE + OBSERVE: latent " .. index .. " inspected.")
-              else
-                state.targets[index].observed = true
-                addLog("CHOOSE + OBSERVE: target " .. index .. " inspected.")
-              end
-              finishEffectIfDone()
-            end)
-          elseif glyph == "△" then
-            chooseHidden("CHOOSE + MANIFEST: choose hidden card to reveal.", { latent = true, targets = true, deck = false }, function(zone, index)
-              local slots = zone == "latent" and state.latent or state.targets
-              slots[index].publicRevealed = true
-              slots[index].observed = false
-              addLog("CHOOSE + MANIFEST: " .. zone .. " " .. index .. " became public.")
-              finishEffectIfDone()
-            end)
-          elseif glyph == "☷" then
-            chooseDissolveLatent()
-          elseif glyph == "☵" then
-            chooseEncodePair("choose_encode_first")
-          else
-            addLog("CHOOSE + " .. operatorByGlyph[glyph].name .. " is deferred in v0.")
-            finishEffectIfDone()
-          end
-        end)
-      end
-    end
-  end
-
-  return options
-end
-
-local function startResolvedAction(mode, handIndex, manifestIndex)
-  local played = table.remove(state.hand, handIndex)
-  local replaced = state.manifest[manifestIndex]
-  table.insert(state.grave, 1, replaced)
-  state.manifest[manifestIndex] = played
-
-  addLog(string.upper(mode) .. ": " .. describeCard(played) .. " replaced slot " .. manifestIndex .. ".")
-
-  if mode == "strong" then
-    drawIntoHand(2, "Strong")
-  end
-
-  clearSelection()
-  local options = operatorOptions(played, mode, manifestIndex)
-  startEffectSession({ mode = mode, card = played, columnIndex = manifestIndex }, options)
-  finishEffectIfDone()
-end
-
-local function resetState()
-  nextInstanceId = 1
-  state = {
-    deck = buildDeck(),
-    hand = {},
-    manifest = {},
-    latent = {},
-    targets = {},
-    runtime = nil,
-    grave = {},
+local state = {
+    mode = "DEV",
+    selected = nil,
+    hover_target = nil,
+    drag = nil,
+    cards = {},
+    zones = {},
     log = {},
-    turn = 1,
-    actionMode = "play",
-    selectedHandIndex = nil,
-    selectedManifestIndex = nil,
-    prompt = "Choose Play, then hand card, then manifest slot.",
-    promptButtons = {},
-    pending = nil,
-    effectSession = nil,
-    deckObserved = false,
-  }
+    message = "DEV mode: free structural card manipulation.",
+    layout = nil,
+    fonts = {},
+}
 
-  for _ = 1, 3 do
-    state.targets[#state.targets + 1] = newHiddenSlot(drawCard())
-  end
-  for _ = 1, 5 do
-    state.manifest[#state.manifest + 1] = drawCard()
-  end
-  for _ = 1, 5 do
-    state.latent[#state.latent + 1] = newHiddenSlot(drawCard())
-  end
-  for _ = 1, 5 do
-    state.hand[#state.hand + 1] = drawCard()
-  end
+local ZONE_META = {
+    deck = {title = "DECK", kind = "stack"},
+    runtime = {title = "RUNTIME", kind = "slots", slot_count = 1},
+    trump = {title = "TRUMP ZONE", kind = "slots", slot_count = 2},
+    targets = {title = "TARGETS", kind = "slots", slot_count = 3},
+    manifest = {title = "MANIFEST", kind = "slots", slot_count = 5},
+    latent = {title = "LATENT", kind = "slots", slot_count = 5},
+    hand = {title = "HAND", kind = "fan"},
+    grave = {title = "GRAVE", kind = "stack"},
+}
 
-  addLog("LÖVE prototype booted.")
-  addLog("Minor-only machine online. No victory conditions yet.")
-end
-
-local function pointInRect(x, y, rect)
-  return rect and x >= rect.x and y >= rect.y and x <= rect.x + rect.w and y <= rect.y + rect.h
-end
-
-local function setColor(color)
-  love.graphics.setColor(color)
-end
-
-local function drawPanel(rect)
-  setColor(palette.panel)
-  love.graphics.rectangle("fill", rect.x, rect.y, rect.w, rect.h, 8, 8)
-  setColor(palette.lineSoft)
-  love.graphics.setLineWidth(1)
-  love.graphics.rectangle("line", rect.x, rect.y, rect.w, rect.h, 8, 8)
-  setColor({1, 1, 1, 0.06})
-  love.graphics.rectangle("line", rect.x + 6, rect.y + 6, rect.w - 12, rect.h - 12, 6, 6)
-end
-
-local function drawTextBlock(font, color, text, x, y, w, align)
-  love.graphics.setFont(font)
-  setColor(color)
-  love.graphics.printf(text, x, y, w, align or "left")
-end
-
-local function drawCardFace(card, rect, opts)
-  opts = opts or {}
-  local fill = opts.faceDown and palette.back or palette.card
-  local text = opts.faceDown and palette.text or palette.ink
-  setColor(fill)
-  love.graphics.rectangle("fill", rect.x, rect.y, rect.w, rect.h, 8, 8)
-
-  if opts.highlight == "good" then
-    setColor(palette.accentSoft)
-    love.graphics.rectangle("fill", rect.x - 2, rect.y - 2, rect.w + 4, rect.h + 4, 10, 10)
-  end
-  if opts.highlight == "weak" then
-    setColor({palette.ok[1], palette.ok[2], palette.ok[3], 0.18})
-    love.graphics.rectangle("fill", rect.x - 2, rect.y - 2, rect.w + 4, rect.h + 4, 10, 10)
-  end
-  if opts.highlight == "bad" then
-    setColor({palette.bad[1], palette.bad[2], palette.bad[3], 0.18})
-    love.graphics.rectangle("fill", rect.x - 2, rect.y - 2, rect.w + 4, rect.h + 4, 10, 10)
-  end
-
-  setColor(opts.borderColor or palette.line)
-  love.graphics.setLineWidth(opts.selected and 3 or 1)
-  love.graphics.rectangle("line", rect.x, rect.y, rect.w, rect.h, 8, 8)
-
-  drawTextBlock(fonts.monoSmall, {text[1], text[2], text[3], 0.72}, opts.id or card.id, rect.x + 8, rect.y + 8, rect.w - 16)
-  if opts.faceDown then
-    drawTextBlock(fonts.symbolLarge, text, opts.center or "◎", rect.x + 10, rect.y + rect.h * 0.36, rect.w - 20, "center")
-    drawTextBlock(fonts.small, {text[1], text[2], text[3], 0.72}, opts.subtitle or "hidden", rect.x + 8, rect.y + rect.h - 38, rect.w - 16, "center")
-  else
-    drawTextBlock(fonts.symbolLarge, text, card.title, rect.x + 10, rect.y + 28, rect.w - 20, "center")
-    drawTextBlock(fonts.small, {text[1], text[2], text[3], 0.86}, card.label, rect.x + 10, rect.y + 72, rect.w - 20, "center")
-    drawTextBlock(fonts.monoSmall, {text[1], text[2], text[3], 0.72}, opts.badge or "MINOR", rect.x + 10, rect.y + rect.h - 28, rect.w - 20, "right")
-  end
-end
-
-local function layout()
-  local w, h = love.graphics.getDimensions()
-  local pad = 16
-  local topbarH = 90
-  local gap = 14
-  local leftW = 220
-  local rightW = 300
-  local centerW = w - pad * 2 - leftW - rightW - gap * 2
-  local leftX = pad
-  local centerX = leftX + leftW + gap
-  local rightX = centerX + centerW + gap
-  local bodyY = pad + topbarH + gap
-  local bodyH = h - bodyY - pad
-
-  ui.topbar = { x = pad, y = pad, w = w - pad * 2, h = topbarH }
-  ui.left = { x = leftX, y = bodyY, w = leftW, h = bodyH }
-  ui.center = { x = centerX, y = bodyY, w = centerW, h = bodyH }
-  ui.right = { x = rightX, y = bodyY, w = rightW, h = bodyH }
-
-  ui.leftPanels = {
-    deck = { x = leftX, y = bodyY, w = leftW, h = 220 },
-    runtime = { x = leftX, y = bodyY + 234, w = leftW, h = 180 },
-    status = { x = leftX, y = bodyY + 428, w = leftW, h = bodyH - 428 },
-  }
-
-  ui.centerPanels = {
-    targets = { x = centerX, y = bodyY, w = centerW, h = 150 },
-    board = { x = centerX, y = bodyY + 164, w = centerW, h = 340 },
-    hand = { x = centerX, y = bodyY + 518, w = centerW, h = bodyH - 518 },
-  }
-
-  ui.rightPanels = {
-    prompt = { x = rightX, y = bodyY, w = rightW, h = 180 },
-    grave = { x = rightX, y = bodyY + 194, w = rightW, h = 260 },
-    log = { x = rightX, y = bodyY + 468, w = rightW, h = bodyH - 468 },
-  }
-
-  ui.actionButtons = {}
-  local bx = ui.topbar.x + ui.topbar.w - 120 * #actionDefs - 12 * (#actionDefs - 1) - 22
-  local by = ui.topbar.y + 18
-  for i, action in ipairs(actionDefs) do
-    ui.actionButtons[i] = { action = action.id, x = bx + (i - 1) * 132, y = by, w = 120, h = 54 }
-  end
-
-  local cardW = math.floor((centerW - 32 - 14 * 4) / 5)
-  local cardH = math.floor(cardW / 0.70)
-  ui.manifestCards = {}
-  ui.latentCards = {}
-  local startX = ui.centerPanels.board.x + 18
-  local manifestY = ui.centerPanels.board.y + 72
-  local latentY = manifestY + cardH + 16
-  for i = 1, 5 do
-    local rect = { x = startX + (i - 1) * (cardW + 14), y = manifestY, w = cardW, h = cardH }
-    ui.manifestCards[i] = rect
-    ui.latentCards[i] = { x = rect.x, y = latentY, w = cardW, h = cardH }
-  end
-
-  ui.targetCards = {}
-  local targetW = 110
-  local targetH = 154
-  local tx = ui.centerPanels.targets.x + 22
-  for i = 1, 3 do
-    ui.targetCards[i] = { x = tx + (i - 1) * (targetW + 16), y = ui.centerPanels.targets.y + 46, w = targetW, h = targetH }
-  end
-
-  ui.handCards = {}
-  local handY = ui.centerPanels.hand.y + 58
-  for i = 1, math.max(5, #state.hand) do
-    ui.handCards[i] = { x = startX + (i - 1) * (cardW + 10), y = handY, w = cardW, h = cardH }
-  end
-
-  ui.deck = { x = ui.leftPanels.deck.x + 25, y = ui.leftPanels.deck.y + 44, w = 136, h = 190 }
-  ui.runtimeCard = { x = ui.leftPanels.runtime.x + 25, y = ui.leftPanels.runtime.y + 44, w = 136, h = 190 }
-
-  ui.promptButtons = {}
-  local px = ui.rightPanels.prompt.x + 18
-  local py = ui.rightPanels.prompt.y + 92
-  for i, button in ipairs(state.promptButtons) do
-    local row = math.floor((i - 1) / 2)
-    local col = (i - 1) % 2
-    ui.promptButtons[i] = { x = px + col * 130, y = py + row * 42, w = 118, h = 34, action = button.action }
-  end
-end
-
-local function drawActionButtons()
-  for i, def in ipairs(actionDefs) do
-    local rect = ui.actionButtons[i]
-    local active = state.actionMode == def.id
-    setColor(active and palette.panel2 or palette.panel)
-    love.graphics.rectangle("fill", rect.x, rect.y, rect.w, rect.h, 8, 8)
-    setColor(active and palette.accent or palette.line)
-    love.graphics.rectangle("line", rect.x, rect.y, rect.w, rect.h, 8, 8)
-    drawTextBlock(fonts.monoSmall, active and palette.text or palette.dim, def.title, rect.x, rect.y + 8, rect.w, "center")
-    drawTextBlock(fonts.small, palette.dim, def.description, rect.x + 6, rect.y + 26, rect.w - 12, "center")
-  end
-end
-
-local function drawTopbar()
-  drawPanel(ui.topbar)
-  drawTextBlock(fonts.title, palette.text, "PROCESS", ui.topbar.x + 20, ui.topbar.y + 16, 220)
-  drawTextBlock(fonts.title, palette.accent, "CARDS", ui.topbar.x + 132, ui.topbar.y + 16, 220)
-  drawTextBlock(fonts.small, palette.dim, "LÖVE v0 minor-machine", ui.topbar.x + 22, ui.topbar.y + 52, 240)
-  drawActionButtons()
-end
-
-local function drawDeckPanel()
-  local panel = ui.leftPanels.deck
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "DECK", panel.x + 16, panel.y + 14, panel.w - 32)
-  drawCardFace({ id = "DECK" }, ui.deck, {
-    faceDown = true,
-    id = "DECK",
-    center = tostring(#state.deck),
-    subtitle = state.deckObserved and state.deck[1] and state.deck[1].title or "top hidden",
-  })
-  drawTextBlock(fonts.small, palette.dim, string.format("%d cards remaining", #state.deck), panel.x + 16, panel.y + panel.h - 40, panel.w - 32)
-end
-
-local function drawRuntimePanel()
-  local panel = ui.leftPanels.runtime
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "RUNTIME", panel.x + 16, panel.y + 14, panel.w - 32)
-  if state.runtime then
-    drawCardFace(state.runtime, ui.runtimeCard, { badge = "RUNTIME" })
-  else
-    drawCardFace({ id = "EMPTY" }, ui.runtimeCard, { faceDown = true, id = "EMPTY", center = "1", subtitle = "slot only" })
-  end
-  drawTextBlock(fonts.small, palette.dim, "Runtime install is deferred in v0.", panel.x + 16, panel.y + panel.h - 40, panel.w - 32)
-end
-
-local function drawStatusPanel()
-  local panel = ui.leftPanels.status
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "SYSTEM", panel.x + 16, panel.y + 14, panel.w - 32)
-  local selectedWeak, selectedStrong = selectedRelationStats()
-  local rows = {
-    { "Turn", tostring(state.turn) },
-    { "Mode", string.upper(state.actionMode) },
-    { "Weak", tostring(countValidMoves("weak")) },
-    { "Strong", tostring(countValidMoves("strong")) },
-    { "Hand", tostring(#state.hand) },
-    { "Sel Weak", tostring(selectedWeak) },
-    { "Sel Strong", tostring(selectedStrong) },
-  }
-  local y = panel.y + 48
-  for _, row in ipairs(rows) do
-    drawTextBlock(fonts.small, palette.dim, row[1], panel.x + 16, y, 80)
-    drawTextBlock(fonts.monoSmall, palette.text, row[2], panel.x + 90, y, panel.w - 110, "right")
-    y = y + 26
-  end
-end
-
-local function drawTargetsPanel()
-  local panel = ui.centerPanels.targets
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "TARGETS", panel.x + 16, panel.y + 14, panel.w - 32)
-  drawTextBlock(fonts.small, palette.dim, "Victory shell only. No win condition yet.", panel.x + 16, panel.y + 32, panel.w - 32)
-  for i, slot in ipairs(state.targets) do
-    local rect = ui.targetCards[i]
-    if slot.publicRevealed then
-      drawCardFace(slot.card, rect, { badge = "PUBLIC" })
-    elseif slot.observed then
-      drawCardFace(slot.card, rect, { badge = "PEEKED" })
-    else
-      drawCardFace(slot.card or { id = "T" .. i }, rect, { faceDown = true, id = "T-" .. i, subtitle = "hidden target" })
+local function push_log(text)
+    table.insert(state.log, 1, text)
+    if #state.log > 24 then
+        table.remove(state.log)
     end
-  end
 end
 
-local function drawBoardPanel()
-  local panel = ui.centerPanels.board
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "MANIFEST CHAIN", panel.x + 16, panel.y + 14, panel.w - 32)
-  drawTextBlock(fonts.small, palette.dim, "Manifest ring is 1-2-3-4-5-1. After hand selection, slots show WEAK or STRONG automatically.", panel.x + 16, panel.y + 32, panel.w - 32)
-  drawTextBlock(fonts.monoSmall, palette.dim, "Manifest", panel.x + 18, panel.y + 54, 100)
-  drawTextBlock(fonts.monoSmall, palette.dim, "Latent", panel.x + 18, panel.y + 54 + ui.manifestCards[1].h + 16, 100)
+local function init_fonts()
+    state.fonts.small = love.graphics.newFont(11)
+    state.fonts.body = love.graphics.newFont(15)
+    state.fonts.title = love.graphics.newFont(18)
+    state.fonts.big = love.graphics.newFont(22)
+end
 
-  for i, card in ipairs(state.manifest) do
-    local highlight = nil
-    local badge = "MANIFEST"
-    local borderColor = nil
-    if state.selectedHandIndex then
-      local selected = state.hand[state.selectedHandIndex]
-      if state.actionMode == "play" then
-        local relation = relationType(selected, card)
-        if relation == "strong" then
-          highlight = "good"
-          borderColor = palette.accent
-          badge = "STRONG"
-        elseif relation == "weak" then
-          highlight = "weak"
-          borderColor = palette.ok
-          badge = "WEAK"
-        else
-          highlight = "bad"
+local function scale()
+    local w, h = love.graphics.getDimensions()
+    return math.min(w / BASE_W, h / BASE_H)
+end
+
+local function rounded(mode, x, y, w, h, r)
+    love.graphics.rectangle(mode, x, y, w, h, r, r)
+end
+
+local function set_color(c, alpha)
+    love.graphics.setColor(c[1], c[2], c[3], alpha or 1)
+end
+
+local function new_zone(name, cards)
+    local meta = ZONE_META[name]
+    return {
+        name = name,
+        title = meta.title,
+        kind = meta.kind,
+        slot_count = meta.slot_count or 0,
+        cards = cards or {},
+    }
+end
+
+local function clear_runtime_state()
+    state.selected = nil
+    state.hover_target = nil
+    state.drag = nil
+    state.cards = {}
+    state.zones = {
+        deck = new_zone("deck"),
+        runtime = new_zone("runtime", {nil}),
+        trump = new_zone("trump", {nil, nil}),
+        targets = new_zone("targets", {nil, nil, nil}),
+        manifest = new_zone("manifest", {nil, nil, nil, nil, nil}),
+        latent = new_zone("latent", {nil, nil, nil, nil, nil}),
+        hand = new_zone("hand"),
+        grave = new_zone("grave"),
+    }
+end
+
+local function sync_zone_cards(zone_name)
+    local zone = state.zones[zone_name]
+    if zone.kind == "slots" then
+        for slot = 1, zone.slot_count do
+            local card_id = zone.cards[slot]
+            if card_id then
+                local card = state.cards[card_id]
+                card.zone = zone_name
+                card.slot = slot
+            end
         end
-      end
-    end
-    drawCardFace(card, ui.manifestCards[i], {
-      badge = isMirrorRelation(state.selectedHandIndex and state.hand[state.selectedHandIndex] or nil, card) and "MIRROR" or badge,
-      selected = state.selectedManifestIndex == i,
-      highlight = highlight,
-      borderColor = borderColor,
-    })
-  end
-
-  for i, slot in ipairs(state.latent) do
-    local rect = ui.latentCards[i]
-    if slot.publicRevealed then
-      drawCardFace(slot.card, rect, { badge = "PUBLIC" })
-    elseif slot.observed then
-      drawCardFace(slot.card, rect, { badge = "PEEKED" })
     else
-      drawCardFace(slot.card or { id = "L" .. i }, rect, { faceDown = true, id = "L-" .. i, subtitle = "hidden latent" })
-    end
-  end
-end
-
-local function drawHandPanel()
-  local panel = ui.centerPanels.hand
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "HAND", panel.x + 16, panel.y + 14, panel.w - 32)
-  drawTextBlock(fonts.small, palette.dim, "Choose card, then manifest target. Weak/Strong is detected automatically.", panel.x + 16, panel.y + 32, panel.w - 32)
-  for i, card in ipairs(state.hand) do
-    drawCardFace(card, ui.handCards[i], {
-      badge = "HAND",
-      selected = state.selectedHandIndex == i,
-    })
-  end
-end
-
-local function drawPromptPanel()
-  local panel = ui.rightPanels.prompt
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "RESOLUTION", panel.x + 16, panel.y + 14, panel.w - 32)
-  drawTextBlock(fonts.small, palette.dim, state.prompt, panel.x + 16, panel.y + 40, panel.w - 32)
-  for i, button in ipairs(state.promptButtons) do
-    local rect = ui.promptButtons[i]
-    setColor(palette.panel2)
-    love.graphics.rectangle("fill", rect.x, rect.y, rect.w, rect.h, 6, 6)
-    setColor(palette.line)
-    love.graphics.rectangle("line", rect.x, rect.y, rect.w, rect.h, 6, 6)
-    drawTextBlock(fonts.monoSmall, palette.text, button.label, rect.x + 4, rect.y + 9, rect.w - 8, "center")
-  end
-end
-
-local function drawGravePanel()
-  local panel = ui.rightPanels.grave
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "GRAVE", panel.x + 16, panel.y + 14, panel.w - 32)
-  drawTextBlock(fonts.small, palette.dim, string.format("Ordered residue: %d cards", #state.grave), panel.x + 16, panel.y + 32, panel.w - 32)
-  local y = panel.y + 58
-  for i = 1, math.min(5, #state.grave) do
-    local card = state.grave[i]
-    local rect = { x = panel.x + 18, y = y, w = panel.w - 36, h = 34 }
-    setColor(palette.card)
-    love.graphics.rectangle("fill", rect.x, rect.y, rect.w, rect.h, 6, 6)
-    setColor(palette.line)
-    love.graphics.rectangle("line", rect.x, rect.y, rect.w, rect.h, 6, 6)
-    drawTextBlock(fonts.monoSmall, palette.ink, card.title, rect.x + 10, rect.y + 8, 60)
-    drawTextBlock(fonts.small, {0.1, 0.1, 0.1, 0.85}, card.label, rect.x + 68, rect.y + 9, rect.w - 78)
-    y = y + 40
-  end
-end
-
-local function drawLogPanel()
-  local panel = ui.rightPanels.log
-  drawPanel(panel)
-  drawTextBlock(fonts.monoSmall, palette.text, "LOG", panel.x + 16, panel.y + 14, panel.w - 32)
-  local y = panel.y + 40
-  for i = 1, math.min(10, #state.log) do
-    drawTextBlock(fonts.small, palette.dim, "• " .. state.log[i], panel.x + 16, y, panel.w - 32)
-    y = y + 24
-  end
-end
-
-local function clickActionButtons(x, y)
-  for _, rect in ipairs(ui.actionButtons) do
-    if pointInRect(x, y, rect) then
-      state.actionMode = rect.action
-      clearSelection()
-      state.pending = nil
-      state.effectSession = nil
-      state.promptButtons = {}
-      if rect.action == "pass" then
-        addLog("Pass. No action resolved.")
-        endTurn()
-      else
-        if rect.action == "discard" then
-          state.prompt = "Choose hand card to discard."
-        else
-          state.prompt = "Choose hand card to see WEAK / STRONG targets."
+        for index, card_id in ipairs(zone.cards) do
+            local card = state.cards[card_id]
+            card.zone = zone_name
+            card.slot = index
         end
-      end
-      return true
     end
-  end
-  return false
 end
 
-local function clickPromptButtons(x, y)
-  for i, rect in ipairs(ui.promptButtons) do
-    if pointInRect(x, y, rect) then
-      local button = state.promptButtons[i]
-      if button and button.action then
-        button.action()
-      end
-      return true
-    end
-  end
-  return false
+local function create_card(id)
+    state.cards[id] = {
+        id = id,
+        face_up = false,
+        zone = nil,
+        slot = nil,
+    }
+    return id
 end
 
-local function handleHiddenChoice(zoneName, index)
-  local pending = state.pending
-  if not pending then
-    return false
-  end
+local function remove_from_current_zone(card_id)
+    local card = state.cards[card_id]
+    if not card.zone then
+        return
+    end
 
-  if pending.type == "choose_hidden" then
-    pending.callback(zoneName, index)
+    local zone = state.zones[card.zone]
+    if zone.kind == "slots" then
+        zone.cards[card.slot] = nil
+    else
+        table.remove(zone.cards, card.slot)
+    end
+
+    card.zone = nil
+    card.slot = nil
+    sync_zone_cards(zone.name)
+end
+
+local function structural_accepts(zone_name, slot)
+    local zone = state.zones[zone_name]
+    if zone.kind == "slots" then
+        if not slot or slot < 1 or slot > zone.slot_count then
+            return false
+        end
+        return zone.cards[slot] == nil
+    end
     return true
-  end
+end
 
-  if pending.type == "choose_dissolve_latent" and zoneName == "latent" then
-    local slot = state.latent[index]
-    if slot and slot.card then
-      table.insert(state.grave, 1, slot.card)
-      state.latent[index] = newHiddenSlot(drawCard())
-      addLog("CHOOSE + DISSOLVE: latent " .. index .. " -> grave.")
-      finishEffectIfDone()
-      return true
+local function first_open_slot(zone_name)
+    local zone = state.zones[zone_name]
+    if zone.kind ~= "slots" then
+        return nil
     end
-  end
-
-  if pending.type == "choose_encode_first" and zoneName == "latent" then
-    local slot = state.latent[index]
-    if slot and slot.card and not slot.publicRevealed then
-      chooseEncodePair("choose_encode_second", index)
-      return true
+    for i = 1, zone.slot_count do
+        if zone.cards[i] == nil then
+            return i
+        end
     end
-  end
+    return nil
+end
 
-  if pending.type == "choose_encode_second" and zoneName == "latent" then
-    local slot = state.latent[index]
-    local first = state.latent[pending.firstIndex]
-    if slot and slot.card and not slot.publicRevealed and first and first.card and index ~= pending.firstIndex then
-      state.latent[pending.firstIndex], state.latent[index] = state.latent[index], state.latent[pending.firstIndex]
-      addLog("CHOOSE + ENCODE: latent " .. pending.firstIndex .. " swapped with latent " .. index .. ".")
-      finishEffectIfDone()
-      return true
+local function place_card(card_id, zone_name, slot)
+    local zone = state.zones[zone_name]
+    if zone.kind == "slots" then
+        zone.cards[slot] = card_id
+    else
+        table.insert(zone.cards, card_id)
     end
-  end
+    sync_zone_cards(zone_name)
+end
 
-  return false
+local function move_card(card_id, zone_name, slot, reason)
+    if not structural_accepts(zone_name, slot) then
+        state.message = "Invalid structural placement."
+        push_log("Rejected move for " .. card_id .. " -> " .. zone_name .. ".")
+        return false
+    end
+
+    local from_zone = state.cards[card_id].zone
+    remove_from_current_zone(card_id)
+    place_card(card_id, zone_name, slot)
+
+    local label = card_id .. " -> " .. zone_name
+    if slot then
+        label = label .. "[" .. slot .. "]"
+    end
+    if reason then
+        label = label .. " (" .. reason .. ")"
+    end
+    state.message = label
+    push_log(label)
+
+    if from_zone == "deck" and zone_name == "hand" then
+        state.cards[card_id].face_up = true
+    end
+
+    return true
+end
+
+local function build_empty_surface()
+    state.log = {}
+    state.message = "DEV mode: free structural card manipulation."
+    clear_runtime_state()
+
+    push_log("Layer 1 board skeleton booted.")
+    push_log("DEV mode active. Gameplay legality is deferred.")
+end
+
+local function shuffle_in_place(list)
+    for i = #list, 2, -1 do
+        local j = love.math.random(i)
+        list[i], list[j] = list[j], list[i]
+    end
+end
+
+local function build_full_temp_deck()
+    clear_runtime_state()
+
+    for i = 1, 100 do
+        local id = string.format("MINOR-%d", i)
+        create_card(id)
+        table.insert(state.zones.deck.cards, id)
+    end
+
+    for i = 1, 22 do
+        local id = string.format("TRUMP-%d", i)
+        create_card(id)
+        table.insert(state.zones.deck.cards, id)
+    end
+
+    sync_zone_cards("deck")
+end
+
+local function deal_from_deck(zone_name, slot, face_up)
+    local deck = state.zones.deck.cards
+    if #deck == 0 then
+        return nil
+    end
+
+    local card_id = deck[#deck]
+    move_card(card_id, zone_name, slot, "setup")
+    state.cards[card_id].face_up = face_up
+    return card_id
+end
+
+local function start_game()
+    state.log = {}
+    state.message = "Start Game: building two-phase setup."
+    clear_runtime_state()
+
+    for i = 1, 100 do
+        local id = string.format("MINOR-%d", i)
+        create_card(id)
+        table.insert(state.zones.deck.cards, id)
+    end
+
+    shuffle_in_place(state.zones.deck.cards)
+    sync_zone_cards("deck")
+
+    for slot = 1, 5 do
+        deal_from_deck("manifest", slot, true)
+    end
+
+    for _ = 1, 5 do
+        deal_from_deck("hand", nil, true)
+    end
+
+    for i = 1, 22 do
+        local id = string.format("TRUMP-%d", i)
+        create_card(id)
+        table.insert(state.zones.deck.cards, id)
+    end
+
+    shuffle_in_place(state.zones.deck.cards)
+    sync_zone_cards("deck")
+
+    deal_from_deck("targets", 1, false)
+    deal_from_deck("targets", 2, false)
+    deal_from_deck("targets", 3, false)
+
+    for slot = 1, 5 do
+        deal_from_deck("latent", slot, false)
+    end
+
+    state.selected = nil
+    state.hover_target = nil
+    state.drag = nil
+    state.message = "Start Game complete: two-phase opening board ready."
+    push_log("Start Game complete.")
+    push_log("Phase A: 100 minors -> 5 manifest, 5 hand.")
+    push_log("Phase B: +22 trumps -> 3 targets, 5 latent.")
+    push_log("Deck now holds 104 cards.")
+end
+
+local function zone_counts()
+    return {
+        deck = #state.zones.deck.cards,
+        hand = #state.zones.hand.cards,
+        grave = #state.zones.grave.cards,
+    }
+end
+
+local function make_layout()
+    local s = scale()
+    local w, h = love.graphics.getDimensions()
+    local m = math.floor(16 * s)
+    local gap = math.floor(14 * s)
+    local left_w = math.floor(188 * s)
+    local right_w = math.floor(240 * s)
+    local top_bar_h = math.floor(34 * s)
+    local top_h = math.floor(116 * s)
+    local deck_h = math.floor(286 * s)
+    local status_h = math.floor(78 * s)
+    local grave_h = math.floor(146 * s)
+    local hand_h = math.floor(164 * s)
+    local bottom_h = hand_h
+    local center_x = m + left_w + gap
+    local center_w = w - center_x - right_w - m - gap
+    local left_x = m
+    local right_x = w - m - right_w
+    local target_w = math.floor(300 * s)
+    local trump_w = math.floor(190 * s)
+    local table_w = math.floor(670 * s)
+    local table_x = center_x + math.floor((center_w - table_w) / 2) - math.floor(10 * s)
+    local target_x = center_x + math.floor((center_w - target_w) / 2)
+    local trump_x = right_x - trump_w - math.floor(20 * s)
+    local combined_h = math.floor(298 * s)
+    local manifest_h = math.floor(140 * s)
+    local divider_h = math.floor(18 * s)
+    local latent_h = combined_h - manifest_h - divider_h
+    local y1 = m + top_bar_h
+    local y2 = y1 + top_h + gap
+    local footer_h = math.floor(44 * s)
+    local y3 = h - m - footer_h - gap - bottom_h
+
+    local right_mid_y = y1 + status_h + gap
+    local right_log_h = y3 - gap - right_mid_y
+    local runtime_w = math.floor(170 * s)
+
+    return {
+        scale = s,
+        margin = m,
+        gap = gap,
+        card_w = math.floor(82 * s),
+        card_h = math.floor(118 * s),
+        top_bar_h = top_bar_h,
+        left = {
+            deck = {x = left_x, y = y1, w = left_w, h = deck_h},
+            runtime = {x = left_x, y = y3, w = runtime_w, h = bottom_h},
+        },
+        center = {
+            top = {x = target_x, y = y1, w = (trump_x + trump_w) - target_x, h = top_h},
+            targets = {x = target_x, y = y1, w = target_w, h = top_h},
+            trump = {x = trump_x, y = y1, w = trump_w, h = top_h},
+            combined = {x = table_x, y = y2, w = table_w, h = combined_h},
+            manifest = {x = table_x, y = y2, w = table_w, h = manifest_h},
+            divider = {x = table_x, y = y2 + manifest_h, w = table_w, h = divider_h},
+            latent = {x = table_x, y = y2 + manifest_h + divider_h, w = table_w, h = latent_h},
+            hand = {x = left_x + runtime_w + gap, y = y3, w = right_x - gap - (left_x + runtime_w + gap), h = hand_h},
+        },
+        right = {
+            system = {x = right_x, y = y1, w = right_w, h = status_h},
+            log = {x = right_x, y = right_mid_y, w = right_w, h = right_log_h},
+            grave = {x = right_x, y = y3, w = right_w, h = grave_h},
+        },
+        footer = {x = m, y = h - m - footer_h, w = w - m * 2, h = footer_h},
+    }
+end
+
+local function get_zone_rect(name)
+    local l = state.layout
+    if name == "deck" then return l.left.deck end
+    if name == "runtime" then return l.left.runtime end
+    if name == "trump" then return l.center.trump end
+    if name == "targets" then return l.center.targets end
+    if name == "manifest" then return l.center.manifest end
+    if name == "latent" then return l.center.latent end
+    if name == "hand" then return l.center.hand end
+    if name == "grave" then return l.right.grave end
+    return nil
+end
+
+local function slot_rects_for_zone(name)
+    local zone = state.zones[name]
+    if zone.kind ~= "slots" then
+        return {}
+    end
+
+    local rect = get_zone_rect(name)
+    local cw = state.layout.card_w
+    local ch = state.layout.card_h
+    local gap = math.floor(14 * state.layout.scale)
+    if name == "manifest" or name == "latent" then
+        gap = math.floor(20 * state.layout.scale)
+    elseif name == "targets" or name == "trump" then
+        gap = math.floor(12 * state.layout.scale)
+    end
+    local total_w = zone.slot_count * cw + (zone.slot_count - 1) * gap
+    local start_x = rect.x + math.floor((rect.w - total_w) / 2)
+    local y = rect.y + rect.h - ch - math.floor(10 * state.layout.scale)
+    local result = {}
+
+    if name == "targets" then
+        y = rect.y + math.floor((rect.h - ch) / 2)
+    elseif name == "latent" then
+        y = rect.y + math.floor((rect.h - ch) / 2) + math.floor(2 * state.layout.scale)
+    elseif name == "trump" or name == "runtime" then
+        y = rect.y + math.floor((rect.h - ch) / 2)
+        start_x = rect.x + math.floor((rect.w - total_w) / 2)
+    elseif name == "manifest" then
+        y = rect.y + math.floor((rect.h - ch) / 2) + math.floor(6 * state.layout.scale)
+    end
+
+    for i = 1, zone.slot_count do
+        result[i] = {x = start_x + (i - 1) * (cw + gap), y = y, w = cw, h = ch}
+    end
+    return result
+end
+
+local function card_views()
+    local views = {}
+    local cw = state.layout.card_w
+    local ch = state.layout.card_h
+
+    local deck_rect = get_zone_rect("deck")
+    local deck_count = #state.zones.deck.cards
+    for i, card_id in ipairs(state.zones.deck.cards) do
+        local stack_idx = math.min(deck_count - i, 4)
+        views[card_id] = {
+            x = deck_rect.x + math.floor(24 * state.layout.scale) + stack_idx * math.floor(2 * state.layout.scale),
+            y = deck_rect.y + math.floor(28 * state.layout.scale) + stack_idx * math.floor(2 * state.layout.scale),
+            w = cw,
+            h = ch,
+        }
+    end
+
+    local grave_rect = get_zone_rect("grave")
+    local grave_count = #state.zones.grave.cards
+    for i, card_id in ipairs(state.zones.grave.cards) do
+        local stack_idx = math.min(grave_count - i, 4)
+        views[card_id] = {
+            x = grave_rect.x + math.floor(20 * state.layout.scale) + stack_idx * math.floor(2 * state.layout.scale),
+            y = grave_rect.y + math.floor(12 * state.layout.scale) + stack_idx * math.floor(2 * state.layout.scale),
+            w = cw,
+            h = ch,
+        }
+    end
+
+    for _, zone_name in ipairs({"runtime", "trump", "targets", "manifest", "latent"}) do
+        local rects = slot_rects_for_zone(zone_name)
+        local zone = state.zones[zone_name]
+        for slot = 1, zone.slot_count do
+            local card_id = zone.cards[slot]
+            if card_id then
+                local r = rects[slot]
+                views[card_id] = {x = r.x, y = r.y, w = r.w, h = r.h}
+            end
+        end
+    end
+
+    local hand_rect = get_zone_rect("hand")
+    local count = #state.zones.hand.cards
+    local gap = math.floor(12 * state.layout.scale)
+    local max_total = hand_rect.w - math.floor(28 * state.layout.scale)
+    local used_gap = gap
+    if count > 1 then
+        local natural_total = count * cw + (count - 1) * gap
+        if natural_total > max_total then
+            used_gap = math.max(math.floor((max_total - count * cw) / math.max(count - 1, 1)), math.floor(-cw * 0.35))
+        end
+    end
+    local total_w = count > 0 and (count * cw + (count - 1) * used_gap) or 0
+    local start_x = hand_rect.x + math.floor((hand_rect.w - total_w) / 2)
+    local y = hand_rect.y + hand_rect.h - ch - math.floor(14 * state.layout.scale)
+    for i, card_id in ipairs(state.zones.hand.cards) do
+        views[card_id] = {x = start_x + (i - 1) * (cw + used_gap), y = y, w = cw, h = ch}
+    end
+
+    return views
+end
+
+local function point_in_rect(x, y, rect)
+    return rect and x >= rect.x and x <= rect.x + rect.w and y >= rect.y and y <= rect.y + rect.h
+end
+
+local function pick_card(x, y)
+    local views = card_views()
+    local ordered = {}
+    for _, zone_name in ipairs({"hand", "manifest", "latent", "targets", "runtime", "trump", "grave", "deck"}) do
+        local zone = state.zones[zone_name]
+        if zone.kind == "slots" then
+            for i = zone.slot_count, 1, -1 do
+                local card_id = zone.cards[i]
+                if card_id then
+                    table.insert(ordered, card_id)
+                end
+            end
+        else
+            local cards = zone.cards
+            for i = #cards, 1, -1 do
+                local card_id = cards[i]
+                if card_id then
+                    table.insert(ordered, card_id)
+                end
+            end
+        end
+    end
+    for _, card_id in ipairs(ordered) do
+        local rect = views[card_id]
+        if point_in_rect(x, y, rect) then
+            return card_id, rect
+        end
+    end
+    return nil, nil
+end
+
+local function pick_drop_target(x, y)
+    for _, zone_name in ipairs({"manifest", "latent", "targets", "runtime", "trump"}) do
+        local rects = slot_rects_for_zone(zone_name)
+        for slot, rect in ipairs(rects) do
+            if point_in_rect(x, y, rect) then
+                return {zone = zone_name, slot = slot}
+            end
+        end
+    end
+    for _, zone_name in ipairs({"deck", "hand", "grave"}) do
+        local rect = get_zone_rect(zone_name)
+        if point_in_rect(x, y, rect) then
+            return {zone = zone_name, slot = nil}
+        end
+    end
+    return nil
+end
+
+local function button_specs()
+    local s = state.layout.scale
+    local footer = state.layout.footer
+    local gap = math.floor(12 * s)
+    local bh = footer.h
+    local x = footer.x
+    local widths = {
+        start = math.floor(176 * s),
+        draw = math.floor(118 * s),
+        flip = math.floor(146 * s),
+        discard = math.floor(152 * s),
+        reset = math.floor(152 * s),
+    }
+    local buttons = {
+        {id = "start", label = "Start Game", hint = "[S]", action = function()
+            start_game()
+        end},
+        {id = "draw", label = "Draw", hint = "[1]", action = function()
+            local deck = state.zones.deck.cards
+            if #deck == 0 then
+                state.message = "Deck is empty."
+                push_log("Draw rejected: deck empty.")
+                return
+            end
+            move_card(deck[#deck], "hand", nil, "draw")
+        end},
+        {id = "flip", label = "Flip", hint = "[2 / F]", action = function()
+            if not state.selected then
+                state.message = "Select a card first."
+                return
+            end
+            local card = state.cards[state.selected]
+            card.face_up = not card.face_up
+            push_log(state.selected .. " flip -> " .. (card.face_up and "face-up" or "face-down") .. ".")
+            state.message = state.selected .. " flipped."
+        end},
+        {id = "discard", label = "Discard", hint = "[3 / Del]", action = function()
+            if not state.selected then
+                state.message = "Select a card first."
+                return
+            end
+            move_card(state.selected, "grave", nil, "discard")
+        end},
+        {id = "reset", label = "Reset", hint = "[R]", action = function()
+            build_empty_surface()
+        end},
+    }
+    for _, button in ipairs(buttons) do
+        local bw = widths[button.id] or math.floor(152 * s)
+        button.rect = {x = x, y = footer.y, w = bw, h = bh}
+        x = x + bw + gap
+    end
+    return buttons
+end
+
+local function zone_shortcut(zone_name)
+    if not state.selected then
+        state.message = "Select a card first."
+        return
+    end
+    local slot = first_open_slot(zone_name)
+    if state.zones[zone_name].kind == "slots" and not slot then
+        state.message = zone_name .. " has no free slot."
+        push_log("No free slot in " .. zone_name .. ".")
+        return
+    end
+    move_card(state.selected, zone_name, slot, "shortcut")
+end
+
+local function draw_panel(rect, title, subtitle)
+    set_color(COLORS.panel)
+    rounded("fill", rect.x, rect.y, rect.w, rect.h, 12)
+    set_color(COLORS.outline)
+    rounded("line", rect.x, rect.y, rect.w, rect.h, 12)
+    love.graphics.setFont(state.fonts.title)
+    set_color(COLORS.text)
+    love.graphics.print(title, rect.x + 14 * state.layout.scale, rect.y + 9 * state.layout.scale)
+    if subtitle then
+        love.graphics.setFont(state.fonts.small)
+        set_color(COLORS.muted)
+        love.graphics.print(subtitle, rect.x + 14 * state.layout.scale, rect.y + 32 * state.layout.scale)
+    end
+end
+
+local function draw_slot_placeholder(rect, label, highlight)
+    set_color(highlight and COLORS.drop or COLORS.outline, highlight and 0.55 or 0.8)
+    love.graphics.setLineWidth(math.max(1, state.layout.scale * 2))
+    love.graphics.rectangle("line", rect.x, rect.y, rect.w, rect.h, 10, 10)
+    love.graphics.setFont(state.fonts.small)
+    set_color(COLORS.muted)
+    love.graphics.printf(label, rect.x, rect.y + rect.h + 4 * state.layout.scale, rect.w, "center")
+end
+
+local function draw_card(card_id, rect, dragged)
+    local card = state.cards[card_id]
+    local selected = state.selected == card_id
+
+    if card.face_up then
+        set_color(COLORS.card)
+        rounded("fill", rect.x, rect.y, rect.w, rect.h, 10)
+        set_color(selected and COLORS.select or COLORS.card_text)
+        rounded("line", rect.x, rect.y, rect.w, rect.h, 10)
+        love.graphics.setFont(state.fonts.small)
+        love.graphics.printf(card.id, rect.x, rect.y + 10 * state.layout.scale, rect.w, "center")
+        love.graphics.setFont(state.fonts.body)
+        love.graphics.printf("BLANK", rect.x, rect.y + rect.h * 0.48, rect.w, "center")
+        love.graphics.setFont(state.fonts.small)
+        love.graphics.printf(card.zone or "-", rect.x, rect.y + rect.h - 22 * state.layout.scale, rect.w, "center")
+    else
+        set_color(COLORS.card_back)
+        rounded("fill", rect.x, rect.y, rect.w, rect.h, 10)
+        set_color(selected and COLORS.select or COLORS.card_back_alt)
+        rounded("line", rect.x, rect.y, rect.w, rect.h, 10)
+        love.graphics.setFont(state.fonts.body)
+        love.graphics.printf(card.id, rect.x, rect.y + rect.h * 0.42, rect.w, "center")
+    end
+
+    if selected or dragged then
+        set_color(selected and COLORS.select or COLORS.drop, 0.35)
+        rounded("line", rect.x - 2, rect.y - 2, rect.w + 4, rect.h + 4, 12)
+    end
+end
+
+local function draw_zone_contents()
+    local views = card_views()
+    local drag_card = state.drag and state.drag.card_id or nil
+
+    for _, zone_name in ipairs({"deck", "runtime", "trump", "targets", "manifest", "latent", "hand", "grave"}) do
+        local zone = state.zones[zone_name]
+        if zone.kind == "slots" then
+            local rects = slot_rects_for_zone(zone_name)
+            for slot, rect in ipairs(rects) do
+                local hl = state.hover_target and state.hover_target.zone == zone_name and state.hover_target.slot == slot
+                draw_slot_placeholder(rect, zone_name == "runtime" and "slot" or tostring(slot), hl)
+            end
+        end
+
+        if zone.kind == "slots" then
+            for slot = 1, zone.slot_count do
+                local card_id = zone.cards[slot]
+                if card_id and card_id ~= drag_card then
+                    draw_card(card_id, views[card_id], false)
+                end
+            end
+        else
+            for _, card_id in ipairs(zone.cards) do
+                if card_id and card_id ~= drag_card then
+                    draw_card(card_id, views[card_id], false)
+                end
+            end
+        end
+    end
+
+    if state.drag then
+        local rect = {
+            x = state.drag.x - state.drag.ox,
+            y = state.drag.y - state.drag.oy,
+            w = state.layout.card_w,
+            h = state.layout.card_h,
+        }
+        draw_card(state.drag.card_id, rect, true)
+    end
+end
+
+local function draw_system_panel()
+    local rect = state.layout.right.system
+    draw_panel(rect, "SYSTEM", nil)
+    local counts = zone_counts()
+    love.graphics.setFont(state.fonts.small)
+    set_color(COLORS.text)
+    local lines = {
+        "Mode: " .. state.mode,
+        "Selected: " .. (state.selected or "-"),
+        "Deck: " .. counts.deck,
+        "Hand: " .. counts.hand,
+        "Grave: " .. counts.grave,
+    }
+    local y = rect.y + 18 * state.layout.scale
+    for _, line in ipairs(lines) do
+        love.graphics.print(line, rect.x + 14 * state.layout.scale, y)
+        y = y + 11 * state.layout.scale
+    end
+end
+
+local function draw_log_panel()
+    local rect = state.layout.right.log
+    draw_panel(rect, "LOG", nil)
+    love.graphics.setScissor(rect.x, rect.y, rect.w, rect.h)
+    love.graphics.setFont(state.fonts.small)
+    local y = rect.y + 20 * state.layout.scale
+    for _, line in ipairs(state.log) do
+        set_color(COLORS.text)
+        love.graphics.printf(line, rect.x + 12 * state.layout.scale, y, rect.w - 24 * state.layout.scale, "left")
+        y = y + 15 * state.layout.scale
+        if y > rect.y + rect.h - 16 * state.layout.scale then
+            break
+        end
+    end
+    love.graphics.setScissor()
+end
+
+local function draw_left_column()
+    draw_panel(state.layout.left.deck, "DECK", "Draw pile")
+    draw_panel(state.layout.left.runtime, "RUNTIME", "1 slot")
+end
+
+local function draw_center()
+    draw_panel(state.layout.center.targets, "TARGETS", "3 slots")
+    draw_panel(state.layout.center.trump, "TRUMP ZONE", "2 slots")
+    draw_panel(state.layout.center.combined, "MANIFEST / LATENT", nil)
+    draw_panel(state.layout.center.hand, "HAND", nil)
+
+    local divider = state.layout.center.divider
+    set_color(COLORS.outline)
+    love.graphics.line(divider.x + 14 * state.layout.scale, divider.y + divider.h * 0.5, divider.x + divider.w - 14 * state.layout.scale, divider.y + divider.h * 0.5)
+    love.graphics.setFont(state.fonts.small)
+    set_color(COLORS.muted)
+    love.graphics.print("Manifest", divider.x + 12 * state.layout.scale, state.layout.center.manifest.y + 24 * state.layout.scale)
+    love.graphics.print("Latent", divider.x + 12 * state.layout.scale, state.layout.center.latent.y + 14 * state.layout.scale)
+end
+
+local function draw_footer()
+    local buttons = button_specs()
+    for _, button in ipairs(buttons) do
+        local active = button.id == "start" or button.id == "draw" or (state.selected ~= nil)
+        set_color(active and COLORS.panel_alt or COLORS.panel)
+        rounded("fill", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
+        set_color(active and COLORS.accent_soft or COLORS.outline)
+        rounded("line", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
+        love.graphics.setFont(state.fonts.body)
+        set_color(COLORS.text)
+        love.graphics.printf(button.label, button.rect.x, button.rect.y + 8 * state.layout.scale, button.rect.w, "center")
+        love.graphics.setFont(state.fonts.small)
+        set_color(COLORS.muted)
+        love.graphics.printf(button.hint, button.rect.x, button.rect.y + 24 * state.layout.scale, button.rect.w, "center")
+    end
+
+    local footer = state.layout.footer
+    love.graphics.setFont(state.fonts.small)
+    set_color(COLORS.muted)
+    local help = "S Start Game  1 draw  2/F flip  3/Delete discard  R reset  H/M/L/T/U/P/G/K move to zone"
+    love.graphics.print(help, footer.x + math.floor(760 * state.layout.scale), footer.y + 14 * state.layout.scale)
+end
+
+local function draw_top_header()
+    love.graphics.setFont(state.fonts.big)
+    set_color(COLORS.text)
+    love.graphics.print("PROCESSCARDS", state.layout.margin, 2 * state.layout.scale)
+    set_color(COLORS.accent)
+    love.graphics.print("DEV", state.layout.margin + 182 * state.layout.scale, 2 * state.layout.scale)
+
+    love.graphics.setFont(state.fonts.small)
+    set_color(COLORS.muted)
+    love.graphics.print(state.message, state.layout.margin + 240 * state.layout.scale, 7 * state.layout.scale)
+end
+
+local function trigger_button(id)
+    for _, button in ipairs(button_specs()) do
+        if button.id == id then
+            button.action()
+            return
+        end
+    end
 end
 
 function love.load()
-  love.window.setMode(1440, 900, { resizable = true, minwidth = 1200, minheight = 780 })
-  love.math.setRandomSeed(os.time())
-  canon = loadCanon()
-  fonts.title = loadFontWithFallback(28, TEXT_FONT_CANDIDATES)
-  fonts.symbolLarge = loadFontWithFallback(24, SYMBOL_FONT_CANDIDATES)
-  fonts.monoSmall = loadFontWithFallback(14, TEXT_FONT_CANDIDATES)
-  fonts.small = loadFontWithFallback(13, TEXT_FONT_CANDIDATES)
-  resetState()
-  layout()
+    love.graphics.setBackgroundColor(COLORS.bg)
+    init_fonts()
+    build_empty_surface()
+    state.layout = make_layout()
 end
 
 function love.resize()
-  layout()
+    state.layout = make_layout()
 end
 
 function love.update()
-  layout()
+    state.layout = make_layout()
+    if state.drag then
+        local x, y = love.mouse.getPosition()
+        state.drag.x = x
+        state.drag.y = y
+        state.hover_target = pick_drop_target(x, y)
+    else
+        state.hover_target = nil
+    end
 end
 
 function love.draw()
-  setColor(palette.bg)
-  love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
-  drawTopbar()
-  drawDeckPanel()
-  drawRuntimePanel()
-  drawStatusPanel()
-  drawTargetsPanel()
-  drawBoardPanel()
-  drawHandPanel()
-  drawPromptPanel()
-  drawGravePanel()
-  drawLogPanel()
+    state.layout = make_layout()
+
+    draw_top_header()
+    draw_left_column()
+    draw_center()
+    draw_system_panel()
+    draw_log_panel()
+    draw_panel(state.layout.right.grave, "GRAVE", "Ordered discard pile")
+    draw_zone_contents()
+    draw_footer()
 end
 
 function love.mousepressed(x, y, button)
-  if button ~= 1 then
-    return
-  end
-
-  if clickActionButtons(x, y) then
-    return
-  end
-  if clickPromptButtons(x, y) then
-    return
-  end
-
-  if pointInRect(x, y, ui.deck) then
-    if state.pending and state.pending.type == "choose_hidden" and state.pending.allow.deck then
-      state.pending.callback("deck", 1)
-    elseif state.pending and state.pending.type == "choose_flow_space" then
-      flowDeck()
-      finishEffectIfDone()
-    end
-    return
-  end
-
-  for i, rect in ipairs(ui.handCards) do
-    if pointInRect(x, y, rect) and state.hand[i] then
-      if state.pending and state.pending.type == "cycle_discard" then
-        local discarded = table.remove(state.hand, i)
-        table.insert(state.grave, 1, discarded)
-        addLog("CYCLE discard: " .. describeCard(discarded) .. ".")
-        finishEffectIfDone()
-        return
-      end
-      if state.actionMode == "discard" then
-        local discarded = table.remove(state.hand, i)
-        table.insert(state.grave, 1, discarded)
-        addLog("Discard: " .. describeCard(discarded) .. ".")
-        endTurn()
-        return
-      end
-      state.selectedHandIndex = i
-      local weakCount, strongCount = selectedRelationStats()
-      state.prompt = string.format("Choose manifest slot. Weak: %d, Strong: %d.", weakCount, strongCount)
-      return
-    end
-  end
-
-  for i, rect in ipairs(ui.manifestCards) do
-    if pointInRect(x, y, rect) then
-      state.selectedManifestIndex = i
-      if not state.selectedHandIndex then
-        state.prompt = "Choose hand card first."
-        return
-      end
-      local handCard = state.hand[state.selectedHandIndex]
-      local target = state.manifest[i]
-      if state.actionMode == "play" then
-        local relation = relationType(handCard, target)
-        if relation == "strong" then
-          startResolvedAction("strong", state.selectedHandIndex, i)
-          return
-        elseif relation == "weak" then
-          startResolvedAction("weak", state.selectedHandIndex, i)
-          return
-        else
-          addLog("Play rejected: no weak or strong relation.")
-          return
+    if button == 1 then
+        for _, spec in ipairs(button_specs()) do
+            if point_in_rect(x, y, spec.rect) then
+                spec.action()
+                return
+            end
         end
-      elseif state.actionMode == "discard" then
-        return
-      end
-    end
-  end
 
-  for i, rect in ipairs(ui.latentCards) do
-    if pointInRect(x, y, rect) then
-      if handleHiddenChoice("latent", i) then
-        return
-      end
-    end
-  end
+        local card_id, rect = pick_card(x, y)
+        if card_id then
+            state.selected = card_id
+            state.drag = {
+                card_id = card_id,
+                x = x,
+                y = y,
+                ox = x - rect.x,
+                oy = y - rect.y,
+                start_x = x,
+                start_y = y,
+                moved = false,
+            }
+            state.message = "Selected " .. card_id .. "."
+            return
+        end
 
-  for i, rect in ipairs(ui.targetCards) do
-    if pointInRect(x, y, rect) then
-      if handleHiddenChoice("targets", i) then
-        return
-      end
+        local target = pick_drop_target(x, y)
+        if target and state.selected then
+            local slot = target.slot or first_open_slot(target.zone)
+            if slot or state.zones[target.zone].kind ~= "slots" then
+                move_card(state.selected, target.zone, slot, "click-place")
+            end
+            return
+        end
+
+        state.selected = nil
+    elseif button == 2 then
+        local card_id = pick_card(x, y)
+        if card_id then
+            local card = state.cards[card_id]
+            card.face_up = not card.face_up
+            state.selected = card_id
+            state.message = card_id .. " flipped."
+            push_log(card_id .. " flip -> " .. (card.face_up and "face-up" or "face-down") .. ".")
+        end
     end
-  end
+end
+
+function love.mousereleased(x, y, button)
+    if button ~= 1 or not state.drag then
+        return
+    end
+
+    if not state.drag.moved then
+        state.drag = nil
+        state.hover_target = nil
+        return
+    end
+
+    local target = pick_drop_target(x, y)
+    local card_id = state.drag.card_id
+    state.drag = nil
+    state.hover_target = nil
+
+    if target then
+        local slot = target.slot or first_open_slot(target.zone)
+        if slot or state.zones[target.zone].kind ~= "slots" then
+            if move_card(card_id, target.zone, slot, "drag-drop") then
+                state.selected = card_id
+                return
+            end
+        end
+    end
+
+    state.message = "Move canceled."
+    push_log("Canceled drag for " .. card_id .. ".")
 end
 
 function love.keypressed(key)
-  if key == "r" then
-    resetState()
-  elseif key == "escape" then
-    clearSelection()
-    state.pending = nil
-    state.promptButtons = {}
-    state.prompt = "Choose Play, then hand card, then manifest slot."
-  end
+    if key == "s" then
+        trigger_button("start")
+    elseif key == "1" then
+        trigger_button("draw")
+    elseif key == "2" or key == "f" then
+        trigger_button("flip")
+    elseif key == "3" or key == "delete" or key == "backspace" then
+        trigger_button("discard")
+    elseif key == "r" then
+        trigger_button("reset")
+    elseif key == "escape" then
+        state.selected = nil
+        state.drag = nil
+        state.message = "Selection cleared."
+    elseif key == "h" then
+        zone_shortcut("hand")
+    elseif key == "m" then
+        zone_shortcut("manifest")
+    elseif key == "l" then
+        zone_shortcut("latent")
+    elseif key == "t" then
+        zone_shortcut("targets")
+    elseif key == "u" then
+        zone_shortcut("runtime")
+    elseif key == "p" then
+        zone_shortcut("trump")
+    elseif key == "g" then
+        zone_shortcut("grave")
+    elseif key == "k" then
+        zone_shortcut("deck")
+    end
+end
+
+function love.mousemoved(x, y)
+    if not state.drag then
+        return
+    end
+
+    local dx = x - state.drag.start_x
+    local dy = y - state.drag.start_y
+    if dx * dx + dy * dy > 16 then
+        state.drag.moved = true
+    end
 end

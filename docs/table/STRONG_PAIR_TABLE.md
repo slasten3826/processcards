@@ -19,6 +19,13 @@ canonical table draft
 
 - [STRONG_COMBINED_LAW.md](./STRONG_COMBINED_LAW.md)
 
+Role split:
+
+```text
+STRONG_COMBINED_LAW.md = how strong is read in principle
+STRONG_PAIR_TABLE.md   = which concrete pair families are documented right now
+```
+
 ## 1. Read law
 
 Каждая запись ниже описывает:
@@ -47,7 +54,7 @@ A then B
 - `rough` = направление понятно, но кодить ещё нельзя
 - `unresolved` = честно не знаем pair-reading
 
-## 3. Special family exclusion
+## 3. Special family routing
 
 `☰ CONNECT` не живёт в этой таблице как ordinary strong pair.
 
@@ -56,6 +63,13 @@ Bridge rule:
 ```text
 whenever a pair contains ☰,
 CONNECT_LAW overrides ordinary strong-pair interpretation
+```
+
+Special note:
+
+```text
+☶☰ / ☰☶ does not fall back to plain CONNECT
+it must be treated as logic-modified connect-family behavior
 ```
 
 Для всех пар с `☰` читать:
@@ -69,6 +83,24 @@ CONNECT_LAW overrides ordinary strong-pair interpretation
 ```
 
 Значит `☰ + X` не надо замазывать псевдо-combined payload-ами в этом файле.
+
+`☱ RUNTIME` routed differently.
+
+It may still appear in this table as:
+
+```text
+provisional pair reference
+```
+
+But authoritative execution law for `☱` belongs to:
+
+- [operators/RUNTIME.md](./operators/RUNTIME.md)
+
+So:
+
+- `☰` is excluded from ordinary pair-table handling
+- `☱` may remain listed here for maturity mapping
+- runtime execution authority still belongs to runtime law
 
 ## 4. Pair entries
 

@@ -86,6 +86,49 @@ The skeleton must support:
 - drawing from deck
 - discarding to grave
 
+## 5.5. Mode policy
+
+Board engine skeleton should be conceived with two modes:
+
+- `dev mode`
+- `normal mode`
+
+But current build target requires only:
+
+```text
+dev mode
+```
+
+### Dev mode
+
+This mode is for free manual table manipulation.
+
+It allows:
+
+- moving cards between zones
+- placing cards into ordered slots
+- flipping cards
+- drawing
+- discarding
+- testing board surface without gameplay legality
+
+### Normal mode
+
+This mode is future-facing only at this stage.
+
+It will later own:
+
+- gameplay-legal play
+- action restrictions
+- weak/strong interaction
+- operator-aware moves
+
+Current rule:
+
+```text
+normal mode is not required for layer 1
+```
+
 ## 6. Minimum movement law
 
 At this stage,
@@ -144,6 +187,16 @@ Current rule:
 This is shell-only presence,
 not gameplay commitment.
 
+This layering follows:
+
+- [LAYERED_PROJECT_POLICY.md](./LAYERED_PROJECT_POLICY.md)
+
+Meaning:
+
+- zone roles come from `table`
+- board engine skeleton belongs to `crystall`
+- final card-face design does not belong to this layer yet
+
 ## 10. Runtime law
 
 `runtime` must also exist from the start.
@@ -175,6 +228,7 @@ That means the player can already:
 
 This layer does not yet require:
 
+- `normal mode`
 - complete weak/strong legality
 - full strong pair readings
 - complete operator payloads
@@ -194,6 +248,7 @@ Board engine skeleton is done when:
 6. deck decreases when drawing
 7. grave grows visibly and in order
 8. manifest/latent/targets/runtime/trump zone are all already present as board reality
+9. `dev mode` supports free structural card manipulation
 
 ## 14. Short formula
 

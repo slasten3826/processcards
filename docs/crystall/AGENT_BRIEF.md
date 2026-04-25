@@ -30,18 +30,20 @@ thought
 
 ## 2. Текущий scope
 
-Первый playable prototype сейчас:
+Первый ближайший runtime layer сейчас:
 
 ```text
-minor-only machine
+board engine skeleton
 ```
 
 То есть:
 
-- `100` minor cards
-- без victory conditions
-- без active trump-layer
-- без trump zone в обязательном first-build scope
+- все ключевые зоны уже присутствуют
+- карты уже существуют как сущности
+- gameplay legality ещё не включена
+- `trump zone` уже есть как shell
+- active trump gameplay по-прежнему не включён
+- `Start Game` setup may already exist before normal mode
 
 ## 3. Текущий runtime target
 
@@ -107,17 +109,22 @@ draw 2 + one combined reading of the pair
 - latent row
 - targets shell
 - runtime shell
+- trump zone shell
 - grave
 - log
-- `play / discard / pass`
-- auto-detected weak/strong legality on manifest
+- `dev mode`
+- `draw / discard / manual place / flip`
+- `Start Game` from full 122-card deck
+- shuffled opening setup with targets / manifest / latent / hand
+
+Нормальный gameplay mode на этом слое ещё не обязателен.
 
 ## 8. Чего не делать
 
 Сейчас нельзя:
 
 - возвращать trump-first scope
-- строить active trump zone в first build
+- строить active trump gameplay в first build
 - кодить unresolved strong pairs
 - держать в handoff два несовместимых runtime target
 - вводить hidden digital truth без cardboard analogue
