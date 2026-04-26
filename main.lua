@@ -9,6 +9,9 @@
 -- docs/table/DECK_AND_SETUP_LAW.md
 -- docs/crystall/START_GAME_FLOW.md
 
+local glyphs = require("src.glyphs")
+local glyph_layout = require("src.glyph_layout")
+
 local BASE_W = 1280
 local BASE_H = 720
 
@@ -31,6 +34,67 @@ local COLORS = {
     drop = {0.92, 0.60, 0.24},
 }
 
+local OPERATORS = {
+    "FLOW",
+    "CONNECT",
+    "DISSOLVE",
+    "ENCODE",
+    "CHOOSE",
+    "OBSERVE",
+    "LOGIC",
+    "CYCLE",
+    "RUNTIME",
+    "MANIFEST",
+}
+
+local TRUMP_CANON = {
+    {"FLOW", "CONNECT"},
+    {"FLOW", "DISSOLVE"},
+    {"FLOW", "OBSERVE"},
+    {"CONNECT", "DISSOLVE"},
+    {"CONNECT", "OBSERVE"},
+    {"CONNECT", "ENCODE"},
+    {"DISSOLVE", "OBSERVE"},
+    {"DISSOLVE", "CHOOSE"},
+    {"OBSERVE", "ENCODE"},
+    {"OBSERVE", "CHOOSE"},
+    {"OBSERVE", "RUNTIME"},
+    {"ENCODE", "CHOOSE"},
+    {"ENCODE", "RUNTIME"},
+    {"ENCODE", "CYCLE"},
+    {"CHOOSE", "RUNTIME"},
+    {"CHOOSE", "LOGIC"},
+    {"LOGIC", "CYCLE"},
+    {"LOGIC", "RUNTIME"},
+    {"LOGIC", "MANIFEST"},
+    {"CYCLE", "RUNTIME"},
+    {"CYCLE", "MANIFEST"},
+    {"RUNTIME", "MANIFEST"},
+}
+
+local TRUMP_NAMES = {
+    [1] = "FOOL",
+    [2] = "EJECT",
+    [14] = "SHUFFLE",
+    [16] = "RECAST",
+    [17] = "RESET",
+    [21] = "UNVEIL",
+    [22] = "HALT",
+}
+
+local OP_COLORS = {
+    FLOW = {0.22, 0.82, 0.82},
+    CONNECT = {0.90, 0.78, 0.22},
+    DISSOLVE = {0.63, 0.44, 0.88},
+    ENCODE = {0.25, 0.49, 0.90},
+    CHOOSE = {0.82, 0.26, 0.26},
+    OBSERVE = {0.86, 0.86, 0.84},
+    LOGIC = {0.34, 0.68, 0.32},
+    CYCLE = {0.84, 0.49, 0.18},
+    RUNTIME = {0.18, 0.20, 0.24},
+    MANIFEST = {0.86, 0.68, 0.26},
+}
+
 local state = {
     mode = "DEV",
     selected = nil,
@@ -41,7 +105,12 @@ local state = {
     log = {},
     message = "DEV mode: free structural card manipulation.",
     layout = nil,
+    layout_w = nil,
+    layout_h = nil,
     fonts = {},
+    ui = {
+        buttons = {},
+    },
 }
 
 local ZONE_META = {
@@ -54,6 +123,9 @@ local ZONE_META = {
     hand = {title = "HAND", kind = "fan"},
     grave = {title = "GRAVE", kind = "stack"},
 }
+
+local minor_pair_from_index
+local trump_pair_from_index
 
 local function push_log(text)
     table.insert(state.log, 1, text)
@@ -80,6 +152,14 @@ end
 
 local function set_color(c, alpha)
     love.graphics.setColor(c[1], c[2], c[3], alpha or 1)
+end
+
+local function lerp_color(a, b, t)
+    return {
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+        a[3] + (b[3] - a[3]) * t,
+    }
 end
 
 local function new_zone(name, cards)
@@ -130,14 +210,44 @@ local function sync_zone_cards(zone_name)
     end
 end
 
-local function create_card(id)
+local function create_card(id, class, op_a, op_b)
     state.cards[id] = {
         id = id,
+        class = class or "minor",
+        op_a = op_a,
+        op_b = op_b,
         face_up = false,
         zone = nil,
         slot = nil,
     }
     return id
+end
+
+local function create_minor_card(index)
+    local id = string.format("MINOR-%d", index)
+    local op_a, op_b = minor_pair_from_index(index)
+    create_card(id, "minor", op_a, op_b)
+    return id
+end
+
+local function create_trump_card(index)
+    local id = string.format("TRUMP-%d", index)
+    local op_a, op_b = trump_pair_from_index(index)
+    create_card(id, "trump", op_a, op_b)
+    state.cards[id].trump_name = TRUMP_NAMES[index]
+    return id
+end
+
+local function append_minor_deck(target)
+    for i = 1, 100 do
+        table.insert(target, create_minor_card(i))
+    end
+end
+
+local function append_trump_deck(target)
+    for i = 1, 22 do
+        table.insert(target, create_trump_card(i))
+    end
 end
 
 local function remove_from_current_zone(card_id)
@@ -236,21 +346,22 @@ local function shuffle_in_place(list)
     end
 end
 
+minor_pair_from_index = function(index)
+    local zero = index - 1
+    local a = math.floor(zero / #OPERATORS) + 1
+    local b = (zero % #OPERATORS) + 1
+    return OPERATORS[a], OPERATORS[b]
+end
+
+trump_pair_from_index = function(index)
+    local pair = TRUMP_CANON[index]
+    return pair[1], pair[2]
+end
+
 local function build_full_temp_deck()
     clear_runtime_state()
-
-    for i = 1, 100 do
-        local id = string.format("MINOR-%d", i)
-        create_card(id)
-        table.insert(state.zones.deck.cards, id)
-    end
-
-    for i = 1, 22 do
-        local id = string.format("TRUMP-%d", i)
-        create_card(id)
-        table.insert(state.zones.deck.cards, id)
-    end
-
+    append_minor_deck(state.zones.deck.cards)
+    append_trump_deck(state.zones.deck.cards)
     sync_zone_cards("deck")
 end
 
@@ -271,11 +382,7 @@ local function start_game()
     state.message = "Start Game: building two-phase setup."
     clear_runtime_state()
 
-    for i = 1, 100 do
-        local id = string.format("MINOR-%d", i)
-        create_card(id)
-        table.insert(state.zones.deck.cards, id)
-    end
+    append_minor_deck(state.zones.deck.cards)
 
     shuffle_in_place(state.zones.deck.cards)
     sync_zone_cards("deck")
@@ -288,11 +395,7 @@ local function start_game()
         deal_from_deck("hand", nil, true)
     end
 
-    for i = 1, 22 do
-        local id = string.format("TRUMP-%d", i)
-        create_card(id)
-        table.insert(state.zones.deck.cards, id)
-    end
+    append_trump_deck(state.zones.deck.cards)
 
     shuffle_in_place(state.zones.deck.cards)
     sync_zone_cards("deck")
@@ -555,59 +658,57 @@ local function pick_drop_target(x, y)
     return nil
 end
 
-local function button_specs()
+local BUTTON_ORDER = {
+    {id = "start", label = "Start Game", hint = "[S]"},
+    {id = "draw", label = "Draw", hint = "[1]"},
+    {id = "flip", label = "Flip", hint = "[2 / F]"},
+    {id = "discard", label = "Discard", hint = "[3 / Del]"},
+    {id = "reset", label = "Reset", hint = "[R]"},
+}
+
+local BUTTON_WIDTHS = {
+    start = 176,
+    draw = 118,
+    flip = 146,
+    discard = 152,
+    reset = 152,
+}
+
+local function update_buttons()
+    if not state.layout then
+        return
+    end
+
     local s = state.layout.scale
     local footer = state.layout.footer
     local gap = math.floor(12 * s)
     local bh = footer.h
     local x = footer.x
-    local widths = {
-        start = math.floor(176 * s),
-        draw = math.floor(118 * s),
-        flip = math.floor(146 * s),
-        discard = math.floor(152 * s),
-        reset = math.floor(152 * s),
-    }
-    local buttons = {
-        {id = "start", label = "Start Game", hint = "[S]", action = function()
-            start_game()
-        end},
-        {id = "draw", label = "Draw", hint = "[1]", action = function()
-            local deck = state.zones.deck.cards
-            if #deck == 0 then
-                state.message = "Deck is empty."
-                push_log("Draw rejected: deck empty.")
-                return
-            end
-            move_card(deck[#deck], "hand", nil, "draw")
-        end},
-        {id = "flip", label = "Flip", hint = "[2 / F]", action = function()
-            if not state.selected then
-                state.message = "Select a card first."
-                return
-            end
-            local card = state.cards[state.selected]
-            card.face_up = not card.face_up
-            push_log(state.selected .. " flip -> " .. (card.face_up and "face-up" or "face-down") .. ".")
-            state.message = state.selected .. " flipped."
-        end},
-        {id = "discard", label = "Discard", hint = "[3 / Del]", action = function()
-            if not state.selected then
-                state.message = "Select a card first."
-                return
-            end
-            move_card(state.selected, "grave", nil, "discard")
-        end},
-        {id = "reset", label = "Reset", hint = "[R]", action = function()
-            build_empty_surface()
-        end},
-    }
-    for _, button in ipairs(buttons) do
-        local bw = widths[button.id] or math.floor(152 * s)
+    state.ui.buttons = {}
+
+    for _, spec in ipairs(BUTTON_ORDER) do
+        local bw = math.floor((BUTTON_WIDTHS[spec.id] or 152) * s)
+        local button = {
+            id = spec.id,
+            label = spec.label,
+            hint = spec.hint,
+        }
         button.rect = {x = x, y = footer.y, w = bw, h = bh}
         x = x + bw + gap
+        table.insert(state.ui.buttons, button)
     end
-    return buttons
+end
+
+local function refresh_layout(force)
+    local w, h = love.graphics.getDimensions()
+    if not force and state.layout and state.layout_w == w and state.layout_h == h then
+        return
+    end
+
+    state.layout = make_layout()
+    state.layout_w = w
+    state.layout_h = h
+    update_buttons()
 end
 
 local function zone_shortcut(zone_name)
@@ -648,21 +749,75 @@ local function draw_slot_placeholder(rect, label, highlight)
     love.graphics.printf(label, rect.x, rect.y + rect.h + 4 * state.layout.scale, rect.w, "center")
 end
 
+local function glyph_color(op_name)
+    if op_name == "RUNTIME" then return {1, 1, 1} end
+    return OP_COLORS[op_name]
+end
+
 local function draw_card(card_id, rect, dragged)
     local card = state.cards[card_id]
     local selected = state.selected == card_id
 
     if card.face_up then
-        set_color(COLORS.card)
-        rounded("fill", rect.x, rect.y, rect.w, rect.h, 10)
-        set_color(selected and COLORS.select or COLORS.card_text)
+        local ca = OP_COLORS[card.op_a] or COLORS.card
+        local cb = OP_COLORS[card.op_b] or COLORS.card
+        local dark_a = lerp_color(ca, COLORS.bg, 0.90)
+        local dark_b = lerp_color(cb, COLORS.bg, 0.90)
+
+        if card.class == "trump" then
+            set_color(dark_a)
+            rounded("fill", rect.x, rect.y, rect.w * 0.5, rect.h, 10)
+            set_color(dark_b)
+            love.graphics.rectangle("fill", rect.x + rect.w * 0.5, rect.y, rect.w * 0.5, rect.h, 10, 10)
+            set_color(lerp_color(ca, cb, 0.5), 0.18)
+            love.graphics.rectangle("fill", rect.x + rect.w * 0.47, rect.y + 4, rect.w * 0.06, rect.h - 8)
+        else
+            set_color(dark_a)
+            love.graphics.polygon("fill",
+                rect.x, rect.y,
+                rect.x + rect.w, rect.y,
+                rect.x, rect.y + rect.h
+            )
+            set_color(dark_b)
+            love.graphics.polygon("fill",
+                rect.x + rect.w, rect.y,
+                rect.x + rect.w, rect.y + rect.h,
+                rect.x, rect.y + rect.h
+            )
+        end
+
+        -- Outer border
+        set_color(selected and COLORS.select or lerp_color(ca, cb, 0.5))
         rounded("line", rect.x, rect.y, rect.w, rect.h, 10)
+        -- Inner frame
+        set_color(COLORS.outline, 0.40)
+        rounded("line", rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8, 8)
+
+        -- Debug id
         love.graphics.setFont(state.fonts.small)
-        love.graphics.printf(card.id, rect.x, rect.y + 10 * state.layout.scale, rect.w, "center")
-        love.graphics.setFont(state.fonts.body)
-        love.graphics.printf("BLANK", rect.x, rect.y + rect.h * 0.48, rect.w, "center")
-        love.graphics.setFont(state.fonts.small)
-        love.graphics.printf(card.zone or "-", rect.x, rect.y + rect.h - 22 * state.layout.scale, rect.w, "center")
+        set_color(COLORS.muted)
+        love.graphics.printf(card.id, rect.x + 6, rect.y + 3 * state.layout.scale, rect.w - 12, "center")
+
+        local gs = math.floor(15 * state.layout.scale)
+
+        if card.class == "trump" then
+            local pos = glyph_layout.trump_pos(rect)
+            set_color(glyph_color(card.op_a))
+            glyphs[card.op_a](pos.ax, pos.ay, gs)
+            set_color(glyph_color(card.op_b))
+            glyphs[card.op_b](pos.bx, pos.by, gs)
+            if card.trump_name then
+                love.graphics.setFont(state.fonts.small)
+                set_color(COLORS.accent, 0.85)
+                love.graphics.printf(card.trump_name, rect.x + 6, rect.y + rect.h - 16 * state.layout.scale, rect.w - 12, "center")
+            end
+        else
+            local pos = glyph_layout.minor_pos(rect)
+            set_color(glyph_color(card.op_a))
+            glyphs[card.op_a](pos.ax, pos.ay, gs)
+            set_color(glyph_color(card.op_b))
+            glyphs[card.op_b](pos.bx, pos.by, gs)
+        end
     else
         set_color(COLORS.card_back)
         rounded("fill", rect.x, rect.y, rect.w, rect.h, 10)
@@ -777,8 +932,7 @@ local function draw_center()
 end
 
 local function draw_footer()
-    local buttons = button_specs()
-    for _, button in ipairs(buttons) do
+    for _, button in ipairs(state.ui.buttons) do
         local active = button.id == "start" or button.id == "draw" or (state.selected ~= nil)
         set_color(active and COLORS.panel_alt or COLORS.panel)
         rounded("fill", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
@@ -812,11 +966,46 @@ local function draw_top_header()
 end
 
 local function trigger_button(id)
-    for _, button in ipairs(button_specs()) do
-        if button.id == id then
-            button.action()
+    if id == "start" then
+        start_game()
+        return
+    end
+
+    if id == "draw" then
+        local deck = state.zones.deck.cards
+        if #deck == 0 then
+            state.message = "Deck is empty."
+            push_log("Draw rejected: deck empty.")
             return
         end
+        move_card(deck[#deck], "hand", nil, "draw")
+        return
+    end
+
+    if id == "flip" then
+        if not state.selected then
+            state.message = "Select a card first."
+            return
+        end
+        local card = state.cards[state.selected]
+        card.face_up = not card.face_up
+        push_log(state.selected .. " flip -> " .. (card.face_up and "face-up" or "face-down") .. ".")
+        state.message = state.selected .. " flipped."
+        return
+    end
+
+    if id == "discard" then
+        if not state.selected then
+            state.message = "Select a card first."
+            return
+        end
+        move_card(state.selected, "grave", nil, "discard")
+        return
+    end
+
+    if id == "reset" then
+        build_empty_surface()
+        return
     end
 end
 
@@ -824,15 +1013,15 @@ function love.load()
     love.graphics.setBackgroundColor(COLORS.bg)
     init_fonts()
     build_empty_surface()
-    state.layout = make_layout()
+    refresh_layout(true)
 end
 
 function love.resize()
-    state.layout = make_layout()
+    refresh_layout(true)
 end
 
 function love.update()
-    state.layout = make_layout()
+    refresh_layout()
     if state.drag then
         local x, y = love.mouse.getPosition()
         state.drag.x = x
@@ -844,7 +1033,7 @@ function love.update()
 end
 
 function love.draw()
-    state.layout = make_layout()
+    refresh_layout()
 
     draw_top_header()
     draw_left_column()
@@ -858,9 +1047,9 @@ end
 
 function love.mousepressed(x, y, button)
     if button == 1 then
-        for _, spec in ipairs(button_specs()) do
+        for _, spec in ipairs(state.ui.buttons) do
             if point_in_rect(x, y, spec.rect) then
-                spec.action()
+                trigger_button(spec.id)
                 return
             end
         end
