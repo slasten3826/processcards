@@ -48,12 +48,12 @@ all cards in trump zone are face-up
 ## 4. Entry timing
 
 На текущем слое козырь может попасть в `trump zone`
-только после того, как его эффект уже разыгрался.
+только после того, как его event-step уже разыгрался.
 
 То есть:
 
 ```text
-trump enters trump zone only after resolution
+trump enters trump zone only after event resolution
 ```
 
 Следствие:
@@ -61,6 +61,10 @@ trump enters trump zone only after resolution
 - `trump zone` не является staging zone для нерешённого козыря
 - `trump zone` не хранит pending trump
 - `trump zone` хранит только уже resolved trump residue
+
+На текущем prototype scope minimal event meaning читается через:
+
+- [TRUMP_EVENT_MINIMAL_LAW.md](./TRUMP_EVENT_MINIMAL_LAW.md)
 
 ## 5. Capacity
 

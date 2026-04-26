@@ -158,6 +158,7 @@ Flip уже сейчас нужно считать first-class animation event.
 - expensive shaders
 - final Balatro-level juice
 - final sound sync
+- animated Start Game sequence in the immediate next slice
 
 Он требует только:
 
@@ -165,7 +166,23 @@ Flip уже сейчас нужно считать first-class animation event.
 no critical gameplay change should read as a blind teleport
 ```
 
-## 9. Platform consequence
+## 9. Deferred start-game sequence
+
+Анимированная стартовая раскладка считается желательным будущим слоем,
+но не обязательным для ближайшей реализации gameplay gesture.
+
+То есть:
+
+```text
+animated Start Game is intended
+but deferred until later polishing
+```
+
+Когда этот слой будет делаться,
+он должен читать `Start Game` как sequence,
+а не как blind board pop-in.
+
+## 10. Platform consequence
 
 Этот animation layer должен строиться так,
 чтобы later оставаться совместимым с:
@@ -179,21 +196,21 @@ no critical gameplay change should read as a blind teleport
 - simple timelines
 - no platform-specific rendering tricks as a dependency
 
-## 10. Implementation direction
+## 11. Implementation direction
 
 На ближайшем кодовом слое желательно иметь:
 
 - animation event queue
 - card presentation objects
 - separation of:
-  - requested move
-  - committed truth
-  - displayed interpolation
+- requested move
+- committed truth
+- displayed interpolation
 
 Это ещё не требует full engine,
 но требует правильной архитектурной развилки.
 
-## 11. Short formula
+## 12. Short formula
 
 ```text
 cards do not teleport

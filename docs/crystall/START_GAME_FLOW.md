@@ -117,7 +117,31 @@ Start Game
 - `Reset` = technical rebuild / clear surface
 - `Start Game` = build shuffled opening board from full deck
 
-## 7. What this contract does not require yet
+## 7. Animation note
+
+На текущем слое `Start Game` может оставаться мгновенной процедурой.
+
+Но future-facing direction уже фиксируется:
+
+```text
+Start Game may later become a visible animated dealing sequence
+```
+
+То есть позже runtime может показывать:
+
+- initial dealing to `manifest`
+- draw to `hand`
+- merge / reshuffle moment
+- dealing to `targets`
+- dealing to `latent`
+
+Важно:
+
+- это ожидаемый будущий слой
+- но он не обязателен для ближайшего gameplay slice
+- его можно отложить до позднего polishing pass
+
+## 8. What this contract does not require yet
 
 Этот документ пока не требует:
 
@@ -126,7 +150,7 @@ Start Game
 - target victory logic
 - trump gameplay
 
-## 8. Short formula
+## 9. Short formula
 
 ```text
 Start Game = clear board
