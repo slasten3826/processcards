@@ -76,7 +76,7 @@ deck -> targets[i] face-down
 ## 6. Trump reveal override
 
 Если карта в `targets` раскрывается
-или становится видимой через observe,
+или становится `known` через observe,
 и это козырь,
 то для этой зоны действует special-case override.
 
@@ -123,5 +123,5 @@ and what happens when a trump in targets becomes visible
 targets are hidden by default
 revealed non-trump target goes to grave
 deck refills the slot face-down
-trump seen in targets stays in targets face-up
+trump known or revealed in targets stays in targets face-up
 ```

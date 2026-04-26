@@ -9,68 +9,98 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+current turn-law branch
 ```
 
 ## 1. Core identity
 
-`☱` = deployment bifurcation operator.
+`☱` now reads as install-choice operator.
 
-It gives a card an additional legal destination:
-
-```text
-runtime zone
-```
+It does not add a passive aura by itself.
+It expands the future choice menu of later plays
+through the `runtime` zone.
 
 Short formula:
 
 ```text
-☱ = alternate deployment layer
+☱ = install one extra reusable operator choice
 ```
 
 ## 2. What it is not
 
 `☱` is not:
 
-- automatic permanent effect
-- mandatory install
-- generic "this card is persistent" text by default
+- automatic free extra effect on every play
+- passive aura math
+- draw
+- reveal
+- generic “make this card permanent” without runtime law
 
-## 3. Weak and strong reading
+## 3. Current playtest law
 
-`☱` does not erase normal play.
+If a card with `☱` is chosen for its runtime effect,
+it may be installed into `runtime`
+instead of using its ordinary partner operator as a one-shot effect.
 
-A `☱X` card may still be played into manifest through normal card rules.
+Then:
 
-If it is instead installed into runtime,
-the paired operator `X` is read in runtime form.
+1. the card goes to `runtime`
+2. its partner operator `X` becomes an extra reusable option
+3. on future plays, each played card may choose:
+   - operator A of the played card
+   - operator B of the played card
+   - runtime operator `X`
+
+Player still chooses exactly **one** effect.
+
+Runtime does not create additive multi-cast by default.
 
 ## 4. Runtime access law
 
-Only cards containing `☱` may be installed into runtime.
+By default:
 
-That access is optional at play time.
+- only cards containing `☱` may enter `runtime`
+- installed card stays in the one runtime slot
+- its partner operator is the granted runtime choice
 
-Short formula:
+## 5. Meaning of runtime choice
+
+The runtime-granted operator is not tied
+to the card being played from hand.
+
+It is a machine-level available choice.
+
+Example:
+
+- if `☱☰` is installed in runtime,
+  every future played card may choose `☰`
+  as a third effect option
+
+## 6. Special self-pair law: `☱☱`
+
+`☱☱` is special.
+
+It does not immediately grant two runtime operators.
+
+Instead:
 
 ```text
-☱ opens an extra legal destination
+☱☱ opens runtime for any card
 ```
 
-## 5. Runtime form
+While `☱☱` remains in runtime:
 
-When installed,
-the paired operator becomes a recurring or persistent behavior,
-not a normal one-shot resolution.
+- player may later install any minor card into runtime
+- that chosen card replaces `☱☱`
+- `☱☱` goes to `grave`
+- the newly installed card then grants both of its operators
+  as extra future choices
 
-Example directions:
+So `☱☱` is a runtime-opener,
+not the final payload itself.
 
-- `☱☴` — installed observe behavior
-- `☱▽` — installed flow behavior
-- `☱☶` — installed logic privilege
-- `☱☰` — installed connect privilege
-
-## 6. Physical execution law
+## 7. Physical execution law
 
 Runtime must stay cardboard-readable.
 
@@ -78,23 +108,24 @@ That means:
 
 - runtime is a real table zone
 - installed card visibly occupies it
-- players can see which operator family is currently installed
+- players can see which extra operator choice(s) the machine currently grants
 
-## 7. Restrictions
+## 8. Restrictions
 
-- runtime access belongs only to `☱`
-- install is not mandatory
-- runtime-form behavior must not rely on invisible digital counters
+- runtime slot count remains `1`
+- runtime grants extra choice, not free additional cast
+- a played card still resolves exactly one chosen effect
+- trumps do not become runtime cards through this default law
 
-## 8. Open questions
+## 9. Open questions
 
-- exact cadence and trigger windows of runtime behaviors
-- runtime slot replacement law
-- whether installed cards stay indefinitely or get displaced
-- exact meaning of `☱☱`
+- whether some future pair laws may alter how often runtime choice can be used
+- whether runtime-installed card should always enter revealed
+- exact replacement timing if runtime slot is already occupied by a non-opener card
 
-## 9. Short formula
+## 10. Short formula
 
 ```text
-☱ RUNTIME = optional install into runtime, where partner becomes ongoing behavior
+☱ RUNTIME = install one extra reusable operator choice
+☱☱ = open runtime for any later minor card
 ```

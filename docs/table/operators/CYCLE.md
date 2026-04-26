@@ -9,17 +9,18 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+current hand-filter operator
 ```
 
 ## 1. Core identity
 
-`☲` = exchange through turnover.
+`☲` now reads as the main hand-filter operator.
 
 Short formula:
 
 ```text
-take one / release one
+draw first, then discard
 ```
 
 ## 2. What it is not
@@ -31,29 +32,43 @@ take one / release one
 - reveal
 - removal from field by default
 
-## 3. Weak law
+## 3. Current playtest law
 
-Weak `☲` performs a narrow cycle action.
+If `☲` is the chosen operator effect,
+player:
 
-Current safe reading:
+1. performs `1` draw procedure
+2. then discards `1` card from hand
 
-- draw a card
-- then discard a card
+Read the draw through:
 
-This is a provisional but stable working direction.
+- [../DRAW_PROCEDURE_LAW.md](../DRAW_PROCEDURE_LAW.md)
 
-## 4. Strong law
+This means:
 
-Strong `☲` widens cycle value.
+- if a minor is drawn, hand briefly expands before discard choice
+- if a trump is drawn, that draw procedure burns into trump-event,
+  and discard still happens afterwards
 
-Strong baseline still applies:
+## 4. Why draw first
+
+`☲` should feel like turnover and filtering,
+not like punishment with late compensation.
+
+So:
 
 ```text
-draw 2
+draw first
+discard second
 ```
 
-The card reading then opens broader exchange logic,
-not just raw card count.
+gives:
+
+- real choice
+- hand smoothing
+- no pure hand growth
+
+This keeps `☲` distinct from `☰`.
 
 ## 5. Pair law directions
 
@@ -81,12 +96,12 @@ That means:
 
 ## 8. Open questions
 
-- whether weak `☲` is always `draw 1 discard 1`
-- whether strong `☲` may include keep-one-from-many patterns
+- whether weak `☲` is always exactly `draw 1 then discard 1`
+- whether later some pair may modify the discard class
 - exact runtime-form cadence for `☱☲`
 
 ## 9. Short formula
 
 ```text
-☲ CYCLE = controlled turnover through draw/discard exchange
+☲ CYCLE = perform 1 draw procedure, then discard 1 from hand
 ```

@@ -3,8 +3,21 @@
 Статус:
 
 ```text
-canonical table law
+legacy table law
+superseded by TURN_LAW_V2 + TURN_SEQUENCE_LAW_V2
 ```
+
+Этот документ фиксирует старую replacement-модель хода.
+
+Он сохраняется как исторический слой,
+но больше не является живым source of truth
+для current move-model.
+
+Current move branch читать через:
+
+- [TURN_LAW_V2.md](./TURN_LAW_V2.md)
+- [TURN_SEQUENCE_LAW_V2.md](./TURN_SEQUENCE_LAW_V2.md)
+- [MOVE_FIT_LAW.md](./MOVE_FIT_LAW.md)
 
 Этот документ фиксирует базовую роль зоны:
 
@@ -104,7 +117,6 @@ and what the primary replacement step looks like
 ## 7. Short formula
 
 ```text
-hand is the source of the turn
-manifest is the primary target surface
+legacy replacement-model:
 the played card replaces the targeted manifest card
 ```

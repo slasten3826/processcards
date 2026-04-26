@@ -41,7 +41,24 @@ trump = event
 
 ## 2. Trump Zone
 
-Resolved trumps go to a separate `trump zone`.
+Resolved trumps do not enter `trump zone` immediately while a chain is still resolving.
+
+During active chain resolution,
+resolved trumps remain:
+
+```text
+in-flight
+```
+
+Only after an ordinary chain closes,
+its in-flight trumps are transferred into `trump zone`.
+
+Short formula:
+
+```text
+in-flight first
+trump zone on ordinary chain close
+```
 
 This zone is not:
 
@@ -85,12 +102,13 @@ Third resolved trump:
 release / reset
 ```
 
-## 4. Third Trump Reset
+## 4. Ordinary Chain Close And Third Trump Reset
 
-Rule direction:
+Ordinary direction:
 
 ```text
-resolved trump -> trump zone
+ordinary chain closes
+-> in-flight trumps enter trump zone in resolution order
 ```
 
 But if `trump zone` already contains two trumps,
@@ -109,7 +127,40 @@ Short formula:
 third trump releases the chamber
 ```
 
-## 5. Why Two, Not Three
+## 5. Halted Chain Exception
+
+`HALT` creates a special chain ending.
+
+If a chain becomes a:
+
+```text
+halted chain
+```
+
+then ordinary trump-zone transfer is bypassed.
+
+In a halted chain:
+
+- the current resolving item may finish
+- no further trump resolution may begin
+- all non-`HALT` trumps from that halted chain are shuffled into deck
+- `HALT` itself enters ordinary trump ecology after the halted chain closes
+
+Short formula:
+
+```text
+ordinary chain -> trump zone
+halted chain -> deck flush
+HALT itself -> trump zone
+```
+
+Canonical compression:
+
+```text
+HALTed chain parks nothing except HALT itself
+```
+
+## 6. Why Two, Not Three
 
 Three parked trumps is too slow.
 
@@ -126,7 +177,10 @@ This is more readable than waiting for a fourth event.
 It also keeps trump circulation alive
 without letting every single trump destroy deck order.
 
-## 6. Relation To ENCODE
+The in-flight rule protects that pressure geometry
+from being distorted mid-chain.
+
+## 7. Relation To ENCODE
 
 If every trump immediately shuffled back into deck,
 `☵ ENCODE` would lose too much value.
@@ -141,7 +195,7 @@ The two-trump chamber protects both:
 - trump escalation
 - deck-order planning
 
-## 7. Visual Requirement
+## 8. Visual Requirement
 
 Trump zone should be visually clear.
 
@@ -154,7 +208,7 @@ two visible trump slots
 The third trump should feel like it releases pressure,
 not like it simply enters a third slot.
 
-## 8. Short Formula
+## 9. Short Formula
 
 ```text
 trump zone = two-event pressure chamber
@@ -162,6 +216,14 @@ trump zone = two-event pressure chamber
 
 ```text
 third trump resets the chamber into deck
+```
+
+```text
+trumps remain in-flight until chain close
+```
+
+```text
+HALT converts chain close into deck flush, except for HALT itself
 ```
 
 ---

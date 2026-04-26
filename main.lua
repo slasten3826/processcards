@@ -102,10 +102,23 @@ local OP_COLORS = {
     MANIFEST = {0.86, 0.68, 0.26},
 }
 
+local TOPOLOGY_ADJ = {}
+for _, op in ipairs(OPERATORS) do
+    TOPOLOGY_ADJ[op] = {[op] = true}
+end
+for _, pair in ipairs(TRUMP_CANON) do
+    local a, b = pair[1], pair[2]
+    TOPOLOGY_ADJ[a][b] = true
+    TOPOLOGY_ADJ[b][a] = true
+end
+
 local state = {
     mode = "DEV",
     selected = nil,
     pending_play = nil,
+    hints_enabled = true,
+    committed = nil,
+    legal_hints = {},
     hover_target = nil,
     drag = nil,
     cards = {},
@@ -190,6 +203,8 @@ end
 local function clear_runtime_state()
     state.selected = nil
     state.pending_play = nil
+    state.committed = nil
+    state.legal_hints = {}
     state.hover_target = nil
     state.drag = nil
     state.cards = {}
@@ -639,6 +654,61 @@ local function current_card_rect(card_id)
     return card_views()[card_id]
 end
 
+local function clear_commit_state()
+    state.committed = nil
+    state.legal_hints = {}
+end
+
+local function topology_adjacent(op_a, op_b)
+    return TOPOLOGY_ADJ[op_a] and TOPOLOGY_ADJ[op_a][op_b] or false
+end
+
+local function full_pair_fit(manifest_card_id, hand_card_id)
+    local manifest = state.cards[manifest_card_id]
+    local hand = state.cards[hand_card_id]
+    if not manifest or not hand then
+        return false
+    end
+    if hand.zone ~= "hand" then
+        return false
+    end
+    return (
+        topology_adjacent(manifest.op_a, hand.op_a) and topology_adjacent(manifest.op_b, hand.op_b)
+    ) or (
+        topology_adjacent(manifest.op_a, hand.op_b) and topology_adjacent(manifest.op_b, hand.op_a)
+    )
+end
+
+local function commit_manifest_card(card_id, slot)
+    if not state.hints_enabled then
+        state.message = "Hints are off."
+        return
+    end
+
+    if state.committed and state.committed.card_id == card_id then
+        clear_commit_state()
+        state.message = "Commit cleared."
+        return
+    end
+
+    state.committed = {
+        card_id = card_id,
+        slot = slot,
+    }
+    state.legal_hints = {}
+
+    local count = 0
+    for _, hand_card_id in ipairs(state.zones.hand.cards) do
+        if full_pair_fit(card_id, hand_card_id) then
+            state.legal_hints[hand_card_id] = true
+            count = count + 1
+        end
+    end
+
+    state.message = card_id .. " committed. Legal hand cards: " .. count .. "."
+    push_log(card_id .. " commit -> " .. count .. " legal hand cards.")
+end
+
 local function predicted_stack_rect(zone_name, count_after_insert)
     local rect = get_zone_rect(zone_name)
     local stack_idx = math.min(math.max((count_after_insert or 1) - 1, 0), 4)
@@ -733,6 +803,7 @@ end
 local BUTTON_ORDER = {
     {id = "start", label = "Start Game", hint = "[S]"},
     {id = "draw", label = "Draw", hint = "[1]"},
+    {id = "hints", label = "Hints", hint = "[V]"},
     {id = "flip", label = "Flip", hint = "[2 / F]"},
     {id = "discard", label = "Discard", hint = "[3 / Del]"},
     {id = "reset", label = "Reset", hint = "[R]"},
@@ -741,6 +812,7 @@ local BUTTON_ORDER = {
 local BUTTON_WIDTHS = {
     start = 176,
     draw = 118,
+    hints = 118,
     flip = 146,
     discard = 152,
     reset = 152,
@@ -1017,6 +1089,7 @@ local function start_hand_manifest_play(card_id, slot)
 
     state.selected = nil
     state.pending_play = nil
+    clear_commit_state()
 
     enqueue_move(target_id, from_manifest, grave_to, {
         face_before = state.cards[target_id].face_up,
@@ -1071,6 +1144,7 @@ local function start_draw_sequence()
         local is_trump = card.class == "trump"
 
         if is_trump then
+            clear_commit_state()
             enqueue_move(card_id, inspect_rect, slot_rects_for_zone("trump")[math.max(first_open_slot("trump") or 1, 1)], {
                 face_before = true,
                 face_after = true,
@@ -1097,6 +1171,21 @@ local function start_draw_sequence()
     start_next_anim()
 end
 
+local function committed_play_allowed(hand_card_id, manifest_slot)
+    if not state.committed then
+        return true
+    end
+    if manifest_slot ~= state.committed.slot then
+        state.message = "Play must target the committed manifest slot."
+        return false
+    end
+    if not state.legal_hints[hand_card_id] then
+        state.message = "This hand card does not fit the committed manifest card."
+        return false
+    end
+    return true
+end
+
 local function start_discard_sequence(card_id)
     local card = state.cards[card_id]
     local from_zone = card.zone
@@ -1106,6 +1195,7 @@ local function start_discard_sequence(card_id)
     local face_before = card.face_up
 
     state.selected = nil
+    clear_commit_state()
     enqueue_move(card_id, from_rect, grave_to, {
         face_before = face_before,
         face_after = true,
@@ -1175,6 +1265,8 @@ local function draw_card(card_id, rect, dragged, opts)
     local card = state.cards[card_id]
     opts = opts or {}
     local selected = state.selected == card_id
+    local committed = state.committed and state.committed.card_id == card_id
+    local legal_hint = state.legal_hints[card_id] == true
     local scale_x = opts.scale_x or 1
     local face_up = opts.face_up
     if face_up == nil then
@@ -1252,6 +1344,16 @@ local function draw_card(card_id, rect, dragged, opts)
         rounded("line", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
         love.graphics.setFont(state.fonts.body)
         love.graphics.printf(card.id, draw_rect.x, draw_rect.y + draw_rect.h * 0.42, draw_rect.w, "center")
+    end
+
+    if committed then
+        set_color(COLORS.drop, 0.75)
+        rounded("line", draw_rect.x - 3, draw_rect.y - 3, draw_rect.w + 6, draw_rect.h + 6, 12)
+    end
+
+    if legal_hint then
+        set_color(COLORS.success, 0.80)
+        rounded("line", draw_rect.x - 3, draw_rect.y - 3, draw_rect.w + 6, draw_rect.h + 6, 12)
     end
 
     if selected or dragged then
@@ -1367,10 +1469,17 @@ end
 
 local function draw_footer()
     for _, button in ipairs(state.ui.buttons) do
-        local active = button.id == "start" or button.id == "draw" or (state.selected ~= nil)
+        local active = button.id == "start"
+            or button.id == "draw"
+            or button.id == "hints"
+            or (state.selected ~= nil)
+        local tint = active and COLORS.accent_soft or COLORS.outline
+        if button.id == "hints" and state.hints_enabled then
+            tint = COLORS.success
+        end
         set_color(active and COLORS.panel_alt or COLORS.panel)
         rounded("fill", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
-        set_color(active and COLORS.accent_soft or COLORS.outline)
+        set_color(tint)
         rounded("line", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
         love.graphics.setFont(state.fonts.body)
         set_color(COLORS.text)
@@ -1383,7 +1492,7 @@ local function draw_footer()
     local footer = state.layout.footer
     love.graphics.setFont(state.fonts.small)
     set_color(COLORS.muted)
-    local help = "S Start Game  1 draw  2/F flip  3/Delete discard  R reset  H/M/L/T/U/P/G/K move to zone"
+    local help = "S Start Game  1 draw  V hints  2/F flip  3/Delete discard  R reset  H/M/L/T/U/P/G/K move to zone"
     love.graphics.print(help, footer.x + math.floor(760 * state.layout.scale), footer.y + 14 * state.layout.scale)
 end
 
@@ -1411,6 +1520,16 @@ local function trigger_button(id)
             return
         end
         start_draw_sequence()
+        return
+    end
+
+    if id == "hints" then
+        state.hints_enabled = not state.hints_enabled
+        if not state.hints_enabled then
+            clear_commit_state()
+        end
+        state.message = "Hints " .. (state.hints_enabled and "enabled." or "disabled.")
+        push_log("Hints -> " .. (state.hints_enabled and "on" or "off") .. ".")
         return
     end
 
@@ -1514,12 +1633,27 @@ function love.mousepressed(x, y, button)
             local clicked = state.cards[card_id]
             local selected = state.selected and state.cards[state.selected] or nil
             if state.mode == "GAMEPLAY"
+                and state.hints_enabled
+                and clicked
+                and clicked.zone == "manifest"
+                and clicked.slot
+                and not (selected and selected.zone == "hand")
+            then
+                state.selected = nil
+                state.drag = nil
+                commit_manifest_card(card_id, clicked.slot)
+                return
+            end
+            if state.mode == "GAMEPLAY"
                 and selected
                 and selected.zone == "hand"
                 and clicked
                 and clicked.zone == "manifest"
                 and clicked.slot
             then
+                if not committed_play_allowed(state.selected, clicked.slot) then
+                    return
+                end
                 start_hand_manifest_play(state.selected, clicked.slot)
                 return
             end
@@ -1547,6 +1681,9 @@ function love.mousepressed(x, y, button)
                 and target.zone == "manifest"
                 and target.slot
             then
+                if not committed_play_allowed(state.selected, target.slot) then
+                    return
+                end
                 start_hand_manifest_play(state.selected, target.slot)
             else
                 local slot = target.slot or first_open_slot(target.zone)
@@ -1594,6 +1731,9 @@ function love.mousereleased(x, y, button)
             and target.zone == "manifest"
             and target.slot
         then
+            if not committed_play_allowed(card_id, target.slot) then
+                return
+            end
             start_hand_manifest_play(card_id, target.slot)
             return
         else
@@ -1621,6 +1761,8 @@ function love.keypressed(key)
         trigger_button("start")
     elseif key == "1" then
         trigger_button("draw")
+    elseif key == "v" then
+        trigger_button("hints")
     elseif key == "2" or key == "f" then
         trigger_button("flip")
     elseif key == "3" or key == "delete" or key == "backspace" then
@@ -1630,6 +1772,7 @@ function love.keypressed(key)
     elseif key == "escape" then
         state.selected = nil
         state.drag = nil
+        clear_commit_state()
         state.message = "Selection cleared."
     elseif key == "h" then
         zone_shortcut("hand")

@@ -58,6 +58,16 @@ Every trump must resolve using:
 - local board structure
 - grave as ordered residue
 
+Flavor text may exist as a separate card-identity layer.
+
+It should not replace:
+
+- core reading
+- mechanical law
+- canonical resolution text
+
+It should compress the event into one short memorable line.
+
 ## 3. Board Invariant
 
 Trump events may disturb the board,
@@ -134,6 +144,10 @@ deck
 - [RECAST.md](RECAST.md)
 - [SHUFFLE.md](SHUFFLE.md)
 - [EJECT.md](EJECT.md)
+- [RESET.md](RESET.md)
+- [UNVEIL.md](UNVEIL.md)
+- [HALT.md](HALT.md)
+- [FOOL.md](FOOL.md)
 
 ---
 

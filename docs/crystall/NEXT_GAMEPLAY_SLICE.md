@@ -3,8 +3,20 @@
 Статус:
 
 ```text
-canonical crystall contract
+legacy crystall contract
+superseded by NEXT_GAMEPLAY_SLICE_V2
 ```
+
+Этот документ фиксирует старый crystall-slice
+для replacement-модели хода.
+
+Он сохраняется как историческая запись уже собранного слоя,
+но больше не является текущим target-документом
+для next move implementation.
+
+Current branch читать через:
+
+- [NEXT_GAMEPLAY_SLICE_V2.md](./NEXT_GAMEPLAY_SLICE_V2.md)
 
 Этот документ фиксирует,
 что именно мы кодим следующим слоем

@@ -24,13 +24,18 @@
 - [PROTOTYPE_TABLE.md](../table/PROTOTYPE_TABLE.md)
 - [DECK_AND_SETUP_LAW.md](../table/DECK_AND_SETUP_LAW.md)
 - [CHAIN_SURFACE_LAW.md](../table/CHAIN_SURFACE_LAW.md)
+- [CARD_INFORMATION_STATE_LAW.md](../table/CARD_INFORMATION_STATE_LAW.md)
 - [GRAVE_LAW.md](../table/GRAVE_LAW.md)
-- [HAND_AND_PLAY_LAW.md](../table/HAND_AND_PLAY_LAW.md)
+- [HAND_AND_PLAY_LAW.md](../table/HAND_AND_PLAY_LAW.md) — legacy replacement-model law
 - [OBSERVE_VS_REVEAL_LAW.md](../table/OBSERVE_VS_REVEAL_LAW.md)
+- [MOVE_FIT_LAW.md](../table/MOVE_FIT_LAW.md) — current move-fit canon
 - [RESOLUTION_ORDER_LAW.md](../table/RESOLUTION_ORDER_LAW.md)
 - [RUNTIME_ZONE_LAW.md](../table/RUNTIME_ZONE_LAW.md)
 - [TARGET_ZONE_LAW.md](../table/TARGET_ZONE_LAW.md)
+- [TURN_LAW_V2.md](../table/TURN_LAW_V2.md) — current turn-law canon
+- [TURN_SEQUENCE_LAW_V2.md](../table/TURN_SEQUENCE_LAW_V2.md) — current turn sequence canon
 - [TRUMP_EVENT_MINIMAL_LAW.md](../table/TRUMP_EVENT_MINIMAL_LAW.md)
+- [TRUMP_BRANCH_STATUS.md](../table/TRUMP_BRANCH_STATUS.md)
 - [TRUMP_ZONE_LAW.md](../table/TRUMP_ZONE_LAW.md)
 - [TRUMP_IDENTITY_LAW.md](../table/TRUMP_IDENTITY_LAW.md)
 
@@ -46,7 +51,8 @@
 - [LAYERED_PROJECT_POLICY.md](../crystall/LAYERED_PROJECT_POLICY.md)
 - [START_GAME_FLOW.md](../crystall/START_GAME_FLOW.md)
 - [GAMEPLAY_ANIMATION_LAYER.md](../crystall/GAMEPLAY_ANIMATION_LAYER.md)
-- [NEXT_GAMEPLAY_SLICE.md](../crystall/NEXT_GAMEPLAY_SLICE.md)
+- [NEXT_GAMEPLAY_SLICE.md](../crystall/NEXT_GAMEPLAY_SLICE.md) — legacy replacement-model slice
+- [NEXT_GAMEPLAY_SLICE_V2.md](../crystall/NEXT_GAMEPLAY_SLICE_V2.md)
 
 ## `docs/manifest/`
 
@@ -112,3 +118,34 @@ old docs are marked as legacy or superseded
 То есть история проекта сохраняется в репозитории,
 а новый канон добавляется поверх неё,
 а не вместо неё.
+
+## Current move-law routing
+
+Текущий move-law canon читать так:
+
+### Current canon branch
+
+- [MOVE_FIT_LAW.md](../table/MOVE_FIT_LAW.md)
+- [TURN_LAW_V2.md](../table/TURN_LAW_V2.md)
+- [TURN_SEQUENCE_LAW_V2.md](../table/TURN_SEQUENCE_LAW_V2.md)
+- [NEXT_GAMEPLAY_SLICE_V2.md](../crystall/NEXT_GAMEPLAY_SLICE_V2.md)
+
+### Legacy replacement branch
+
+- [HAND_AND_PLAY_LAW.md](../table/HAND_AND_PLAY_LAW.md)
+- [NEXT_GAMEPLAY_SLICE.md](../crystall/NEXT_GAMEPLAY_SLICE.md)
+
+### Candidate-for-legacy group
+
+Эти документы пока не объявлены legacy,
+но их канон почти наверняка придётся пересобирать
+после стабилизации нового turn-law:
+
+- [OPERATOR_MODEL.md](../table/OPERATOR_MODEL.md)
+- [STRONG_COMBINED_LAW.md](../table/STRONG_COMBINED_LAW.md)
+- [STRONG_PAIR_TABLE.md](../table/STRONG_PAIR_TABLE.md)
+- [CONNECT_LAW.md](../table/CONNECT_LAW.md)
+
+Их still можно читать как semantic/archive layer,
+но уже нельзя читать как бесспорный current execution canon
+для новой ветки хода.

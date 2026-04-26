@@ -9,17 +9,22 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+aligned with hidden / known / revealed model
 ```
 
 ## 1. Core identity
 
-`△` = turn hidden state into explicit table state.
+`△` now reads through the new information-state model:
+
+```text
+not-revealed -> revealed
+```
 
 Short formula:
 
 ```text
-latent -> known
+△ = make one not-revealed card revealed
 ```
 
 ## 2. What it is not
@@ -31,32 +36,43 @@ latent -> known
 - generic movement
 - broad state rewrite by itself
 
-## 3. Weak law
+## 3. Current playtest law
 
-Weak `△` performs a narrow manifestation.
+If `△` is the chosen operator effect:
 
-Current safe reading:
+1. choose one `not-revealed` card
+2. make that card `revealed`
 
-- reveal one hidden card
-- that revealed state becomes public
+This means:
 
-## 4. Strong law
+- `hidden` may become `revealed`
+- `known` may become `revealed`
+- already `revealed` cards are not legal targets
 
-Strong `△` widens manifestation.
+## 4. Zone consequence
 
-Strong baseline still applies:
+`△` itself only changes information state.
 
-```text
-draw 2
-```
+After that,
+the target zone's own laws continue to apply.
 
-Possible widening:
+Examples:
 
-- broader reveal choice
-- stronger reveal consequence
-- manifestation combined with second operator
+- in `latent`, the card remains there as `revealed`
+- on `topdeck`, the card remains there as `revealed topdeck`
+- in `targets`, reveal immediately passes into `TARGET_ZONE_LAW`
 
-## 5. Pair law directions
+## 5. Why this fits the new model
+
+`☴ OBSERVE` and `△ MANIFEST` now become cleanly separated:
+
+- `☴` = `hidden -> known`
+- `△` = `not-revealed -> revealed`
+
+That makes `MANIFEST` the public-surfacing operator,
+not the private-inspection operator.
+
+## 6. Pair law directions
 
 - `△☴` — choose/inspect hidden state, then make it explicit under pair law
 - `△☳` — choose what to manifest
@@ -64,7 +80,7 @@ Possible widening:
 - `△☶` — manifest while ignoring one normal manifest restriction
 - `△☱` — install a runtime-form manifestation privilege
 
-## 6. Physical execution law
+## 7. Physical execution law
 
 Manifest must be visible and stable on cardboard.
 
@@ -81,12 +97,12 @@ That means:
 
 ## 8. Open questions
 
-- whether weak `△` only reveals or may also expose topdeck
-- how manifested latent interacts with later replacement rules
+- whether some pair laws should let `△` force additional aftermath
 - exact runtime-form behavior for `☱△`
+- whether `△△` should stay single reveal or escalate scope
 
 ## 9. Short formula
 
 ```text
-△ MANIFEST = make hidden state explicit on the table
+△ MANIFEST = choose one not-revealed card and make it revealed
 ```

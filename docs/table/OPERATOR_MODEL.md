@@ -3,16 +3,35 @@
 Статус:
 
 ```text
-canonical table law
+candidate-for-legacy table law
+pending rewrite after turn-law stabilization
 ```
 
-Этот документ фиксирует текущую каноническую модель операторов minor-карт.
+Этот документ фиксирует старую каноническую модель операторов minor-карт
+до стабилизации нового topology-first turn-law.
+
+Он всё ещё полезен как semantic source,
+но больше не должен читаться как полностью живой source of truth
+для current gameplay branch.
+
+Current move transition branch:
+
+- [TURN_LAW_V2.md](./TURN_LAW_V2.md)
+- [TURN_SEQUENCE_LAW_V2.md](./TURN_SEQUENCE_LAW_V2.md)
+- [MOVE_FIT_LAW.md](./MOVE_FIT_LAW.md)
 
 Он не финализирует каждый оператор до последней формулы,
 но задаёт текущий канон operator layer.
 
-Если более старые документы расходятся с этим документом,
-приоритет у этого файла.
+Если старые operator drafts расходятся с этим документом,
+приоритет пока остаётся у этого файла.
+
+Но если этот файл расходится с новой move-моделью,
+приоритет уже у:
+
+- [TURN_LAW_V2.md](./TURN_LAW_V2.md)
+- [TURN_SEQUENCE_LAW_V2.md](./TURN_SEQUENCE_LAW_V2.md)
+- newer operator rewrites once they are written
 
 ## 1. Current gameplay frame
 
@@ -240,4 +259,9 @@ operators are no longer just flavor labels
 they are the active grammar of weak and strong card resolution
 ```
 
-machines only. not for humans.
+Короткий вывод статуса:
+
+```text
+operator identity notes remain useful
+but the gameplay chassis in this file is no longer fully current
+```

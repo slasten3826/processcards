@@ -9,92 +9,113 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+current turn-law branch
 ```
 
 ## 1. Core identity
 
-`☶` = operator of rule exception.
-
-It does not mainly provide value, draw, reveal, or movement.
-It changes how another operator may legally resolve.
+`☶` now reads not as abstract exception text,
+but as a direct swap operator for revealed minor-cards.
 
 Short formula:
 
 ```text
-☶ = exception / override
+☶ = swap one revealed minor-card with one card from hand
 ```
 
 ## 2. What it is not
 
 `☶` is not:
 
-- generic wildcard
-- free ignore-all-rules text
-- standalone value engine
+- draw
+- reveal
+- trump manipulation
+- hidden-card manipulation by default
 
-## 3. Weak law
+## 3. Current playtest law
 
-Any card containing `☶` has no weak mode.
+If `☶` is the chosen operator effect:
 
-Short formula:
+1. choose one revealed minor-card in a legal public zone
+2. choose one card from hand
+3. swap them
+
+This means:
+
+- chosen revealed minor goes to `hand`
+- chosen hand-card takes that card's exact place
+- inserted hand-card enters that place as `revealed`
+
+The inserted card does not separately resolve its own effect.
+
+## 4. Legal target class
+
+`☶` may target only:
+
+- `revealed` cards
+- `minor` cards
+
+Default legal public zones:
+
+- `manifest`
+- `revealed latent`
+- `grave`
+- revealed `topdeck`
+
+It does **not** target:
+
+- hidden cards
+- known-but-not-revealed cards
+- trumps
+- `targets`
+- `trump zone`
+
+## 5. Why the trump exclusion is clean
+
+In current machine reality,
+revealed trumps live only in:
+
+- `targets`
+- `trump zone`
+
+And those zones do not contain revealed minor-cards.
+
+So `☶` can stay simple:
 
 ```text
-☶ cards are strong-only
+logic works only with revealed minor-cards
 ```
 
-## 4. Strong law
-
-When a `☶X` card resolves,
-the paired operator `X` resolves while ignoring or reinterpreting one native restriction.
-
-Strong baseline still applies:
-
-```text
-draw 2
-```
-
-## 5. Pair law
-
-Each `☶X` pair breaks exactly one rule naturally attached to `X`.
-
-That broken rule:
-
-- is pair-defined
-- is not freely chosen during resolution
-
-Example directions:
-
-- `☶☴` — observe while ignoring one normal observe restriction
-- `☶☷` — dissolve while ignoring one normal dissolve restriction
-- `☶☵` — encode while ignoring one native encode restriction
-- `☶△` — manifest while ignoring one normal manifest restriction
-- `☶☳` — choose while ignoring one normal targeting restriction
+without needing a second trump exception table.
 
 ## 6. Physical execution law
 
-Logic must still be table-readable.
+Logic must still be cardboard-playable.
 
 That means:
 
-- the exception must be pair-specific and documented
-- players must be able to see what normal restriction is being bent
-- no invisible engine-only permission layer
+- both swapped cards are physically visible and trackable
+- chosen public slot is explicit
+- the extracted revealed card really enters hand
+- the inserted hand-card really takes that exact public place
 
 ## 7. Restrictions
 
 - `☶` does not ignore all rules
-- `☶` does not invent a separate subsystem
-- exactly one native restriction is altered
+- `☶` does not touch trumps by default
+- `☶` does not touch hidden cards by default
+- swap does not trigger a second play on the inserted hand-card
+- swap does not trigger chain repair if the slot never stays empty
 
 ## 8. Open questions
 
-- exact pair texts for each `☶X`
-- whether some `☶X` pairs should be intentionally weaker than others
-- how duplicate-colored strong branches interact with strong-only logic cards
+- whether revealed `topdeck` should be treated exactly like a public slot
+- whether `☶☶` should amplify swap scope or stay simple
+- whether later some mixed pairs should extend legal public zones
 
 ## 9. Short formula
 
 ```text
-☶ LOGIC = strong-only exception operator
+☶ LOGIC = swap one revealed minor-card with one card from hand
 ```

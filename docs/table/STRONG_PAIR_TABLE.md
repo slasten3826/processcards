@@ -3,10 +3,20 @@
 Статус:
 
 ```text
-canonical table draft
+candidate-for-legacy table draft
+strong pair table pending rewrite
 ```
 
 Этот документ — рабочая таблица strong combined readings для minor-пар.
+
+После перехода к новой move-модели
+эта таблица больше не является надёжным current execution map.
+
+Она пока полезна как:
+
+- archive of pair ideas
+- maturity map of old strong branch
+- source of possible later pair semantics
 
 Он не обязан покрывать всю матрицу.
 Он обязан быть честным:
@@ -25,6 +35,9 @@ Role split:
 STRONG_COMBINED_LAW.md = how strong is read in principle
 STRONG_PAIR_TABLE.md   = which concrete pair families are documented right now
 ```
+
+Но оба эти файла сейчас уже не равны
+живому move-law current branch.
 
 ## 1. Read law
 
@@ -103,6 +116,12 @@ So:
 - runtime execution authority still belongs to runtime law
 
 ## 4. Pair entries
+
+Все записи ниже пока следует читать как:
+
+```text
+candidate pair semantics from the old strong branch
+```
 
 ### `☳ + ▽`
 

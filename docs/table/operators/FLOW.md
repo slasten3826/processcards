@@ -9,211 +9,162 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+current turn-law branch
 ```
 
 ## 1. Core identity
 
-`▽ FLOW` is not draw.
+`▽ FLOW` снова читается как оператор движения скрытого будущего.
 
-It is not primarily value gain.
-It is not generic cycling.
-
-Canonical reading:
+Current playtest candidate:
 
 ```text
-▽ = forced continuation / movement of a concealed sequence
+▽ = shift not-revealed cards by 1 step
 ```
 
-Short formula:
+Коротко:
 
 ```text
-advance hidden structure by one lawful step
+flow advances concealed structure
 ```
 
 ## 2. What it is not
 
 `▽` is not:
 
-- draw
-- generic card advantage
-- hand cycling
-- grave recursion
-- random reshuffle
-- encode / structural editing
+- draw by default
+- reveal
+- removal
+- choose
+- runtime install
 
-Useful contrast:
+## 3. Current playtest law
 
-```text
-☵ rearranges structure
-▽ pushes structure forward
-```
+If `▽` is the chosen operator effect,
+the player shifts a legal not-revealed structure
+by exactly `1` step.
 
-## 3. Mandatory law
-
-If a flow effect is the selected branch of the card,
-it must resolve.
-
-Player does not get to decline it
-just because the continuation is inconvenient.
-
-Short formula:
+Legal spaces:
 
 ```text
-selected flow must happen
+targets
+latent
+deck
 ```
 
-## 4. Hidden-only law
-
-Flow may target only hidden structures.
-
-Current legal flow spaces:
-
-1. hidden layer of the `ManifestChain`
-2. hidden target / victory structure
-3. `deck`
-
-Flow does not target:
-
-- hand
-- grave
-- open manifest cards
-- runtime zone
-- arbitrary open zones
-
-## 5. Default meaning of flow
-
-A flow action means:
+Direction:
 
 ```text
-shift the target hidden structure forward by one step
-according to that structure's native order
+left or right
 ```
 
-Flow is therefore lawful motion inside a hidden structure.
+For `deck`, the same law means:
+
+```text
+topdeck <-> bottom access through one-step rotation
+```
+
+So yes:
+
+```text
+FLOW may bring bottom-deck card to topdeck
+```
+
+as part of repeated lawful motion.
+
+## 4. Not-revealed law
+
+`▽` works on:
+
+- `hidden`
+- `known`
+
+But not on:
+
+- `revealed`
+
+Коротко:
+
+```text
+flow moves not-revealed cards only
+revealed cards stay fixed
+```
+
+## 5. Hand-economy role
+
+`▽` is no longer the hand-refill operator.
+
+Its role is:
+
+```text
+hidden-world manipulation
+```
+
+That means hand economy should be carried elsewhere,
+not by `FLOW`.
 
 ## 6. Native order by space
 
-### Hidden layer of ManifestChain
+### `targets`
 
-The hidden layer is ordered toroidally across `5` columns.
+One flow step means:
 
-That means:
+- rotate target structure by one slot
+- only not-revealed target cards participate in motion
 
-- column 1 adjacent to 2 and 5
-- column 5 adjacent to 4 and 1
+### `latent`
 
-Current working convention:
+One flow step means:
 
-- one flow step = one step left around the toroidal order
+- rotate latent row by one slot
+- only not-revealed latent cards participate in motion
+- revealed latent cards remain fixed
 
-### Hidden target structure
+### `deck`
 
-The target structure has `3` slots.
+One flow step means:
 
-One flow step there means:
+- rotate deck by one card
+- top card may move to bottom
+- bottom card may move to top
 
-- advance hidden target state by one slot in that zone's cyclic order
+Direction decides which way the deck rotates.
 
-### Deck
+If topdeck is already `revealed`,
+that card becomes a fixed anchor.
 
-One flow step on the deck means:
+Then `FLOW(deck)` rotates only the still not-revealed remainder of the deck.
 
-```text
-top card -> bottom of deck
-```
+## 7. Revealed anchors
 
-This keeps deck-flow as motion, not draw.
+If a structure contains revealed cards,
+those cards are anchors and do not move.
 
-## 7. Revealed cards are anchors
+Flow continues only through the not-revealed part
+of that structure.
 
-If a hidden structure contains cards that are already revealed and fixed,
-those cards do not move when flow resolves.
+This is especially important for:
 
-They act as anchors.
+- revealed cards in `targets`
+- revealed cards in `latent`
+- revealed topdeck
 
-Flow continues only through the still-hidden part of the structure.
+## 8. Legacy relation
 
-This applies at least to:
+The temporary `draw 2` idea for `▽`
+should now be treated as superseded playtest thinking.
 
-- hidden cards in the `ManifestChain` that became revealed and fixed
-- target structure slots that became revealed and fixed
+The new preferred branch is hidden-structure motion.
 
-## 8. Null-result legality
+## 9. Open questions
 
-Some legal flow resolutions may produce little or no visible change.
+- exact physical law when a structure has mixed revealed and not-revealed cards
+- whether deck flow is better read as circular rotation or explicit top/bottom step
+- whether `▽▽` should amplify step count or scope
 
-This is still legal.
-
-A mandatory flow effect does not become optional
-just because the current visible result is null.
-
-## 9. Locality and targeting
-
-Without `☳ CHOOSE`,
-flow is not a free global selector.
-
-Default rule:
-
-- if the card does not explicitly provide selection,
-- flow resolves through its default or local binding
-
-For weak-local behavior,
-that means flow should bind to the hidden structure naturally associated
-with where the card is played,
-not freely choose any legal hidden flow space.
-
-## 10. Interaction with CHOOSE
-
-`☳` can turn local flow into explicitly targeted flow.
-
-Working principle:
+## 10. Short formula
 
 ```text
-☳▽ / ▽☳ strong
--> choose which legal hidden structure to flow
-```
-
-Legal chosen spaces remain only:
-
-- hidden manifest layer
-- hidden target structure
-- deck
-
-## 11. Safe-mode interaction
-
-`☳` currently has no strong standalone payload in weak mode.
-
-Because of that,
-mixed `☳▽ / ▽☳` cards create a canonical safe-mode interaction:
-
-- if the card is played weak,
-- player may choose the `☳` side,
-- which effectively means "no flow"
-
-This is not treated as a bug.
-It is part of the current character of `☳`.
-
-## 12. Physical execution law
-
-Flow stays cardboard-playable because:
-
-- it acts only on real hidden structures
-- those structures have visible native order
-- revealed anchors visibly stay fixed
-- deck flow is physical top-to-bottom motion
-
-No invisible engine-only momentum state is required.
-
-## 13. Open questions
-
-- final wording for weak-local flow on every pair
-- whether hidden-layer flow should always be defined as leftward or abstract forward
-- whether later cards may amplify flow by more than one step
-- final law for duplicate `▽▽`
-
-## 14. Short formula
-
-```text
-▽ FLOW = mandatory hidden continuation by one lawful step
+▽ FLOW = shift not-revealed cards by 1 step in targets, latent, or deck
 ```

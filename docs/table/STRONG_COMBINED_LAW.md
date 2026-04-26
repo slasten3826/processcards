@@ -3,10 +3,16 @@
 Статус:
 
 ```text
-canonical table draft
+candidate-for-legacy table draft
+strong-model branch pending rewrite
 ```
 
-Этот документ фиксирует базовый закон сильного хода у minor-карт.
+Этот документ фиксирует старую strong-ветку minor-карт,
+собранную вокруг weak/strong chassis.
+
+После перехода к новой move-модели
+этот документ больше не должен читаться
+как безусловный current gameplay canon.
 
 Он не даёт ещё полную таблицу всех `100` карт.
 Он задаёт правильную поверхность:
@@ -15,6 +21,17 @@ canonical table draft
 strong is a combined reading of the pair
 not two weak effects in sequence
 ```
+
+Что здесь остаётся полезным:
+
+- сама идея `pair reading`
+- отказ от `A then B`
+
+Что больше не считается жёстко текущим:
+
+- старый strong chassis
+- baseline `draw 2` как уже зафиксированная истина
+- привязка strong к replacement-model play
 
 ## 0. Source of truth
 
@@ -77,7 +94,7 @@ Strong is not:
 
 ## 3. Default prototype strong chassis
 
-Current default prototype chassis for manifest-played minor cards:
+Legacy default prototype chassis used to be:
 
 ```text
 strong move
@@ -88,10 +105,21 @@ strong move
 
 This is not a universal law for every future strong-capable surface.
 
-It is the default chassis for:
+It was the default chassis for:
 
 ```text
 ordinary minor card played from hand into manifest chain
+```
+
+## 3.5 Status consequence
+
+Пока новый turn-law не стабилизировал
+судьбу strong как отдельного класса хода,
+этот документ читать как:
+
+```text
+useful pair-reading theory
+not locked current move-law execution
 ```
 
 ## 4. Pair classes

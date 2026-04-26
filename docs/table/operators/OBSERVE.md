@@ -9,17 +9,25 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+aligned with hidden / known / revealed model
 ```
 
 ## 1. Core identity
 
-`☴` = inspect hidden information without forcing change.
+`☴` now reads through the new information-state model:
+
+```text
+hidden -> known
+```
+
+It is no longer useful to describe `☴`
+as vague “look at hidden card” language only.
 
 Short formula:
 
 ```text
-knowledge without mandatory state rewrite
+☴ = hidden to known
 ```
 
 ## 2. What it is not
@@ -32,25 +40,35 @@ knowledge without mandatory state rewrite
 - removal
 - free broad search
 
-## 3. Weak law
+## 3. Current playtest law
 
-Weak `☴` gives a narrow observe action.
-
-Current safe reading:
-
-- look at one hidden card
-- hidden card remains hidden unless another law says otherwise
-
-## 4. Strong law
-
-Strong `☴` keeps observe identity,
-but may widen scope or precision.
-
-Strong baseline still applies:
+If `☴` is the chosen operator effect,
+player chooses one legal hidden card
+and that card becomes:
 
 ```text
-draw 2
+known
 ```
+
+It does **not** become `revealed` by default.
+
+That means:
+
+- card identity is known
+- card may remain face-down on the table
+- a later visual layer may show ghost identity over the back
+
+## 4. Trump consequence
+
+Because trump-law now triggers on `known`,
+`☴` can immediately cause trump-event behavior
+if the observed hidden card is a trump,
+unless zone override says otherwise.
+
+Important special case:
+
+- in `targets`, known trump stays there and becomes revealed
+- outside `targets`, known trump triggers prototype trump-event path
 
 ## 5. Pair law directions
 
@@ -71,6 +89,8 @@ That means:
 - player may privately inspect one physical hidden card
 - card position must remain recoverable
 - observation cannot rely on invisible engine memory
+- if digital prototype shows ghost identity,
+  that overlay must represent real knowledge, not fake engine clairvoyance
 
 ## 7. Restrictions
 
@@ -80,12 +100,12 @@ That means:
 
 ## 8. Open questions
 
-- default weak scope: same column only or any legal hidden card
-- whether topdeck counts as standard hidden observe target by default
-- exact strong widening for self-pair and mixed pairs
+- default observe scope in the new move branch
+- whether topdeck counts as ordinary observe target by default
+- whether some mixed pairs should escalate known directly into revealed
 
 ## 9. Short formula
 
 ```text
-☴ OBSERVE = inspect hidden state without mandatory manifestation
+☴ OBSERVE = hidden becomes known without mandatory reveal
 ```

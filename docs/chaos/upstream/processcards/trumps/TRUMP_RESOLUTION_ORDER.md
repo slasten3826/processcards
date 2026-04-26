@@ -100,7 +100,60 @@ queue, not stack
 
 ---
 
-## 5. Why This Matters
+## 5. In-Flight Trumps
+
+While a trump chain is still resolving,
+resolved trumps are not yet parked in `trump zone`.
+
+They remain:
+
+```text
+in-flight
+```
+
+This matters because:
+
+- `trump zone` should not release mid-chain
+- chain exceptions such as `HALT` need access to the full active anomaly contour
+- ecology handling belongs to chain close, not mid-chain
+
+Short formula:
+
+```text
+resolve now
+park later
+```
+
+---
+
+## 6. Chain Close Handling
+
+When an ordinary trump chain closes:
+
+1. resolved in-flight trumps are transferred into `trump zone` in resolution order
+2. if this produces a third parked trump, resolve the ordinary chamber release
+
+When a halted chain closes:
+
+1. all non-`HALT` trumps from that halted chain are shuffled into deck
+2. `HALT` itself enters ordinary trump ecology
+
+Short formula:
+
+```text
+ordinary close -> trump zone
+halted close -> deck flush + HALT to trump zone
+```
+
+Canonical compression:
+
+```text
+HALTed chain parks nothing except HALT itself
+```
+
+---
+
+## 7. Why This Matters
 
 This keeps `ProcessCards` readable.
 
@@ -112,16 +165,17 @@ It should behave like a process machine:
 2. the local board shape is restored
 3. newly active anomalies enter the queue
 4. the queue resolves in order
+5. the closed chain enters ecology handling
 
 Short formula:
 
 ```text
-board repair -> event queue -> ordered resolution
+board repair -> event queue -> ordered resolution -> chain close handling
 ```
 
 ---
 
-## 6. Example Reading
+## 8. Example Reading
 
 `EJECT` targets a manifest card whose hidden counterpart causes exposure of a trump.
 
@@ -135,15 +189,23 @@ Correct order:
 If that trump causes another trump,
 the second trump enters the queue after the first.
 
+If `HALT` is later activated in that same chain,
+the current resolving item may finish,
+but the chain closes through halted-chain handling instead of ordinary parking.
+
 ---
 
-## 7. Minimal Canonical Summary
+## 9. Minimal Canonical Summary
 
 ```text
 ProcessCards uses ordered trump resolution, not stack resolution.
 If a trump effect creates a board vacancy, restore the slot first.
 If a trump effect activates another trump, enqueue it.
 Resolve trumps in the order they were caused.
+Resolved trumps remain in-flight until chain close.
+Ordinary closed chains enter trump zone.
+Halted chains flush non-HALT trumps into deck, while HALT itself follows ordinary ecology.
+HALTed chain parks nothing except HALT itself.
 ```
 
 ---

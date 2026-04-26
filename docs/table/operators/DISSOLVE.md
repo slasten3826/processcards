@@ -9,51 +9,65 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+aligned with hidden / known / revealed model
 ```
 
 ## 1. Core identity
 
-`☷` = remove a field presence from active structure.
+`☷` now reads as the primary removal operator
+for the main visible game field.
 
 Short formula:
 
 ```text
-sever / break / send out of field
+send one revealed field card to grave
 ```
 
 ## 2. What it is not
 
 `☷` is not:
 
-- ordinary replacement of the played target card
 - draw
 - reveal
+- removal of hidden cards by default
+- removal of merely known cards by default
 - free destruction of anything anywhere
 
-## 3. Weak law
+## 3. Current playtest law
 
-Weak `☷` performs a narrow dissolve action.
+If `☷` is the chosen operator effect,
+it may remove:
 
-Current safe reading:
+1. one `revealed` card in `manifest`
+2. one `revealed` card in `latent`
+3. revealed `topdeck`, if topdeck is currently in revealed state
 
-- send one legal field card to `grave`
-
-## 4. Strong law
-
-Strong `☷` widens dissolve power.
-
-Strong baseline still applies:
+That card goes to:
 
 ```text
-draw 2
+grave
 ```
 
-Strong may mean:
+This makes `☷` a revealed-only removal operator.
 
-- broader legal target space
-- stronger severance privilege
-- dissolve combined with second operator
+## 4. Main field law
+
+`☷` acts only on the main game field by default.
+
+That means it may touch:
+
+- open `manifest`
+- revealed `latent`
+- revealed `topdeck`
+
+It does **not** by default target:
+
+- `hand`
+- `grave`
+- `runtime`
+- arbitrary zone content
+- hidden `targets`
 
 ## 5. Pair law directions
 
@@ -72,21 +86,22 @@ That means:
 - removed card physically goes to `grave`
 - zone change is visible
 - legal target class must be table-readable
+- hidden cards are not legal dissolve targets unless another law explicitly upgrades them
 
 ## 7. Restrictions
 
 - `☷` cannot mean "remove anything" without a target law
-- target scope must be bounded
+- target scope must stay on revealed field-presence by default
 - dissolve should not silently rewrite multiple zones unless pair law says so
 
 ## 8. Open questions
 
-- default weak target class: manifest only or any legal field card
-- whether runtime cards are dissolvable by default
+- whether revealed `targets` later count as main field for dissolve
+- whether `known but not revealed` should ever become dissolvable under pair law
 - exact pair texts for `☷△`, `☷☱`, `☷☶`
 
 ## 9. Short formula
 
 ```text
-☷ DISSOLVE = remove one legal field presence into grave
+☷ DISSOLVE = send one revealed main-field card to grave
 ```

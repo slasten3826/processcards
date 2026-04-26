@@ -9,75 +9,79 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+current hand-refill operator
 ```
 
 ## 1. Core identity
 
-`☰` = hand-side assembly operator.
+В текущей новой ветке `☰`
+рассматривается уже не как segment compiler,
+а как основной оператор подпитки руки.
 
 Short formula:
 
 ```text
-turn hand-state into board-structure
+☰ = perform 2 draw procedures
 ```
 
-## 2. Canon source
+## 2. Current playtest law
 
-Detailed law is fixed in:
+If `☰` is the chosen operator effect,
+player performs:
 
-- [../CONNECT_LAW.md](../CONNECT_LAW.md)
+```text
+2 draw procedures
+```
 
-This family file summarizes that law in the operator index layer.
+Read those procedures through:
 
-## 3. Split identity
+- [../DRAW_PROCEDURE_LAW.md](../DRAW_PROCEDURE_LAW.md)
 
-`☰` has two modes:
+## 3. Why this fits
 
-1. single-card mode
-2. multi-card mode
+`☰` now becomes the dedicated operator
+for hand continuation.
 
-## 4. Weak and strong reading
+This is useful because:
 
-### Single-card mode
+- every played card already costs `hand -1`
+- not every operator should restore hand
+- draw should live on a specific operator,
+  not as a background rule of every move
 
-If a single `☰X` card is played alone:
+## 4. Trump consequence
 
-- `☰` itself is quiet
-- partner operator `X` provides the payload
-- weak/strong legality still belongs to the play law
+Because draw already reveals first,
+`☰` naturally carries trump risk.
 
-### Multi-card mode
+That means:
 
-If two or more `☰` cards are committed from hand:
+- `☰` does not guarantee 2 cards in hand
+- it guarantees 2 draw procedures
+- any of those may be consumed by trump-event
 
-- `☰` becomes active as a segment compiler
-- a contiguous arc of the manifest ring is replaced by a hand-built segment
-- strong topology constrains the assembled segment
+## 5. Restrictions
 
-## 5. Physical execution law
+- `☰` should not secretly bypass draw law
+- `☰` does not mean “take 2 cards ignoring trump”
+- `☰` is hand refill, not generic topology override
 
-Connect is cardboard-playable because:
+## 6. Legacy relation
 
-- cards come from hand
-- segment is physically laid into visible manifest slots
-- replaced manifest cards visibly go to grave
-- arc continuity is visible on table
-
-## 6. Restrictions
-
-- `☰` is not generic multi-play permission
-- segment must satisfy topology law
-- current manifest is replaced, not used as assembly material
+Older assembly / segment-compiler readings of `☰`
+should now be treated as legacy branch material
+unless later the game explicitly returns to that idea.
 
 ## 7. Open questions
 
-- whether every multi-card `☰` play counts as strong automatically
-- exact single-card weak/strong wording for edge cases
-- whether extra follow-up effect exists after installation
+- whether `☰☰` should stay exactly `draw 2`
+  or later become stronger
+- whether some pair-laws should modify one of the two draw procedures
+- whether later hand-cap pressure needs extra constraint on repeated `☰`
 
 ## 8. Short formula
 
 ```text
-☰ CONNECT = quiet alone, structural when assembled
+☰ CONNECT = perform 2 draw procedures
 ```

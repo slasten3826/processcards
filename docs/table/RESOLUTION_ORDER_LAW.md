@@ -109,6 +109,19 @@ then the board repairs the hole
 - relation between primary effect and chain repair
 - порядок repair внутри колонки
 
+Для новой turn-sequence ветки действует ещё одно уточнение:
+
+```text
+world update may still precede the played hand-card effect
+if the move law explicitly says so
+```
+
+То есть:
+
+- `RESOLUTION_ORDER_LAW` остаётся общим законом
+- а конкретный порядок внутри topology-first move
+  задаётся отдельно в `TURN_SEQUENCE_LAW_V2`
+
 Он пока не решает:
 
 - later trump post-resolution order
@@ -125,6 +138,8 @@ then the board repairs the hole
 
 - `CHAIN_SURFACE_LAW` = что именно чинится и чем
 - `RESOLUTION_ORDER_LAW` = когда именно это чинится
+- `TURN_SEQUENCE_LAW_V2` = как topology-first move собирает
+  world update и hand-card effect в один конкретный sequence
 
 ## 9. Short formula
 

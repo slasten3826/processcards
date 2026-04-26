@@ -3,19 +3,28 @@
 Статус:
 
 ```text
-canonical table law
+candidate-for-legacy table law
+pending rewrite after turn-law stabilization
 ```
 
-Этот документ фиксирует текущий канон для `☰ CONNECT`.
+Этот документ фиксирует старую наиболее развитую ветку для `☰ CONNECT`,
+собранную вокруг hand-side segment assembly.
+
+После перехода к новой move-модели
+этот документ больше не должен читаться
+как безусловный current gameplay canon.
 
 Если старые документы описывают `☰` иначе,
 этот документ имеет приоритет.
+
+Но если этот документ расходится с новой topology-first move-моделью,
+приоритет уже не у него.
 
 ## 1. High-level idea
 
 `☰` is not mainly a board-side effect.
 
-Canonical reading:
+Legacy canonical reading used to be:
 
 ```text
 ☰ = hand-side assembly operator
@@ -65,7 +74,7 @@ multi-card ☰ assembles a manifest segment from hand
 
 ## 3. Connect Segment Law
 
-Current canonical formulation:
+Legacy formulation:
 
 1. Player initiates a `☰` play.
 2. One or more `☰` cards are committed from hand.
@@ -141,14 +150,19 @@ Still not fully locked:
 2. whether every multi-card `☰` automatically counts as strong
 3. whether any extra follow-up effect exists after segment installation
 
-These questions do not overturn the canonical identity of `☰`.
+These questions do not overturn the old branch identity of `☰`.
 
 ## 9. Legacy relation
 
 If older files treat `☰` as a generic local linking effect,
 read those files as legacy.
 
-This document is current canon.
+This file itself is now a transition candidate:
+
+```text
+the semantic intuition may remain useful
+the move chassis around it is no longer fully current
+```
 
 ## 10. Short formula
 

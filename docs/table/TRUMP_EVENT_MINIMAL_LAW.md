@@ -11,7 +11,7 @@ canonical prototype table law
 
 ## 1. Core claim
 
-Если козырь становится видимым
+Если козырь становится `known`
 вне special-case override `targets`,
 то он не продолжает жить как обычная карта зоны.
 
@@ -39,7 +39,7 @@ resolved trump moves to trump zone
 
 ## 3. Observe path
 
-Если observe-path обнаруживает козырь
+Если observe-path делает козырь `known`
 вне `targets`,
 то:
 
@@ -54,11 +54,11 @@ resolved trump moves to trump zone
 
 Для `targets` этот общий закон не действует напрямую.
 
-Если козырь обнаружен в `targets`,
+Если козырь становится `known` в `targets`,
 то:
 
 - он не запускает `TRUMP event`
-- он флипается
+- он становится `revealed`
 - остаётся в `targets` face-up
 
 См.:
@@ -70,8 +70,7 @@ resolved trump moves to trump zone
 Для текущего прототипа draw-path должен мыслиться так:
 
 ```text
-draw = reveal top deck first
-then take card
+each draw is one separate draw procedure
 ```
 
 Это важно потому что:
@@ -81,6 +80,8 @@ then take card
 - если top deck оказался trump,
   она не считается “обычно взятой в руку”
   и уходит в `TRUMP event` path
+  и сжигает именно эту draw procedure,
+  но не весь multi-draw effect целиком
 
 ## 6. Hand consequence
 
@@ -92,7 +93,7 @@ then take card
 
 Сначала:
 
-1. card becomes visible
+1. card becomes known
 2. if it is a trump, `TRUMP event` fires
 3. only non-trump card proceeds to ordinary hand entry
 
@@ -119,13 +120,13 @@ then take card
 Он решает только:
 
 ```text
-what the prototype does the moment a trump becomes visible outside targets
+what the prototype does the moment a trump becomes known outside targets
 ```
 
 ## 9. Short formula
 
 ```text
-visible trump outside targets triggers TRUMP event
+known trump outside targets triggers TRUMP event
 minimal TRUMP event sends that trump to trump zone
 draw reveals first, then only non-trumps enter hand normally
 ```

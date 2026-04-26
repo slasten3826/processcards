@@ -58,7 +58,8 @@ svyato mesto pusto ne byvaet
 1. `latent[i]` поднимается в `manifest[i]`
 2. поднятая карта раскрывается,
    если она была закрыта
-3. в `latent[i]` докладывается новая карта из `deck` face-down
+3. в `latent[i]` докладывается новая карта из `deck`
+   с сохранением её текущего information state
 
 Короткая формула:
 
@@ -73,7 +74,8 @@ latent hole is repaired by deck
 то:
 
 1. слот `latent[i]` становится пуст
-2. в `latent[i]` докладывается новая карта из `deck` face-down
+2. в `latent[i]` докладывается новая карта из `deck`
+   с сохранением её текущего information state
 
 То есть:
 
@@ -100,8 +102,12 @@ latent -> manifest = reveal on ascent
 Из этого следует:
 
 - `manifest` не пополняется скрытой картой
-- `latent` остаётся hidden reservoir
+- `latent` по умолчанию остаётся hidden reservoir
 - `deck` взаимодействует с `manifest` только опосредованно, через `latent`
+
+Но если карта из `deck` уже стала `known` или `revealed`
+по другому закону,
+repair не должен заново делать её полной hidden.
 
 ## 7. What this law does not decide
 
@@ -123,4 +129,5 @@ how manifest and latent structurally refill
 manifest is repaired by latent
 latent is repaired by deck
 latent rises revealed
+deck refill preserves current known/revealed state
 ```

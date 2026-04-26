@@ -11,23 +11,30 @@ canonical table law
 - `observe`
 - `reveal`
 
+И опирается на общий truth-model:
+
+- `hidden`
+- `known`
+- `revealed`
+
 А также special-case поведение козырей в observe-path.
 
 ## 1. Core distinction
 
 `observe` и `reveal` — не одно и то же.
 
-Коротко:
+Коротко базовое различие:
 
 ```text
-reveal changes the board
-observe shows hidden information without automatically changing the board
+observe creates known without necessarily creating revealed
+reveal creates revealed board state
 ```
 
 ## 2. Reveal
 
 `Reveal` значит:
 
+- карта становится `revealed`
 - карта реально становится открытой частью board state
 - её информационный режим меняется для машины
 - это больше не просто частное знание наблюдателя
@@ -42,6 +49,7 @@ observe shows hidden information without automatically changing the board
 
 `Observe` значит:
 
+- карта становится `known`
 - игрок получает доступ к скрытой информации
 - но сама карта не обязана менять свой board-state
 - это inspection of hidden content, not automatic board reveal
@@ -50,7 +58,7 @@ observe shows hidden information without automatically changing the board
 
 ```text
 observe is an inspection act
-not the same thing as face-up persistence
+it creates known, not necessarily revealed
 ```
 
 ## 4. Trump on observe: general law
@@ -61,7 +69,7 @@ not the same thing as face-up persistence
 Коротко:
 
 ```text
-observed trump triggers TRUMP event
+observed trump becomes known and triggers TRUMP event
 ```
 
 ## 5. Target zone override
@@ -73,7 +81,7 @@ observed trump triggers TRUMP event
 то он:
 
 - **не** запускает `TRUMP event`
-- просто флипается
+- становится `revealed`
 - остаётся в том же `targets[i]`
 - остаётся там в открытую
 
@@ -81,7 +89,7 @@ observed trump triggers TRUMP event
 
 ```text
 observed trump in targets does not auto-resolve
-it flips and remains in targets face-up
+it becomes revealed and remains in targets face-up
 ```
 
 ## 6. Why this distinction matters
@@ -94,7 +102,7 @@ it flips and remains in targets face-up
 
 Иначе `observe` превратится в неясную смесь:
 
-- flip
+- know
 - reveal
 - event trigger
 
@@ -106,6 +114,7 @@ it flips and remains in targets face-up
 - [TRUMP_EVENT_MINIMAL_LAW.md](./TRUMP_EVENT_MINIMAL_LAW.md)
 - [TRUMP_ZONE_LAW.md](./TRUMP_ZONE_LAW.md)
 - [GRAVE_LAW.md](./GRAVE_LAW.md)
+- [CARD_INFORMATION_STATE_LAW.md](./CARD_INFORMATION_STATE_LAW.md)
 
 Разделение такое:
 
@@ -113,6 +122,7 @@ it flips and remains in targets face-up
 - `TARGET_ZONE_LAW` = special behavior of target cards
 - `TRUMP_EVENT_MINIMAL_LAW` = what prototype-level trump event currently means
 - `TRUMP_ZONE_LAW` = what happens to resolved trump residue later
+- `CARD_INFORMATION_STATE_LAW` = hidden / known / revealed truth model
 
 ## 8. What this law does not decide yet
 
@@ -133,6 +143,8 @@ and observed trump normally triggers TRUMP event except in targets
 
 ```text
 observe != reveal
+observe creates known
+revealed creates board-open state
 observed trump usually triggers TRUMP event
-observed trump in targets only flips and stays there
+observed trump in targets only becomes revealed and stays there
 ```

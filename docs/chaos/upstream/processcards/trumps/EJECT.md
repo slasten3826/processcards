@@ -14,6 +14,12 @@ Legacy breadcrumb:
 I. Маг
 ```
 
+Flavor text:
+
+```text
+What cannot remain is ejected.
+```
+
 Core edge:
 
 ```text

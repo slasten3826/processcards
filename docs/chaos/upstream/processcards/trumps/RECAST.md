@@ -23,6 +23,12 @@ Primary short name:
 RECAST
 ```
 
+Flavor text:
+
+```text
+System rewritten. Context inverted.
+```
+
 ## 1. Core Reading
 
 `☳ CHOOSE` does not resolve as free choice.

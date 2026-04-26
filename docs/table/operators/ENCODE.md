@@ -9,17 +9,18 @@ Symbol:
 Статус:
 
 ```text
-canonical operator family
+canonical operator law
+aligned with hidden / known / revealed model
 ```
 
 ## 1. Core identity
 
-`☵` = hidden-order manipulation and concealed restructuring.
+`☵` now reads as direct concealed swap.
 
 Short formula:
 
 ```text
-change hidden structure without immediate public display
+☵ = choose two not-revealed cards and swap them
 ```
 
 ## 2. What it is not
@@ -30,33 +31,64 @@ change hidden structure without immediate public display
 - generic discard
 - generic draw by itself
 - random shuffle-everything permission
+- lawful one-step motion like `FLOW`
 
-## 3. Weak law
+## 3. Current playtest law
 
-Weak `☵` performs a narrow encode action.
+If `☵` is the chosen operator effect:
 
-Current safe reading direction:
+1. choose two legal `not-revealed` cards
+2. swap them
 
-- reorder hidden cards within a legal local scope
-- or inspect/manipulate top hidden order under limited scope
+`Not-revealed` includes:
 
-## 4. Strong law
+- `hidden`
+- `known`
 
-Strong `☵` widens encode power.
+but excludes:
 
-Strong baseline still applies:
+- `revealed`
+
+## 4. Legal spaces
+
+`☵` may swap between zones.
+
+Default legal hidden structures:
+
+- `targets`
+- `latent`
+- `deck`
+
+But with one restriction:
 
 ```text
-draw 2
+inside deck, only topdeck is a legal encode target
+and only if that topdeck is not-revealed
 ```
 
-Strong should feel like:
+So:
 
-- deeper hidden arrangement
-- stronger scry-like control
-- broader concealed restructuring
+- `latent <-> latent` is legal
+- `targets <-> targets` is legal
+- `latent <-> targets` is legal
+- `latent <-> topdeck` is legal if topdeck is not-revealed
+- `targets <-> topdeck` is legal if topdeck is not-revealed
 
-## 5. Pair law directions
+## 5. Why this fits
+
+This makes `☵` different from `▽ FLOW`:
+
+- `FLOW` = lawful one-step motion inside native order
+- `ENCODE` = deliberate swap of two concealed positions
+
+So:
+
+```text
+flow advances
+encode rewrites
+```
+
+## 6. Pair law directions
 
 - `☵☴` — observe hidden state and then encode it
 - `☵☳` — choose what hidden state to rearrange
@@ -64,30 +96,31 @@ Strong should feel like:
 - `☵☶` — encode while ignoring one native encode restriction
 - `☵☱` — install encode as a runtime-form process
 
-## 6. Physical execution law
+## 7. Physical execution law
 
 Encode must remain executable with physical cards.
 
 That means:
 
-- hidden-card order must be physically trackable
-- reordering must use actual table positions
+- hidden-card positions must be physically trackable
+- swap must use actual table positions
 - no invisible engine-only storage
 
 ## 7. Restrictions
 
 - `☵` should not become unrestricted tutor/search
-- `☵` should preserve hiddenness unless another operator breaks it
-- scope must be bounded by pair law or table law
+- `☵` should preserve not-revealed state unless another operator breaks it
+- revealed cards are illegal encode targets
+- deck access is bounded to topdeck only
 
 ## 8. Open questions
 
-- default weak scope: same column, latent row slice, or topdeck only
-- exact distinction between encode and flow
-- whether some encode actions may legally affect target compiler later
+- whether `☵☵` should stay simple swap or amplify scope
+- whether later pair-laws may allow 3-card encode structures
+- whether topdeck can ever be encoded if it is already revealed
 
 ## 9. Short formula
 
 ```text
-☵ ENCODE = reorder and reshape hidden structure
+☵ ENCODE = choose two not-revealed cards and swap them
 ```

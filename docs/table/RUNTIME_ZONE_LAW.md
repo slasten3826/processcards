@@ -3,7 +3,8 @@
 Статус:
 
 ```text
-mixed table law
+canonical table law
+current runtime install branch
 ```
 
 Этот документ фиксирует поведение зоны:
@@ -12,10 +13,9 @@ mixed table law
 runtime
 ```
 
-Внутри него разделены:
-
-- `canonical zone law`
-- `draft gameplay hypothesis`
+Внутри него сохранён текущий канон зоны
+и отдельно оставлена legacy-draft гипотеза
+для исторического следа.
 
 ## 1. Core identity
 
@@ -44,6 +44,11 @@ Non-runtime cards не могут:
 - устанавливаться в `runtime`
 - оставаться в `runtime`
 
+Special-case override:
+
+- if `☱☱` currently occupies runtime,
+  one later chosen minor card may replace it there
+
 ## 3. Persistence law
 
 Если карта попала в `runtime`,
@@ -58,7 +63,42 @@ runtime cards persist until explicitly removed
 
 То есть `runtime` не является одноразовым transit-slot.
 
-## 4. Current unresolved edge
+## 4. Current canonical grant law
+
+Если в `runtime` лежит карта `☱X`,
+то она не даёт фоновую ауру.
+
+Она даёт:
+
+```text
+one extra reusable operator choice: X
+```
+
+То есть при розыгрыше любой карты игрок может выбрать:
+
+- operator A карты
+- operator B карты
+- runtime operator `X`
+
+Но всегда ровно один эффект.
+
+## 5. Special opener law: `☱☱`
+
+Если в `runtime` лежит `☱☱`,
+то оно открывает install-rule:
+
+```text
+the next chosen minor card may be installed into runtime
+even if it has no ☱
+```
+
+Эта новая карта:
+
+1. replaces `☱☱` in runtime
+2. sends `☱☱` to `grave`
+3. grants both of its operators as extra runtime choices
+
+## 6. Current unresolved edge
 
 На текущем слое ещё **не решено**:
 
@@ -66,7 +106,7 @@ runtime cards persist until explicitly removed
 - какие конкретно эффекты имеют право её удалять
 - может ли later существовать больше одной runtime slot
 
-## 5. Draft gameplay hypothesis
+## 7. Legacy draft branch
 
 Ниже идёт **не канон**, а рабочий draft.
 
@@ -86,11 +126,11 @@ for all played cards
 Статус этой идеи:
 
 ```text
-draft only
-not yet canonical
+legacy draft only
+not current canonical branch
 ```
 
-## 6. Why the draft is not locked yet
+## 8. Why the draft is not locked yet
 
 Эта гипотеза пока ещё не добита,
 потому что она сразу тянет за собой:
@@ -103,19 +143,21 @@ not yet canonical
 То есть это уже не просто zone rule,
 а кусок общей effect engine.
 
-## 7. What is canonical right now
+## 9. What is canonical right now
 
 На текущем шаге жёстко зафиксировано только:
 
 1. `runtime` — отдельная installed zone
-2. туда могут попадать только runtime-cards
-3. карта в `runtime` лежит там,
+2. туда по умолчанию могут попадать только runtime-cards
+3. `☱☱` may temporarily open runtime for any later minor card
+4. installed runtime card grants extra choice(s), not free extra cast
+5. карта в `runtime` лежит там,
    пока эффект явно не уберёт её оттуда
 
-## 8. Short formula
+## 10. Short formula
 
 ```text
 runtime is a persistent install zone
-only runtime-cards may enter it
-what the installed card actually grants remains draft
+runtime grants extra future operator choices
+☱☱ opens runtime for any later minor card
 ```

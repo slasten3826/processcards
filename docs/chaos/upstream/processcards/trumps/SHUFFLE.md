@@ -16,6 +16,12 @@ Primary short name:
 SHUFFLE
 ```
 
+Flavor text:
+
+```text
+History becomes future again.
+```
+
 Edge:
 
 ```text
