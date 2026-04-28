@@ -19,8 +19,8 @@ Current read order:
 ```text
 OPERATORS_INDEX.md
 -> operators/*.md
--> OPERATOR_MODEL.md as candidate-for-legacy semantic layer
--> CONNECT_LAW.md as candidate-for-legacy semantic layer
+-> ../legacy/table/OPERATOR_MODEL.md as legacy semantic layer
+-> ../legacy/table/CONNECT_LAW.md as legacy semantic layer
 -> older legacy drafts
 ```
 

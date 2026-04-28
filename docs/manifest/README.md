@@ -20,13 +20,13 @@
 
 Сюда входят:
 
-- [CONTEXT.md](../table/CONTEXT.md)
-- [PROTOTYPE_TABLE.md](../table/PROTOTYPE_TABLE.md)
 - [DECK_AND_SETUP_LAW.md](../table/DECK_AND_SETUP_LAW.md)
+- [CURRENT_CANON_SUMMARY.md](../table/CURRENT_CANON_SUMMARY.md)
+- [BOARD_SCOPE_LAW.md](../table/BOARD_SCOPE_LAW.md)
 - [CHAIN_SURFACE_LAW.md](../table/CHAIN_SURFACE_LAW.md)
 - [CARD_INFORMATION_STATE_LAW.md](../table/CARD_INFORMATION_STATE_LAW.md)
+- [MACHINE_PRIMITIVES_LAW.md](../table/MACHINE_PRIMITIVES_LAW.md)
 - [GRAVE_LAW.md](../table/GRAVE_LAW.md)
-- [HAND_AND_PLAY_LAW.md](../table/HAND_AND_PLAY_LAW.md) — legacy replacement-model law
 - [OBSERVE_VS_REVEAL_LAW.md](../table/OBSERVE_VS_REVEAL_LAW.md)
 - [MOVE_FIT_LAW.md](../table/MOVE_FIT_LAW.md) — current move-fit canon
 - [RESOLUTION_ORDER_LAW.md](../table/RESOLUTION_ORDER_LAW.md)
@@ -34,10 +34,26 @@
 - [TARGET_ZONE_LAW.md](../table/TARGET_ZONE_LAW.md)
 - [TURN_LAW_V2.md](../table/TURN_LAW_V2.md) — current turn-law canon
 - [TURN_SEQUENCE_LAW_V2.md](../table/TURN_SEQUENCE_LAW_V2.md) — current turn sequence canon
+- [WIN_CHECK_LAW.md](../table/WIN_CHECK_LAW.md)
+- [WIN_CHECK_MIGRATION_STATUS.md](../table/WIN_CHECK_MIGRATION_STATUS.md)
 - [TRUMP_EVENT_MINIMAL_LAW.md](../table/TRUMP_EVENT_MINIMAL_LAW.md)
 - [TRUMP_BRANCH_STATUS.md](../table/TRUMP_BRANCH_STATUS.md)
+- [TRUMP_FLOW_LAW.md](../table/TRUMP_FLOW_LAW.md)
+- [TRUMP_RESOLUTION_ORDER_LAW.md](../table/TRUMP_RESOLUTION_ORDER_LAW.md)
 - [TRUMP_ZONE_LAW.md](../table/TRUMP_ZONE_LAW.md)
 - [TRUMP_IDENTITY_LAW.md](../table/TRUMP_IDENTITY_LAW.md)
+- [FOOL_LAW.md](../table/FOOL_LAW.md)
+- [SHUFFLE_LAW.md](../table/SHUFFLE_LAW.md)
+- [UNVEIL_LAW.md](../table/UNVEIL_LAW.md)
+- [RESET_LAW.md](../table/RESET_LAW.md)
+- [SWAP_LAW.md](../table/SWAP_LAW.md)
+- [WARRANT_LAW.md](../table/WARRANT_LAW.md)
+- [REPEAT_LAW.md](../table/REPEAT_LAW.md)
+- [UNBOUND_LAW.md](../table/UNBOUND_LAW.md)
+- [HALT_LAW.md](../table/HALT_LAW.md)
+- [EJECT_LAW.md](../table/EJECT_LAW.md)
+- [ORACLE_LAW.md](../table/ORACLE_LAW.md)
+- [RECAST_LAW.md](../table/RECAST_LAW.md)
 
 ## `docs/crystall/`
 
@@ -45,14 +61,21 @@
 
 Сюда входят:
 
-- [AGENT_BRIEF.md](../crystall/AGENT_BRIEF.md)
-- [IMPLEMENTATION_PLAN.md](../crystall/IMPLEMENTATION_PLAN.md)
-- [PROTOTYPE_CRYSTALL.md](../crystall/PROTOTYPE_CRYSTALL.md)
 - [LAYERED_PROJECT_POLICY.md](../crystall/LAYERED_PROJECT_POLICY.md)
-- [START_GAME_FLOW.md](../crystall/START_GAME_FLOW.md)
+- [CODE_MIGRATION_PLAN_V2.md](../crystall/CODE_MIGRATION_PLAN_V2.md)
 - [GAMEPLAY_ANIMATION_LAYER.md](../crystall/GAMEPLAY_ANIMATION_LAYER.md)
-- [NEXT_GAMEPLAY_SLICE.md](../crystall/NEXT_GAMEPLAY_SLICE.md) — legacy replacement-model slice
 - [NEXT_GAMEPLAY_SLICE_V2.md](../crystall/NEXT_GAMEPLAY_SLICE_V2.md)
+
+## `docs/legacy/`
+
+Предыдущие поколения документов.
+
+Сюда входят:
+
+- [README.md](../legacy/README.md)
+- [table/](../legacy/table/)
+- [crystall/](../legacy/crystall/)
+- [manifest/](../legacy/manifest/)
 
 ## `docs/manifest/`
 
@@ -61,6 +84,7 @@
 Сюда входят:
 
 - [README.md](./README.md)
+- [PROCESSCARDS_IDENTITY.md](./PROCESSCARDS_IDENTITY.md)
 - [STYLE_CANON.md](./STYLE_CANON.md)
 - [CARD_FACE_COLOR_DIRECTION.md](./CARD_FACE_COLOR_DIRECTION.md)
 - [CARD_FIELD_DARKENING.md](./CARD_FIELD_DARKENING.md)
@@ -108,6 +132,13 @@ crystall = runtime / implementation shell
 manifest = concrete visible card design
 ```
 
+Отдельно:
+
+```text
+manifest may also carry project identity notes
+when they define how the whole game should be read
+```
+
 И ещё один важный закон документации:
 
 ```text
@@ -132,20 +163,32 @@ old docs are marked as legacy or superseded
 
 ### Legacy replacement branch
 
-- [HAND_AND_PLAY_LAW.md](../table/HAND_AND_PLAY_LAW.md)
-- [NEXT_GAMEPLAY_SLICE.md](../crystall/NEXT_GAMEPLAY_SLICE.md)
+- [HAND_AND_PLAY_LAW.md](../legacy/table/HAND_AND_PLAY_LAW.md)
+- [NEXT_GAMEPLAY_SLICE.md](../legacy/crystall/NEXT_GAMEPLAY_SLICE.md)
 
-### Candidate-for-legacy group
+### Legacy operator / strong branch
 
-Эти документы пока не объявлены legacy,
-но их канон почти наверняка придётся пересобирать
-после стабилизации нового turn-law:
+Эти документы уже вынесены из current tree
+и сохраняются как semantic archive
+предыдущей модели:
 
-- [OPERATOR_MODEL.md](../table/OPERATOR_MODEL.md)
-- [STRONG_COMBINED_LAW.md](../table/STRONG_COMBINED_LAW.md)
-- [STRONG_PAIR_TABLE.md](../table/STRONG_PAIR_TABLE.md)
-- [CONNECT_LAW.md](../table/CONNECT_LAW.md)
+- [OPERATOR_MODEL.md](../legacy/table/OPERATOR_MODEL.md)
+- [STRONG_COMBINED_LAW.md](../legacy/table/STRONG_COMBINED_LAW.md)
+- [STRONG_PAIR_TABLE.md](../legacy/table/STRONG_PAIR_TABLE.md)
+- [CONNECT_LAW.md](../legacy/table/CONNECT_LAW.md)
 
-Их still можно читать как semantic/archive layer,
-но уже нельзя читать как бесспорный current execution canon
-для новой ветки хода.
+Их можно читать только как history/semantic archive,
+но не как current execution canon.
+
+## Current machine entry
+
+Если нужен быстрый вход в актуальную машину,
+читать в таком порядке:
+
+1. [PROCESSCARDS_IDENTITY.md](./PROCESSCARDS_IDENTITY.md)
+2. [CURRENT_CANON_SUMMARY.md](../table/CURRENT_CANON_SUMMARY.md)
+3. [TURN_LAW_V2.md](../table/TURN_LAW_V2.md)
+4. [TURN_SEQUENCE_LAW_V2.md](../table/TURN_SEQUENCE_LAW_V2.md)
+5. [OPERATORS_INDEX.md](../table/OPERATORS_INDEX.md)
+6. [WIN_CHECK_LAW.md](../table/WIN_CHECK_LAW.md)
+7. [WIN_CHECK_MIGRATION_STATUS.md](../table/WIN_CHECK_MIGRATION_STATUS.md)

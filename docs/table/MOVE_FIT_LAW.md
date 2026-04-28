@@ -5,16 +5,15 @@
 ```text
 canonical table law
 current move-fit law
+aligned with compiler/victory machine
 ```
 
-Этот документ фиксирует новую рабочую идею:
+Этот документ фиксирует текущий канон legality:
 
 ```text
 ход формируется через committed manifest-card
 и full-fit карты из руки
 ```
-
-Это текущий канон для topology-legal move validation.
 
 ## 1. Core claim
 
@@ -28,7 +27,7 @@ commit one open manifest card
 
 После этого карта из руки проверяется
 не как самостоятельный “режим weak/strong”,
-а как возможный topology-fit к committed карте мира.
+а как topology-fit к committed карте мира.
 
 ## 2. Committed manifest card
 
@@ -183,7 +182,43 @@ the move is topology-first
 not button-mode-first
 ```
 
-## 10. Relationship to old weak/strong model
+## 10. Manifest sentence consequence
+
+Committed card живёт внутри
+не просто open row,
+а внутри:
+
+```text
+6-slot visible directed sentence surface
+```
+
+Это значит:
+
+- fit проверяет local legality of the move
+- но сам move later переписывает один слот
+  будущего visible victory sentence
+
+Коротко:
+
+```text
+fit is local
+sentence consequence is global
+```
+
+## 11. Relationship to current victory branch
+
+Этот документ не делает win check.
+
+Но он должен быть совместим с тем,
+что later победа проверяется
+against one full directed 6-slot reading of `manifest`.
+
+См.:
+
+- [TURN_LAW_V2.md](./TURN_LAW_V2.md)
+- [WIN_CHECK_LAW.md](./WIN_CHECK_LAW.md)
+
+## 12. Relationship to old weak/strong model
 
 Этот документ естественно конфликтует
 со старой интуицией:
@@ -202,15 +237,14 @@ committed manifest pattern + hand-card fit
 
 А не из заранее выбранного режима.
 
-## 11. What this law does not decide yet
+## 13. What this law does not decide yet
 
 Этот документ пока не решает:
 
 - что игрок делает, если fit не собрался
 - даёт ли legal fit сразу draw reward
-- когда именно играет hand-card effect
-- уходит ли committed manifest-card в grave до effect или после него
-- как exact strong / normal / fallback economy будут называться дальше
+- exact final strong law
+- full compiler derivation grammar
 
 Он решает только:
 
@@ -218,11 +252,12 @@ committed manifest pattern + hand-card fit
 what counts as a topology-legal move candidate
 ```
 
-## 12. Short formula
+## 14. Short formula
 
 ```text
 a move is legal only if the hand card fully closes
 against the committed manifest card
 no orphan operator allowed
 duplicates narrow the gate even harder
+the committed slot belongs to a 6-slot visible sentence surface
 ```

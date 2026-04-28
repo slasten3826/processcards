@@ -48,12 +48,13 @@ all cards in trump zone are face-up
 ## 4. Entry timing
 
 На текущем слое козырь может попасть в `trump zone`
-только после того, как его event-step уже разыгрался.
+только после ordinary chain close.
 
 То есть:
 
 ```text
 trump enters trump zone only after event resolution
+and only on ordinary chain close
 ```
 
 Следствие:
@@ -61,6 +62,15 @@ trump enters trump zone only after event resolution
 - `trump zone` не является staging zone для нерешённого козыря
 - `trump zone` не хранит pending trump
 - `trump zone` хранит только уже resolved trump residue
+- `trump zone` does not receive in-flight trumps mid-chain
+
+Active unresolved trump now belongs in:
+
+- [TRUMP_FLOW_LAW.md](./TRUMP_FLOW_LAW.md)
+
+Ordered close handling now belongs in:
+
+- [TRUMP_RESOLUTION_ORDER_LAW.md](./TRUMP_RESOLUTION_ORDER_LAW.md)
 
 На текущем prototype scope minimal event meaning читается через:
 
@@ -76,14 +86,14 @@ trump enters trump zone only after event resolution
 
 ## 6. Overflow law
 
-Если козырь должен попасть в `trump zone`,
+Если ordinary chain close должен припарковать козырь в `trump zone`,
 но свободного места нет,
 то происходит не вытеснение одной карты,
-а полный сброс всей зоны обратно в deck.
+а chamber release обратно в deck.
 
 Порядок:
 
-1. новый входящий козырь объединяется с текущими козырями в `trump zone`
+1. новый ordinary-closing trump объединяется с текущими козырями в `trump zone`
 2. весь этот набор шафлится обратно в `deck`
 3. `trump zone` становится пустой
 
@@ -92,6 +102,12 @@ trump enters trump zone only after event resolution
 ```text
 overflow does not keep the new trump in zone
 overflow flushes the whole trump residue back into deck
+```
+
+Коротко:
+
+```text
+third parked trump releases the chamber
 ```
 
 ## 7. Information consequence
@@ -125,7 +141,7 @@ and what happens on overflow
 ## 9. Short formula
 
 ```text
-trump zone = 2 open resolved trumps only
-if a new resolved trump would overflow it,
+trump zone = 2 open trumps parked after ordinary chain close
+if a third parked trump would enter,
 new trump + all zone trumps shuffle back into deck
 ```

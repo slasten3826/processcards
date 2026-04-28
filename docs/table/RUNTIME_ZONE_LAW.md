@@ -4,7 +4,7 @@
 
 ```text
 canonical table law
-current runtime install branch
+aligned with current machine branch
 ```
 
 Этот документ фиксирует поведение зоны:
@@ -12,10 +12,6 @@ current runtime install branch
 ```text
 runtime
 ```
-
-Внутри него сохранён текущий канон зоны
-и отдельно оставлена legacy-draft гипотеза
-для исторического следа.
 
 ## 1. Core identity
 
@@ -25,11 +21,31 @@ runtime
 
 - обычной частью `manifest`
 - hidden reservoir как `latent`
+- active event queue как `trump flow`
 - discard residue как `grave`
 
-Это отдельный installed layer.
+Это отдельный installed machine layer.
 
-## 2. Entry restriction
+## 2. Why this zone exists
+
+`runtime` нужен,
+чтобы некоторые operator choices
+не исчезали сразу после одного хода,
+а становились:
+
+```text
+persistent future choices
+```
+
+То есть `runtime` не хранит passive aura by default.
+
+Он хранит:
+
+```text
+installed future option state
+```
+
+## 3. Entry restriction
 
 В `runtime` может попасть только runtime-card.
 
@@ -49,7 +65,7 @@ Special-case override:
 - if `☱☱` currently occupies runtime,
   one later chosen minor card may replace it there
 
-## 3. Persistence law
+## 4. Persistence law
 
 Если карта попала в `runtime`,
 она лежит там до тех пор,
@@ -63,7 +79,7 @@ runtime cards persist until explicitly removed
 
 То есть `runtime` не является одноразовым transit-slot.
 
-## 4. Current canonical grant law
+## 5. Current canonical grant law
 
 Если в `runtime` лежит карта `☱X`,
 то она не даёт фоновую ауру.
@@ -80,9 +96,24 @@ one extra reusable operator choice: X
 - operator B карты
 - runtime operator `X`
 
-Но всегда ровно один эффект.
+Но всегда ровно один effect.
 
-## 5. Special opener law: `☱☱`
+## 6. Machine consequence
+
+Из этого следует:
+
+- runtime не создаёт auto-cast
+- runtime не даёт free multi-effect
+- runtime расширяет menu of legal future choices
+
+Коротко:
+
+```text
+runtime adds choice
+runtime does not add extra cast count
+```
+
+## 7. Special opener law: `☱☱`
 
 Если в `runtime` лежит `☱☱`,
 то оно открывает install-rule:
@@ -98,30 +129,68 @@ even if it has no ☱
 2. sends `☱☱` to `grave`
 3. grants both of its operators as extra runtime choices
 
-## 6. Current unresolved edge
+То есть `☱☱` — это opener,
+а не final payload.
+
+## 8. Slot law
+
+Current branch assumes:
+
+```text
+runtime slot count = 1
+```
+
+Это важно,
+чтобы future operator menu
+не расползалось бесконтрольно.
+
+## 9. Physical execution law
+
+Runtime must stay cardboard-readable.
+
+That means:
+
+- runtime is a real table zone
+- installed card visibly occupies it
+- players can see which extra operator choice(s)
+  the machine currently grants
+
+## 10. Relationship to other machine zones
+
+Разделение now looks like:
+
+- `manifest / latent` = breathing world surface
+- `targets` = compiler zone
+- `trump flow` = active trump queue
+- `trump zone` = resolved trump residue
+- `runtime` = installed future choice layer
+
+Коротко:
+
+```text
+runtime is not world surface
+runtime is not trump queue
+runtime is installed choice memory
+```
+
+## 11. Current unresolved edge
 
 На текущем слое ещё **не решено**:
 
-- куда именно уходит карта после удаления из `runtime`
-- какие конкретно эффекты имеют право её удалять
+- какие конкретно эффекты имеют право удалять runtime card
 - может ли later существовать больше одной runtime slot
+- whether runtime-installed card is always considered revealed by placement law
 
-## 7. Legacy draft branch
+## 12. Legacy draft branch
 
-Ниже идёт **не канон**, а рабочий draft.
-
-Идея:
+Ниже сохраняется уже не current canon,
+а historical hypothesis:
 
 ```text
 while a runtime card remains in runtime,
 its second operator becomes a +1 weak effect
 for all played cards
 ```
-
-То есть runtime-card не просто лежит в зоне,
-а создаёт глобальную модификацию текущей машины.
-
-Но это пока **не зафиксировано как law**.
 
 Статус этой идеи:
 
@@ -130,20 +199,7 @@ legacy draft only
 not current canonical branch
 ```
 
-## 8. Why the draft is not locked yet
-
-Эта гипотеза пока ещё не добита,
-потому что она сразу тянет за собой:
-
-- что значит `+1 weak effect`
-- как это взаимодействует с strong
-- что делать, если runtime-card itself has unusual pair structure
-- stacking / replacement / removal order
-
-То есть это уже не просто zone rule,
-а кусок общей effect engine.
-
-## 9. What is canonical right now
+## 13. What is canonical right now
 
 На текущем шаге жёстко зафиксировано только:
 
@@ -152,12 +208,13 @@ not current canonical branch
 3. `☱☱` may temporarily open runtime for any later minor card
 4. installed runtime card grants extra choice(s), not free extra cast
 5. карта в `runtime` лежит там,
-   пока эффект явно не уберёт её оттуда
+   пока effect явно не уберёт её оттуда
 
-## 10. Short formula
+## 14. Short formula
 
 ```text
 runtime is a persistent install zone
 runtime grants extra future operator choices
+runtime stores installed choice-memory, not aura math
 ☱☱ opens runtime for any later minor card
 ```

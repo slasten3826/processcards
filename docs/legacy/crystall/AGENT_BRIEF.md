@@ -69,7 +69,7 @@ CLI-first больше не является первичной траектор
 
 ### Crystall canon
 
-- `docs/crystall/FIRST_LOVE_PROTOTYPE_TZ.md`
+- `docs/legacy/crystall/FIRST_LOVE_PROTOTYPE_TZ.md`
 - `docs/crystall/PROTOTYPE_CRYSTALL.md`
 
 ## 5. Strong law

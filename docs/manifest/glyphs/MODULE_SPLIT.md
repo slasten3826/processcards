@@ -11,7 +11,7 @@ proposed — до реализации не канон
 - [GLYPH_SYSTEM_V1.md](../GLYPH_SYSTEM_V1.md)
 - [GLYPH_INK_LAW.md](../GLYPH_INK_LAW.md)
 - [GLYPH_PLACEMENT_LAW.md](./GLYPH_PLACEMENT_LAW.md)
-- [../../crystall/PROTOTYPE_CRYSTALL.md](../../crystall/PROTOTYPE_CRYSTALL.md)
+- [../../legacy/crystall/PROTOTYPE_CRYSTALL.md](../../legacy/crystall/PROTOTYPE_CRYSTALL.md)
 
 ## 1. Зачем
 

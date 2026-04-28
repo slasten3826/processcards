@@ -21,8 +21,22 @@ canonical table routing note
 Сюда сейчас входят:
 
 - [TRUMP_IDENTITY_LAW.md](./TRUMP_IDENTITY_LAW.md)
+- [TRUMP_FLOW_LAW.md](./TRUMP_FLOW_LAW.md)
+- [TRUMP_RESOLUTION_ORDER_LAW.md](./TRUMP_RESOLUTION_ORDER_LAW.md)
 - [TRUMP_ZONE_LAW.md](./TRUMP_ZONE_LAW.md)
 - [TRUMP_EVENT_MINIMAL_LAW.md](./TRUMP_EVENT_MINIMAL_LAW.md)
+- [FOOL_LAW.md](./FOOL_LAW.md)
+- [SHUFFLE_LAW.md](./SHUFFLE_LAW.md)
+- [UNVEIL_LAW.md](./UNVEIL_LAW.md)
+- [RESET_LAW.md](./RESET_LAW.md)
+- [SWAP_LAW.md](./SWAP_LAW.md)
+- [WARRANT_LAW.md](./WARRANT_LAW.md)
+- [REPEAT_LAW.md](./REPEAT_LAW.md)
+- [UNBOUND_LAW.md](./UNBOUND_LAW.md)
+- [HALT_LAW.md](./HALT_LAW.md)
+- [EJECT_LAW.md](./EJECT_LAW.md)
+- [ORACLE_LAW.md](./ORACLE_LAW.md)
+- [RECAST_LAW.md](./RECAST_LAW.md)
 
 А также связанные зоны:
 
@@ -49,6 +63,21 @@ canonical table routing note
 
 Эти документы уже ценны,
 но пока не считаются автоматически live prototype canon.
+
+Already adopted individual trump law:
+
+- [FOOL_LAW.md](./FOOL_LAW.md)
+- [SHUFFLE_LAW.md](./SHUFFLE_LAW.md)
+- [UNVEIL_LAW.md](./UNVEIL_LAW.md)
+- [RESET_LAW.md](./RESET_LAW.md)
+- [SWAP_LAW.md](./SWAP_LAW.md)
+- [WARRANT_LAW.md](./WARRANT_LAW.md)
+- [REPEAT_LAW.md](./REPEAT_LAW.md)
+- [UNBOUND_LAW.md](./UNBOUND_LAW.md)
+- [HALT_LAW.md](./HALT_LAW.md)
+- [EJECT_LAW.md](./EJECT_LAW.md)
+- [ORACLE_LAW.md](./ORACLE_LAW.md)
+- [RECAST_LAW.md](./RECAST_LAW.md)
 
 ## 2. How to read them
 

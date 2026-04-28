@@ -4,6 +4,7 @@
 
 ```text
 canonical table law
+aligned with compiler/victory machine
 ```
 
 Этот документ фиксирует базовый порядок резолва
@@ -13,17 +14,19 @@ canonical table law
 
 Без порядка резолва один и тот же эффект
 может собрать разные столы в зависимости от того,
-когда именно чинятся пустые слоты.
+когда именно чинятся пустые слоты
+и когда именно разрешается проверка победы.
 
 Этот документ нужен, чтобы:
 
 - не чинить `manifest` слишком рано
 - не путать primary effect с structural repair
 - не подменять effect-state автоматическим refill
+- не проверять победу на промежуточном состоянии
 
 ## 2. Resolution layers
 
-На текущем слое резолв делится на два базовых класса:
+На текущем слое резолв делится на три базовых класса:
 
 ### A. Primary effect
 
@@ -45,18 +48,29 @@ canonical table law
 - repair `manifest` through `latent`
 - repair `latent` through `deck`
 
-## 3. Core precedence
+### C. Post-closure check
+
+Это уже не effect и не repair,
+а проверка machine state after closure.
+
+В текущей ветке это важно прежде всего для:
+
+- victory check
+
+## 3. General precedence
 
 Базовый порядок такой:
 
 1. primary effect resolves
 2. only after that chain surface repair resolves
+3. only after full closure may post-checks run
 
 Коротко:
 
 ```text
 effect first
 repair second
+post-check third
 ```
 
 ## 4. Manifest hole order
@@ -66,7 +80,8 @@ repair second
 
 1. `latent[i]` moves up to `manifest[i]`
 2. that card is revealed if needed
-3. `deck` refills `latent[i]` face-down
+3. `deck` refills `latent[i]`
+   with preservation of current information state
 
 Но это происходит только после того,
 как сам primary effect закончил свою работу.
@@ -76,7 +91,8 @@ repair second
 Если effect создал пустоту только в `latent[i]`,
 то repair идёт так:
 
-1. `deck` refills `latent[i]` face-down
+1. `deck` refills `latent[i]`
+   with preservation of current information state
 
 И снова:
 не во время самого effect-step,
@@ -102,14 +118,10 @@ the effect finishes
 then the board repairs the hole
 ```
 
-## 7. Current scope
+## 7. Move-sequence override
 
-Этот документ пока фиксирует только:
-
-- relation between primary effect and chain repair
-- порядок repair внутри колонки
-
-Для новой turn-sequence ветки действует ещё одно уточнение:
+Для topology-first move branch действует
+специальное уточнение:
 
 ```text
 world update may still precede the played hand-card effect
@@ -120,15 +132,31 @@ if the move law explicitly says so
 
 - `RESOLUTION_ORDER_LAW` остаётся общим законом
 - а конкретный порядок внутри topology-first move
-  задаётся отдельно в `TURN_SEQUENCE_LAW_V2`
+  задаётся отдельно в [TURN_SEQUENCE_LAW_V2.md](./TURN_SEQUENCE_LAW_V2.md)
 
-Он пока не решает:
+## 8. Victory check law
 
-- later trump post-resolution order
-- duplicate cleanup order
-- more advanced competing replacement effects
+Victory не проверяется:
 
-## 8. Relationship to chain law
+- during primary effect
+- during repair
+- on temporary mid-sequence states
+
+Victory may be checked only after:
+
+1. world update is complete
+2. played effect is complete
+3. played hand-card has already been spent
+4. current compiler condition exists in `targets`
+
+Коротко:
+
+```text
+no mid-resolution victory
+check only after full turn closure
+```
+
+## 9. Relationship to chain law
 
 Этот документ нужно читать вместе с:
 
@@ -140,12 +168,24 @@ if the move law explicitly says so
 - `RESOLUTION_ORDER_LAW` = когда именно это чинится
 - `TURN_SEQUENCE_LAW_V2` = как topology-first move собирает
   world update и hand-card effect в один конкретный sequence
+- `WIN_CHECK_LAW` = what the post-closure victory check evaluates
 
-## 9. Short formula
+## 10. Current scope
+
+Этот документ пока не решает:
+
+- later trump post-resolution order
+- duplicate cleanup order
+- more advanced competing replacement effects
+- rare victory exceptions from special trumps
+
+## 11. Short formula
 
 ```text
 primary effect resolves first
 chain repair resolves second
+post-closure checks resolve third
 manifest is repaired through latent
 latent is repaired through deck
+victory is checked only after full turn closure
 ```

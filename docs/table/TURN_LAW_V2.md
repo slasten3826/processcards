@@ -5,36 +5,18 @@
 ```text
 canonical table law
 current turn-law branch
+aligned with compiler/victory machine
 ```
 
-Этот документ фиксирует текущую каноническую модель хода,
-которая появилась из плейтеста прототипа
-и теперь считается active table canon.
+Этот документ фиксирует текущую каноническую модель хода.
 
 Старый закон хода остаётся в:
 
-- [HAND_AND_PLAY_LAW.md](./HAND_AND_PLAY_LAW.md)
+- [../legacy/table/HAND_AND_PLAY_LAW.md](../legacy/table/HAND_AND_PLAY_LAW.md)
 
 как предыдущая replacement-model ветка.
 
-## 1. Why this exists
-
-Плейтест показал важный сигнал:
-
-карта из `hand`,
-которая просто встаёт в `manifest`,
-ощущается слабее,
-чем карта из `manifest`,
-которая visibly уходит в `grave`.
-
-Из этого родилась другая интуиция:
-
-```text
-hand card should act on the world
-not become part of the world
-```
-
-## 2. Core shift
+## 1. Core shift
 
 Старая модель:
 
@@ -57,78 +39,79 @@ hand card does not remain in manifest
 Рука даёт не board-objects,
 а operation packets.
 
-## 3. World-strip reading
+## 2. Manifest as sentence surface
 
-В этой модели `manifest chain`
-надо мыслить не как место,
-куда игрок выкладывает свои карты.
-
-А как:
+В текущей ветке `manifest chain`
+надо мыслить не просто как open row,
+а как:
 
 ```text
-active open layer of the world
+visible directed sentence surface
 ```
 
-`latent` при этом остаётся скрытым подпирающим слоем мира.
+Это важно потому, что:
+
+- ход всегда consume-ит один visible node
+- victory later checks the whole visible sentence
 
 См.:
 
 - [CHAIN_SURFACE_LAW.md](./CHAIN_SURFACE_LAW.md)
+- [WIN_CHECK_LAW.md](./WIN_CHECK_LAW.md)
 
-## 4. Weak move draft
+## 3. Current structural sizes
 
-Ранний weak sketch теперь уступил место более жёсткой sequence-ветке.
+Current machine branch assumes:
 
-Текущую рабочую последовательность хода
-см. в:
+```text
+manifest = 6 visible cards
+hand = 6 cards
+```
+
+Это больше не incidental sizing,
+а часть общей victory/compiler машины.
+
+## 4. Move reading
+
+Текущий ход в этой ветке читается так:
+
+```text
+commit one visible world-node
+fit one hand card into it
+let the world update
+resolve one chosen operator effect
+spend the played card
+```
+
+Подробная sequence-форма вынесена в:
 
 - [TURN_SEQUENCE_LAW_V2.md](./TURN_SEQUENCE_LAW_V2.md)
 
-Старый weak-черновик сохраняется здесь только как historical step:
+## 5. Directed consequence
 
-1. игрок берёт 1 карту из `hand`
-2. игрок целит 1 карту в открытом `manifest`
-3. hand-card effect резолвится
-4. hand-card уходит в `grave`
-5. manifest-card уходит в `grave`
-6. `latent[i]` поднимается
-7. `deck` пополняет `latent[i]`
+Так как `manifest` теперь одновременно:
+
+- active world strip
+- future victory sentence
+
+каждый ход работает не только как local action,
+но и как possible rewrite of directed visible order.
 
 Коротко:
 
 ```text
-the branch has moved from weak-sketch
-to a stricter turn-sequence model
+a move changes both local world state
+and future sentence possibility
 ```
-
-## 5. Strong move draft
-
-Strong move в этой ветке
-больше не должен мыслиться
-как “чуть более сильная версия того же placement”.
-
-Предварительная интуиция такая:
-
-```text
-strong = pair declaration from hand
-applied against manifest
-```
-
-То есть strong move,
-скорее всего,
-должен играться через 2 hand-cards,
-а не через “one card enters manifest and becomes strong there”.
-
-Точный strong law пока не зафиксирован.
 
 ## 6. Grave consequence
 
-Так как и played hand-card,
-и affected manifest-card
-уходят в `grave`,
-grave в этой модели становится ещё сильнее
-не просто discard pile,
-а:
+Так как:
+
+- committed manifest-card уходит в `grave`
+- played hand-card уходит в `grave`
+
+grave в этой модели остаётся:
 
 ```text
 history of opened and spent layers
@@ -140,8 +123,7 @@ history of opened and spent layers
 
 ## 7. Chain consequence
 
-В этой ветке особенно важно,
-что `manifest / latent` остаются самостоятельной машиной.
+`manifest / latent` остаются самостоятельной машиной.
 
 `hand` не подпирает `manifest`.
 
@@ -155,77 +137,71 @@ deck -> latent
 См.:
 
 - [CHAIN_SURFACE_LAW.md](./CHAIN_SURFACE_LAW.md)
-- [RESOLUTION_ORDER_LAW.md](./RESOLUTION_ORDER_LAW.md)
 
-## 8. Operator consequence
+## 8. Compiler consequence
 
-Эта ветка пока не пересобирает все operator laws.
+Victory больше не живёт отдельно от хода.
 
-Но она уже меняет общий режим чтения:
+Ход не обязан сам по себе проверять победу на промежуточном шаге.
 
-- некоторые масти будут читаться чище как operations on the world
-- некоторые масти, особенно `CONNECT` и `RUNTIME`,
-  почти наверняка придётся переосмыслить сильнее других
-
-То есть:
+Но turn-law должен быть совместим с тем, что:
 
 ```text
-turn law changes first
-operator reinterpretation follows later
+victory is checked after full turn closure
+against the fully visible 6-slot manifest sentence
+compiled by 3 target trumps
 ```
 
-## 9. Runtime consequence
+См.:
 
-Эта ветка существует не в отрыве от кода.
+- [TARGET_ZONE_LAW.md](./TARGET_ZONE_LAW.md)
+- [WIN_CHECK_LAW.md](./WIN_CHECK_LAW.md)
 
-Она опирается на уже собранную модульность прототипа:
+## 9. Operator consequence
 
-- zones already exist
-- chain repair already exists
-- grave path already exists
-- animation queue already exists
+Эта ветка уже опирается на новый operator layer,
+а не на old weak/strong chassis.
 
-Поэтому смена turn-law
-не требует тотального переписывания runtime-shell.
+Current read order:
 
-Это и есть один из признаков,
-что модульность прототипа была собрана правильно.
+- [OPERATORS_INDEX.md](./OPERATORS_INDEX.md)
+- `operators/*.md`
 
 ## 10. Development consequence
 
-С этого места проект входит в более жёсткую gameplay-фазу:
+С этого места проект живёт по циклу:
 
 ```text
-think
-prototype
-playtest
-keep or revert
+thought
+-> table
+-> crystall
+-> code
 ```
 
-То есть допустим такой цикл:
-
-1. рождается новая mechanical idea
-2. она фиксируется документом
-3. она кодится модульно
-4. она плейтестится
-5. если работает — остаётся
-6. если не работает — откатывается без разрушения всей машины
-
-Этот документ и существует именно для такой фазы.
+А новые rewrite-ветки теперь должны проверяться
+не только against move feel,
+но и against compiler/victory coherence.
 
 ## 11. What is still unresolved
 
-Этот draft пока не решает:
+Этот current branch пока не решает:
 
-- точный strong move law
-- какие operator families меняются сильнее всего
-- как именно `observe`, `runtime`, `connect`, `logic` перестраиваются в новой модели
+- exact final strong move law
+- full derivation grammar for every compiler trio
+- whether some future operator families may branch turn timing further
+
+Но он уже фиксирует:
+
+```text
+the turn is part of one larger machine
+not a free-floating local card action
+```
 
 ## 12. Short formula
 
 ```text
 hand cards are cast at the world
 not installed into the world
-the exact move sequence is specified separately
-in TURN_SEQUENCE_LAW_V2
+manifest is a 6-slot visible sentence surface
+and each turn rewrites that surface before victory is checked
 ```

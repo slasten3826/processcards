@@ -4,6 +4,7 @@
 
 ```text
 canonical table law
+aligned with current victory/compiler branch
 ```
 
 Этот документ фиксирует:
@@ -11,6 +12,7 @@ canonical table law
 - полный размер колоды
 - временную naming-схему карт
 - стартовую раскладку партии
+- стартовые размеры `manifest` и `hand`
 
 ## 1. Full deck size
 
@@ -48,7 +50,29 @@ MINOR-2
 MINOR-100
 ```
 
-## 3. Start game setup
+## 3. Core structural sizes
+
+Current machine branch assumes:
+
+```text
+manifest chain = 6
+hand = 6
+target zone = 3 slots
+```
+
+Это согласовано с:
+
+- [TURN_LAW_V2.md](./TURN_LAW_V2.md)
+- [WIN_CHECK_LAW.md](./WIN_CHECK_LAW.md)
+
+Short formula:
+
+```text
+3 target trumps compile a 6-slot victory sentence
+so manifest must expose 6 visible positions
+```
+
+## 4. Start game setup
 
 При старте новой партии:
 
@@ -59,7 +83,7 @@ MINOR-100
 5. выполнить второй `shuffle`
 6. только после этого достроить hidden opening
 
-## 4. Two-phase setup
+## 5. Two-phase setup
 
 ### Phase A: minor-only bootstrap
 
@@ -69,23 +93,23 @@ MINOR-100
 
 #### Manifest
 
-- `manifest[1..5]` <- 5 cards face-up
+- `manifest[1..6]` <- 6 cards face-up
 
 #### Hand
 
-- `hand` <- 5 cards
+- `hand` <- 6 cards
 
 После этой фазы:
 
 - `manifest` гарантированно minor-only
 - `hand` гарантированно minor-only
-- в minor deck остаётся `90` cards
+- в minor deck остаётся `88` cards
 
 ### Phase B: full deck completion
 
 После Phase A:
 
-1. взять оставшиеся `90` minor cards
+1. взять оставшиеся `88` minor cards
 2. добавить к ним `22` trump cards
 3. выполнить `shuffle`
 4. из полученной колоды разложить hidden layers
@@ -98,37 +122,39 @@ MINOR-100
 
 #### Latent
 
-- `latent[1..5]` <- 5 cards face-down
+- `latent[1..6]` <- 6 cards face-down
 
-## 5. Why this law exists
+## 6. Why this law exists
 
 Этот setup-law нужен, чтобы:
 
-- `manifest` стартовал как `state surface`
+- `manifest` стартовал как `6-slot visible sentence surface`
 - `hand` стартовала как `minor-only intervention surface`
 - trump cards не прорывались в открытый стартовый chain
 - hidden layers уже могли нести trump potential
+- `targets` уже существовали как hidden compiler shell
 
 Коротко:
 
 ```text
 open opening = minors only
 hidden opening = full deck allowed
+compiler shell exists from the start
 ```
 
-## 6. Deck remainder after setup
+## 7. Deck remainder after setup
 
 Во время setup из колоды выходят:
 
-- `5` cards to manifest
-- `5` cards to hand
+- `6` cards to manifest
+- `6` cards to hand
 - `3` cards to targets
-- `5` cards to latent
+- `6` cards to latent
 
 Итого:
 
 ```text
-18 cards leave the deck during setup
+21 cards leave the deck during setup
 ```
 
 Математика по фазам:
@@ -136,46 +162,60 @@ hidden opening = full deck allowed
 ### After Phase A
 
 - `100 minor`
-- `10` removed to manifest + hand
-- `90 minor remain`
+- `12` removed to manifest + hand
+- `88 minor remain`
 
 ### After Phase B merge
 
-- `90 minor + 22 trump = 112`
+- `88 minor + 22 trump = 110`
 
 ### After hidden dealing
 
-- `8` removed to targets + latent
+- `9` removed to targets + latent
 
 Остаётся в финальной deck:
 
 ```text
-104 cards in deck
+101 cards in deck
 ```
 
-## 7. Zone state after setup
+## 8. Zone state after setup
 
 После `Start Game`:
 
 - `targets` = 3 hidden cards from full merged deck
-- `manifest` = 5 visible minor cards
-- `latent` = 5 hidden cards from full merged deck
-- `hand` = 5 minor cards
+- `manifest` = 6 visible minor cards
+- `latent` = 6 hidden cards from full merged deck
+- `hand` = 6 minor cards
 - `runtime` = empty
 - `grave` = empty
 - `trump zone` = empty
-- `deck` = 104 cards
+- `deck` = 101 cards
 
-## 8. What this law does not decide
+## 9. Compiler consequence
+
+На старте партии `targets` ещё не обязаны содержать 3 trumps.
+
+Значит:
+
+- compiler shell already exists
+- full victory pattern may still not exist yet
+- victory check starts only after target compilation becomes complete
+
+См.:
+
+- [TARGET_ZONE_LAW.md](./TARGET_ZONE_LAW.md)
+- [WIN_CHECK_LAW.md](./WIN_CHECK_LAW.md)
+
+## 10. What this law does not decide
 
 Этот документ пока не решает:
 
 - mulligan
 - redraw
+- exact probability shaping of target compilation
 - trump behavior after setup
-- target semantics
-- weak/strong legality after setup
-- whether hidden targets/latent should later filter trumps further
+- full win-grammar derivation
 
 Он решает только:
 
@@ -183,15 +223,15 @@ hidden opening = full deck allowed
 what a new game physically looks like right after Start Game
 ```
 
-## 9. Short formula
+## 11. Short formula
 
 ```text
 100 minors shuffle
-5 open manifest
-5 hand
+6 open manifest
+6 hand
 then add 22 trumps
 shuffle again
 3 hidden targets
-5 hidden latent
-104 remain in deck
+6 hidden latent
+101 remain in deck
 ```

@@ -74,10 +74,10 @@ Primary sources:
 
 - `docs/table/OPERATORS_INDEX.md`
 - `docs/table/operators/*.md`
-- `docs/table/CONNECT_LAW.md`
-- `docs/table/STRONG_COMBINED_LAW.md`
-- `docs/table/STRONG_PAIR_TABLE.md`
-- `docs/table/MINOR_MACHINE.md`
+- `docs/legacy/table/CONNECT_LAW.md`
+- `docs/legacy/table/STRONG_COMBINED_LAW.md`
+- `docs/legacy/table/STRONG_PAIR_TABLE.md`
+- `docs/legacy/table/MINOR_MACHINE.md`
 
 ## 6. UI law
 

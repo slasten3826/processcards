@@ -5,6 +5,7 @@
 ```text
 canonical crystall contract
 current turn-law branch
+pending sync with compiler/victory implementation layer
 ```
 
 Этот документ фиксирует,
@@ -13,7 +14,7 @@ current turn-law branch
 
 Старый документ:
 
-- [NEXT_GAMEPLAY_SLICE.md](./NEXT_GAMEPLAY_SLICE.md)
+- [../legacy/crystall/NEXT_GAMEPLAY_SLICE.md](../legacy/crystall/NEXT_GAMEPLAY_SLICE.md)
 
 остаётся полезным как предыдущий crystall-slice
 для replacement-модели.
@@ -42,11 +43,19 @@ resolve cast against world strip
 topology-first move prototype
 ```
 
+Но теперь этот slice уже существует
+внутри larger machine,
+где:
+
+- `manifest` = 6 visible slots
+- `targets` = compiler zone
+- victory is checked after full turn closure
+
 ## 2. What this slice must do
 
 Этот slice должен дать:
 
-1. выбор 1 открытой карты в `manifest`
+1. выбор 1 открытой карты в `manifest[1..6]`
 2. её временный `commit / tap` как source of move
 3. подсветку / определение legal hand-cards по `MOVE_FIT_LAW`
 4. выбор 1 legal hand-card
@@ -57,6 +66,7 @@ topology-first move prototype
 9. hand-card effect resolves after world update by default
 10. played hand-card уходит в `grave` after effect
 11. refill preserves current known / revealed state of topdeck
+12. post-resolution victory check may be called against compiled target state
 
 ## 3. Included rules
 
@@ -69,6 +79,7 @@ topology-first move prototype
 - [../table/GRAVE_LAW.md](../table/GRAVE_LAW.md)
 - [../table/CARD_INFORMATION_STATE_LAW.md](../table/CARD_INFORMATION_STATE_LAW.md)
 - [../table/TURN_SEQUENCE_LAW_V2.md](../table/TURN_SEQUENCE_LAW_V2.md)
+- [../table/WIN_CHECK_LAW.md](../table/WIN_CHECK_LAW.md)
 
 То есть:
 
@@ -78,6 +89,7 @@ topology-first move prototype
 - chain repair remains structural truth
 - world update precedes played-card effect by default
 - refill does not re-hide known/revealed topdeck
+- victory is checked only after full turn closure
 
 ## 4. First implementation simplification
 
@@ -98,6 +110,9 @@ full operator payload later
 А уже после этого наслаивать
 реальные operator effects.
 
+Но больше нельзя игнорировать,
+что `manifest` lives inside a 6-slot victory sentence surface.
+
 ## 5. Included animation obligations
 
 См.:
@@ -113,6 +128,8 @@ full operator payload later
 5. hand-card discharge to grave
 6. later optional known-state ghost overlay on latent refill
 7. confirm control is expressed as glyph `△`, not text button
+8. if victory check exists in this slice,
+   it must happen only after played-card discharge
 
 Критично:
 
@@ -129,9 +146,11 @@ not as card teleport bookkeeping
 - fallback action if no fit exists
 - full trump event engine
 - runtime granted effect draft
-- target compiler gameplay
 - final operator reinterpretation
 - final card text rewrite
+
+At this stage compiler grammar may still stay simplified,
+but the slice must not contradict the existence of compiler-driven victory.
 
 ## 7. Lua architecture split
 
@@ -153,6 +172,7 @@ not as card teleport bookkeeping
 - repair column
 - resolve hand-card payload
 - discharge hand-card
+- if compiler complete, run win check after discharge
 
 ### D. Animation
 
@@ -176,6 +196,7 @@ Slice считается собранным,
 6. column visibly repaired
 7. hand-card effect resolves after repair by default
 8. hand-card visibly discharged
+9. no mid-resolution victory check occurs
 
 ## 9. Short formula
 
@@ -186,4 +207,5 @@ fit one hand card into it
 consume the world node
 repair the column
 discharge the played card
+then optionally check compiled victory
 ```

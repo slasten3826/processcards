@@ -5,10 +5,10 @@
 ```text
 canonical table law
 current turn sequence
+aligned with compiler/victory machine
 ```
 
-Этот документ фиксирует уже не общую интуицию новой move-модели,
-а конкретную последовательность хода
+Этот документ фиксирует конкретную последовательность хода
 для topology-first ветки.
 
 Он читается вместе с:
@@ -18,6 +18,7 @@ current turn sequence
 - [CARD_INFORMATION_STATE_LAW.md](./CARD_INFORMATION_STATE_LAW.md)
 - [CHAIN_SURFACE_LAW.md](./CHAIN_SURFACE_LAW.md)
 - [RESOLUTION_ORDER_LAW.md](./RESOLUTION_ORDER_LAW.md)
+- [WIN_CHECK_LAW.md](./WIN_CHECK_LAW.md)
 
 ## 1. Core claim
 
@@ -33,6 +34,7 @@ consume the world node
 update the world
 resolve the played card
 spend the played card
+check victory after full closure
 ```
 
 ## 2. Move preparation
@@ -48,6 +50,7 @@ spend the played card
 
 - commit всегда идёт по одной manifest-card
 - выбор hand-card тоже всегда один
+- `manifest` here means one slot of the current 6-card visible sentence
 
 ## 3. Launch law
 
@@ -61,6 +64,7 @@ spend the played card
 4. `deck top -> latent[i]`
 5. played hand-card effect resolves
 6. played hand-card уходит в `grave`
+7. victory check may occur
 
 ## 4. World update before effect
 
@@ -110,9 +114,9 @@ deck refills latent[i]
 
 Это делает ход:
 
-- локальным
-- читаемым
-- хорошо анимируемым
+- локальным по исполнению
+- читаемым по анимации
+- глобальным по влиянию на directed sentence
 
 ## 7. Refill information law
 
@@ -153,17 +157,50 @@ known cards do not become unknown just because they entered latent
 - `reveal` создаёт `revealed`
 - refill не имеет права заново делать `known/revealed` карту полной `hidden`
 
-## 10. What this law does not decide yet
+## 10. Victory check timing
 
-Этот draft пока не решает:
+Victory не проверяется на промежуточных состояниях sequence.
 
-- fallback action when no fit exists
+Проверка допустима только после того, как:
+
+1. world update завершён
+2. played effect разрешился
+3. played hand-card уже ушла в `grave`
+4. `targets` already hold a complete 3-trump compiler
+
+Коротко:
+
+```text
+no mid-resolution victory
+check only after full turn closure
+```
+
+## 11. Manifest sentence consequence
+
+Так как `manifest` теперь является
+6-slot visible sentence surface,
+каждый turn sequence делает сразу две вещи:
+
+1. local world consumption
+2. rewrite of the current visible victory sentence candidate
+
+То есть:
+
+```text
+the turn updates the world
+and only then the sentence may be checked
+```
+
+## 12. What this law does not decide yet
+
+Этот current branch пока не решает:
+
 - full strong-move law
-- exact operator payloads
-- exact trump-effect insertion into this sequence
+- exact derivation grammar for every target trio
 - whether later some operators may act before world update
+- whether rare trumps may alter the timing of win check
 
-## 11. Short formula
+## 13. Short formula
 
 ```text
 commit one manifest card
@@ -171,5 +208,6 @@ fit one hand card
 send committed world-node to grave
 promote latent and refill the column
 resolve played card effect
-then send the played card to grave
+send the played card to grave
+then check victory against the compiled 6-slot manifest sentence
 ```

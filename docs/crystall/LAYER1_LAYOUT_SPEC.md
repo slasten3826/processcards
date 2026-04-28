@@ -33,7 +33,7 @@ board engine skeleton / dev mode surface
 - [LAYER1_BOARD_SKELETON_SPEC.md](./LAYER1_BOARD_SKELETON_SPEC.md)
 - [BOARD_ENGINE_SKELETON_TZ.md](./BOARD_ENGINE_SKELETON_TZ.md)
 - [PLATFORM_REQUIREMENTS.md](./PLATFORM_REQUIREMENTS.md)
-- [FIRST_PROTOTYPE_VISUAL_TARGET.md](./FIRST_PROTOTYPE_VISUAL_TARGET.md)
+- [../legacy/crystall/FIRST_PROTOTYPE_VISUAL_TARGET.md](../legacy/crystall/FIRST_PROTOTYPE_VISUAL_TARGET.md)
 
 Он теперь фиксирует не только target-form,
 но и текущий accepted baseline после реального runtime pass.

@@ -14,7 +14,7 @@ superseded crystall path
 
 Вместо него читать:
 
-- [FIRST_LOVE_PROTOTYPE_TZ.md](./FIRST_LOVE_PROTOTYPE_TZ.md)
+- [../legacy/crystall/FIRST_LOVE_PROTOTYPE_TZ.md](../legacy/crystall/FIRST_LOVE_PROTOTYPE_TZ.md)
 
 ## Why superseded
 

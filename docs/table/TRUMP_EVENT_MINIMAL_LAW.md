@@ -23,19 +23,29 @@ TRUMP event
 
 ## 2. Minimal trump event result
 
-На текущем прототипном слое `TRUMP event` делает только одно:
+На текущем прототипном слое `TRUMP event`
+теперь читается через две отдельные зоны:
+
+1. active `trump flow`
+2. resolved `trump zone`
+
+Минимальный `TRUMP event` делает следующее:
 
 ```text
-resolved trump moves to trump zone
+known trump enters trump flow
+resolved trump remains in-flight
+ordinary chain close may then move it to trump zone
 ```
 
-То есть пока не вводится полный arcana-effect engine.
+То есть пока не вводится полный arcana-effect engine,
+но active queue уже отделена от residue.
 
 Минимальный слой только:
 
 - выделяет козырь как событие
 - не даёт ему вести себя как обычной minor-card
-- уводит его в `trump zone`
+- помещает его в `trump flow`
+- keeps resolved trump in-flight until chain close
 
 ## 3. Observe path
 
@@ -44,7 +54,9 @@ resolved trump moves to trump zone
 то:
 
 1. возникает `TRUMP event`
-2. этот козырь уходит в `trump zone`
+2. этот козырь входит в `trump flow`
+3. после minimal resolution он остаётся in-flight
+4. after ordinary chain close he may enter `trump zone`
 
 См. также:
 
@@ -106,6 +118,8 @@ each draw is one separate draw procedure
 Разделение такое:
 
 - `TRUMP_EVENT_MINIMAL_LAW` = когда возникает minimal trump event
+- `TRUMP_FLOW_LAW` = где живёт active resolving trump
+- `TRUMP_RESOLUTION_ORDER_LAW` = как active trumps queue and close
 - `TRUMP_ZONE_LAW` = куда попадает уже resolved trump residue
 
 ## 8. What this law does not decide yet
@@ -115,7 +129,7 @@ each draw is one separate draw procedure
 - полный эффект каждого козыря
 - real arcana resolution content
 - later event presentation layer
-- whether later some trump can resolve before entering trump zone in a richer way
+- exact per-trump payloads after chain entry
 
 Он решает только:
 
@@ -127,6 +141,8 @@ what the prototype does the moment a trump becomes known outside targets
 
 ```text
 known trump outside targets triggers TRUMP event
-minimal TRUMP event sends that trump to trump zone
+minimal TRUMP event sends that trump into trump flow
+resolved trump remains in-flight until chain close
+ordinary chain close may then move it to trump zone
 draw reveals first, then only non-trumps enter hand normally
 ```

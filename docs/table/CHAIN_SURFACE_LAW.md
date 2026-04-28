@@ -4,6 +4,7 @@
 
 ```text
 canonical table law
+aligned with compiler/victory machine
 ```
 
 Этот документ фиксирует,
@@ -11,6 +12,14 @@ canonical table law
 
 ```text
 manifest + latent
+```
+
+В текущей машине эта поверхность является не только local board structure,
+но и:
+
+```text
+visible sentence surface
+for future victory embodiment
 ```
 
 ## 1. Core identity
@@ -33,6 +42,17 @@ one vertical column system
 ```text
 latent supports manifest
 ```
+
+Current branch assumes:
+
+```text
+6 columns x 2 layers
+```
+
+То есть:
+
+- `manifest[1..6]`
+- `latent[1..6]`
 
 ## 2. Empty-slot prohibition
 
@@ -68,7 +88,22 @@ manifest hole is repaired by latent
 latent hole is repaired by deck
 ```
 
-## 4. Latent repair law
+## 4. Sentence consequence
+
+Так как `manifest` одновременно является
+visible sentence surface,
+repair не просто восстанавливает board shape.
+
+Он ещё и:
+
+```text
+rewrites one slot of the current visible directed sentence
+```
+
+То есть каждый подъём `latent -> manifest`
+может менять candidate win sentence.
+
+## 5. Latent repair law
 
 Если карта уходит из `latent[i]`,
 то:
@@ -83,7 +118,7 @@ latent hole is repaired by deck
 deck repairs latent directly
 ```
 
-## 5. Reveal law on ascent
+## 6. Reveal law on ascent
 
 Когда карта поднимается из `latent[i]` в `manifest[i]`,
 она должна быть открыта.
@@ -97,7 +132,7 @@ deck repairs latent directly
 latent -> manifest = reveal on ascent
 ```
 
-## 6. Information consequence
+## 7. Information consequence
 
 Из этого следует:
 
@@ -109,7 +144,19 @@ latent -> manifest = reveal on ascent
 по другому закону,
 repair не должен заново делать её полной hidden.
 
-## 7. What this law does not decide
+## 8. Victory relation
+
+Этот документ сам по себе не делает win check.
+
+Но он должен быть совместим с тем,
+что победа later проверяется
+по fully visible 6-slot manifest chain.
+
+См.:
+
+- [WIN_CHECK_LAW.md](./WIN_CHECK_LAW.md)
+
+## 9. What this law does not decide
 
 Этот документ пока не решает:
 
@@ -123,11 +170,12 @@ repair не должен заново делать её полной hidden.
 how manifest and latent structurally refill
 ```
 
-## 8. Short formula
+## 10. Short formula
 
 ```text
 manifest is repaired by latent
 latent is repaired by deck
 latent rises revealed
 deck refill preserves current known/revealed state
+manifest remains a 6-slot sentence surface while repairing
 ```
