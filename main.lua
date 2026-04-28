@@ -5,16 +5,20 @@
 -- docs/crystall/LAYERED_PROJECT_POLICY.md
 -- docs/crystall/PLATFORM_REQUIREMENTS.md
 -- docs/crystall/PORTABILITY_CONSTRAINTS.md
--- docs/crystall/FIRST_PROTOTYPE_VISUAL_TARGET.md
 -- docs/table/DECK_AND_SETUP_LAW.md
--- docs/crystall/START_GAME_FLOW.md
--- docs/table/HAND_AND_PLAY_LAW.md
+-- docs/table/CURRENT_CANON_SUMMARY.md
 -- docs/table/CHAIN_SURFACE_LAW.md
+-- docs/table/CARD_INFORMATION_STATE_LAW.md
+-- docs/table/DRAW_PROCEDURE_LAW.md
+-- docs/table/MOVE_FIT_LAW.md
 -- docs/table/RESOLUTION_ORDER_LAW.md
 -- docs/table/GRAVE_LAW.md
 -- docs/table/TRUMP_EVENT_MINIMAL_LAW.md
+-- docs/table/TURN_LAW_V2.md
+-- docs/table/TURN_SEQUENCE_LAW_V2.md
+-- docs/table/WIN_CHECK_LAW.md
 -- docs/crystall/GAMEPLAY_ANIMATION_LAYER.md
--- docs/crystall/NEXT_GAMEPLAY_SLICE.md
+-- docs/crystall/NEXT_GAMEPLAY_SLICE_V2.md
 
 local glyphs = require("src.glyphs")
 local glyph_layout = require("src.glyph_layout")
@@ -119,6 +123,7 @@ local state = {
     hints_enabled = true,
     committed = nil,
     legal_hints = {},
+    armed_hand = nil,
     hover_target = nil,
     drag = nil,
     cards = {},
@@ -143,16 +148,18 @@ local state = {
 local ZONE_META = {
     deck = {title = "DECK", kind = "stack"},
     runtime = {title = "RUNTIME", kind = "slots", slot_count = 1},
+    play = {title = "PLAY", kind = "slots", slot_count = 1},
     trump = {title = "TRUMP ZONE", kind = "slots", slot_count = 2},
     targets = {title = "TARGETS", kind = "slots", slot_count = 3},
-    manifest = {title = "MANIFEST", kind = "slots", slot_count = 5},
-    latent = {title = "LATENT", kind = "slots", slot_count = 5},
+    manifest = {title = "MANIFEST", kind = "slots", slot_count = 6},
+    latent = {title = "LATENT", kind = "slots", slot_count = 6},
     hand = {title = "HAND", kind = "fan"},
     grave = {title = "GRAVE", kind = "stack"},
 }
 
 local minor_pair_from_index
 local trump_pair_from_index
+local refresh_armed_hand_card
 
 local function push_log(text)
     table.insert(state.log, 1, text)
@@ -205,16 +212,18 @@ local function clear_runtime_state()
     state.pending_play = nil
     state.committed = nil
     state.legal_hints = {}
+    state.armed_hand = nil
     state.hover_target = nil
     state.drag = nil
     state.cards = {}
     state.zones = {
         deck = new_zone("deck"),
         runtime = new_zone("runtime", {nil}),
+        play = new_zone("play", {nil}),
         trump = new_zone("trump", {nil, nil}),
         targets = new_zone("targets", {nil, nil, nil}),
-        manifest = new_zone("manifest", {nil, nil, nil, nil, nil}),
-        latent = new_zone("latent", {nil, nil, nil, nil, nil}),
+        manifest = new_zone("manifest", {nil, nil, nil, nil, nil, nil}),
+        latent = new_zone("latent", {nil, nil, nil, nil, nil, nil}),
         hand = new_zone("hand"),
         grave = new_zone("grave"),
     }
@@ -366,6 +375,23 @@ local function move_card(card_id, zone_name, slot, reason)
     return true
 end
 
+local function insert_hand_card_at(card_id, index, reason)
+    local hand = state.zones.hand
+    remove_from_current_zone(card_id)
+    local insert_at = math.max(1, math.min(index or (#hand.cards + 1), #hand.cards + 1))
+    table.insert(hand.cards, insert_at, card_id)
+    sync_zone_cards("hand")
+    refresh_armed_hand_card()
+
+    local label = card_id .. " -> hand[" .. insert_at .. "]"
+    if reason then
+        label = label .. " (" .. reason .. ")"
+    end
+    state.message = label
+    push_log(label)
+    return true
+end
+
 local function build_empty_surface()
     state.log = {}
     state.message = "DEV mode: free structural card manipulation."
@@ -425,11 +451,11 @@ local function start_game()
     shuffle_in_place(state.zones.deck.cards)
     sync_zone_cards("deck")
 
-    for slot = 1, 5 do
+    for slot = 1, 6 do
         deal_from_deck("manifest", slot, true)
     end
 
-    for _ = 1, 5 do
+    for _ = 1, 6 do
         deal_from_deck("hand", nil, true)
     end
 
@@ -442,18 +468,19 @@ local function start_game()
     deal_from_deck("targets", 2, false)
     deal_from_deck("targets", 3, false)
 
-    for slot = 1, 5 do
+    for slot = 1, 6 do
         deal_from_deck("latent", slot, false)
     end
 
     state.selected = nil
     state.hover_target = nil
     state.drag = nil
+    state.hints_enabled = true
     state.message = "Start Game complete: two-phase opening board ready."
     push_log("Start Game complete.")
-    push_log("Phase A: 100 minors -> 5 manifest, 5 hand.")
-    push_log("Phase B: +22 trumps -> 3 targets, 5 latent.")
-    push_log("Deck now holds 104 cards.")
+    push_log("Phase A: 100 minors -> 6 manifest, 6 hand.")
+    push_log("Phase B: +22 trumps -> 3 targets, 6 latent.")
+    push_log("Deck now holds 101 cards.")
 end
 
 local function zone_counts()
@@ -504,6 +531,8 @@ local function make_layout()
     local right_mid_y = y1 + status_h + gap
     local right_log_h = y3 - gap - right_mid_y
     local runtime_w = math.floor(170 * s)
+    local play_y = y1 + deck_h + gap
+    local play_h = y3 - gap - play_y
 
     return {
         scale = s,
@@ -514,6 +543,7 @@ local function make_layout()
         top_bar_h = top_bar_h,
         left = {
             deck = {x = left_x, y = y1, w = left_w, h = deck_h},
+            play = {x = left_x, y = play_y, w = left_w, h = play_h},
             runtime = {x = left_x, y = y3, w = runtime_w, h = bottom_h},
         },
         center = {
@@ -538,6 +568,7 @@ end
 local function get_zone_rect(name)
     local l = state.layout
     if name == "deck" then return l.left.deck end
+    if name == "play" then return l.left.play end
     if name == "runtime" then return l.left.runtime end
     if name == "trump" then return l.center.trump end
     if name == "targets" then return l.center.targets end
@@ -572,7 +603,7 @@ local function slot_rects_for_zone(name)
         y = rect.y + math.floor((rect.h - ch) / 2)
     elseif name == "latent" then
         y = rect.y + math.floor((rect.h - ch) / 2) + math.floor(2 * state.layout.scale)
-    elseif name == "trump" or name == "runtime" then
+    elseif name == "trump" or name == "runtime" or name == "play" then
         y = rect.y + math.floor((rect.h - ch) / 2)
         start_x = rect.x + math.floor((rect.w - total_w) / 2)
     elseif name == "manifest" then
@@ -614,7 +645,7 @@ local function card_views()
         }
     end
 
-    for _, zone_name in ipairs({"runtime", "trump", "targets", "manifest", "latent"}) do
+    for _, zone_name in ipairs({"runtime", "play", "trump", "targets", "manifest", "latent"}) do
         local rects = slot_rects_for_zone(zone_name)
         local zone = state.zones[zone_name]
         for slot = 1, zone.slot_count do
@@ -657,6 +688,20 @@ end
 local function clear_commit_state()
     state.committed = nil
     state.legal_hints = {}
+    state.armed_hand = nil
+end
+
+refresh_armed_hand_card = function()
+    state.armed_hand = nil
+    if not state.committed then
+        return
+    end
+    for _, hand_card_id in ipairs(state.zones.hand.cards) do
+        if state.legal_hints[hand_card_id] then
+            state.armed_hand = hand_card_id
+            return
+        end
+    end
 end
 
 local function topology_adjacent(op_a, op_b)
@@ -704,6 +749,7 @@ local function commit_manifest_card(card_id, slot)
             count = count + 1
         end
     end
+    refresh_armed_hand_card()
 
     state.message = card_id .. " committed. Legal hand cards: " .. count .. "."
     push_log(card_id .. " commit -> " .. count .. " legal hand cards.")
@@ -747,6 +793,26 @@ local function predicted_hand_rect(extra_cards)
     }
 end
 
+local function hand_insert_index_for_x(x, dragged_card_id)
+    local views = card_views()
+    local ordered = {}
+    for _, hand_card_id in ipairs(state.zones.hand.cards) do
+        if hand_card_id ~= dragged_card_id then
+            table.insert(ordered, hand_card_id)
+        end
+    end
+
+    for i, hand_card_id in ipairs(ordered) do
+        local rect = views[hand_card_id]
+        local mid_x = rect.x + rect.w * 0.5
+        if x < mid_x then
+            return i
+        end
+    end
+
+    return #ordered + 1
+end
+
 local function point_in_rect(x, y, rect)
     return rect and x >= rect.x and x <= rect.x + rect.w and y >= rect.y and y <= rect.y + rect.h
 end
@@ -754,7 +820,7 @@ end
 local function pick_card(x, y)
     local views = card_views()
     local ordered = {}
-    for _, zone_name in ipairs({"hand", "manifest", "latent", "targets", "runtime", "trump", "grave", "deck"}) do
+    for _, zone_name in ipairs({"hand", "manifest", "latent", "targets", "play", "runtime", "trump", "grave", "deck"}) do
         local zone = state.zones[zone_name]
         if zone.kind == "slots" then
             for i = zone.slot_count, 1, -1 do
@@ -804,6 +870,7 @@ local BUTTON_ORDER = {
     {id = "start", label = "Start Game", hint = "[S]"},
     {id = "draw", label = "Draw", hint = "[1]"},
     {id = "hints", label = "Hints", hint = "[V]"},
+    {id = "move", label = "△", hint = "[Space]"},
     {id = "flip", label = "Flip", hint = "[2 / F]"},
     {id = "discard", label = "Discard", hint = "[3 / Del]"},
     {id = "reset", label = "Reset", hint = "[R]"},
@@ -813,6 +880,7 @@ local BUTTON_WIDTHS = {
     start = 176,
     draw = 118,
     hints = 118,
+    move = 94,
     flip = 146,
     discard = 152,
     reset = 152,
@@ -1072,7 +1140,7 @@ end
 local function start_hand_manifest_play(card_id, slot)
     local hand_card = state.cards[card_id]
     if hand_card.zone ~= "hand" then
-        state.message = "Only hand cards can start a play."
+        state.message = "Only hand cards can start a cast."
         return
     end
 
@@ -1084,12 +1152,26 @@ local function start_hand_manifest_play(card_id, slot)
 
     local from_hand = current_card_rect(card_id)
     local from_manifest = current_card_rect(target_id)
-    local manifest_slot_rect = slot_rects_for_zone("manifest")[slot]
+    local play_slot_rect = slot_rects_for_zone("play")[1]
     local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + 1)
+    local grave_to_played = predicted_stack_rect("grave", #state.zones.grave.cards + 2)
 
     state.selected = nil
     state.pending_play = nil
     clear_commit_state()
+
+    enqueue_move(card_id, from_hand, play_slot_rect, {
+        face_before = true,
+        face_after = true,
+        arc = math.floor(18 * state.layout.scale),
+        on_start = function()
+            remove_from_current_zone(card_id)
+        end,
+        on_finish = function()
+            place_card(card_id, "play", 1)
+            push_log(card_id .. " -> play[1] (staged hand-card).")
+        end,
+    })
 
     enqueue_move(target_id, from_manifest, grave_to, {
         face_before = state.cards[target_id].face_up,
@@ -1101,20 +1183,23 @@ local function start_hand_manifest_play(card_id, slot)
         on_finish = function()
             state.cards[target_id].face_up = true
             place_card(target_id, "grave", nil)
-            push_log(target_id .. " -> grave (play).")
+            push_log(target_id .. " -> grave (committed world-node).")
         end,
     })
 
-    enqueue_move(card_id, from_hand, manifest_slot_rect, {
+    queue_chain_repair(slot)
+
+    enqueue_move(card_id, play_slot_rect, grave_to_played, {
         face_before = true,
         face_after = true,
+        arc = math.floor(18 * state.layout.scale),
         on_start = function()
             remove_from_current_zone(card_id)
         end,
         on_finish = function()
-            place_card(card_id, "manifest", slot)
-            push_log(card_id .. " -> manifest[" .. slot .. "] (play).")
-            state.message = card_id .. " replaced " .. target_id .. "."
+            place_card(card_id, "grave", nil)
+            push_log(card_id .. " -> grave (played hand-card discharge).")
+            state.message = card_id .. " cast against manifest[" .. slot .. "]."
         end,
     })
 
@@ -1184,6 +1269,24 @@ local function committed_play_allowed(hand_card_id, manifest_slot)
         return false
     end
     return true
+end
+
+local function launch_committed_play()
+    if state.anim.locked then
+        state.message = "Animation in progress."
+        return
+    end
+    if not state.committed then
+        state.message = "Commit one manifest card first."
+        return
+    end
+    local hand_card_id = state.armed_hand
+    if not hand_card_id then
+        state.message = "No legal hand card available for the committed manifest card."
+        return
+    end
+
+    start_hand_manifest_play(hand_card_id, state.committed.slot)
 end
 
 local function start_discard_sequence(card_id)
@@ -1267,6 +1370,7 @@ local function draw_card(card_id, rect, dragged, opts)
     local selected = state.selected == card_id
     local committed = state.committed and state.committed.card_id == card_id
     local legal_hint = state.legal_hints[card_id] == true
+    local armed = state.armed_hand == card_id
     local scale_x = opts.scale_x or 1
     local face_up = opts.face_up
     if face_up == nil then
@@ -1356,6 +1460,11 @@ local function draw_card(card_id, rect, dragged, opts)
         rounded("line", draw_rect.x - 3, draw_rect.y - 3, draw_rect.w + 6, draw_rect.h + 6, 12)
     end
 
+    if armed then
+        set_color(COLORS.drop, 0.90)
+        rounded("line", draw_rect.x - 6, draw_rect.y - 6, draw_rect.w + 12, draw_rect.h + 12, 14)
+    end
+
     if selected or dragged then
         set_color(selected and COLORS.select or COLORS.drop, 0.35)
         rounded("line", draw_rect.x - 2, draw_rect.y - 2, draw_rect.w + 4, draw_rect.h + 4, 12)
@@ -1366,13 +1475,13 @@ local function draw_zone_contents()
     local views = card_views()
     local drag_card = state.drag and state.drag.card_id or nil
 
-    for _, zone_name in ipairs({"deck", "runtime", "trump", "targets", "manifest", "latent", "hand", "grave"}) do
+    for _, zone_name in ipairs({"deck", "runtime", "play", "trump", "targets", "manifest", "latent", "hand", "grave"}) do
         local zone = state.zones[zone_name]
         if zone.kind == "slots" then
             local rects = slot_rects_for_zone(zone_name)
             for slot, rect in ipairs(rects) do
                 local hl = state.hover_target and state.hover_target.zone == zone_name and state.hover_target.slot == slot
-                draw_slot_placeholder(rect, zone_name == "runtime" and "slot" or tostring(slot), hl)
+                draw_slot_placeholder(rect, (zone_name == "runtime" or zone_name == "play") and "slot" or tostring(slot), hl)
             end
         end
 
@@ -1449,6 +1558,7 @@ end
 
 local function draw_left_column()
     draw_panel(state.layout.left.deck, "DECK", "Draw pile")
+    draw_panel(state.layout.left.play, "PLAY", "1 slot")
     draw_panel(state.layout.left.runtime, "RUNTIME", "1 slot")
 end
 
@@ -1469,10 +1579,20 @@ end
 
 local function draw_footer()
     for _, button in ipairs(state.ui.buttons) do
-        local active = button.id == "start"
-            or button.id == "draw"
-            or button.id == "hints"
-            or (state.selected ~= nil)
+        local active = false
+        if button.id == "start" or button.id == "reset" then
+            active = true
+        elseif button.id == "move" then
+            active = state.committed and state.armed_hand ~= nil
+        elseif state.mode == "DEV" then
+            active = button.id == "draw"
+                or button.id == "hints"
+                or button.id == "flip"
+                or button.id == "discard"
+                or (state.selected ~= nil)
+        elseif state.mode == "GAMEPLAY" then
+            active = button.id == "hints"
+        end
         local tint = active and COLORS.accent_soft or COLORS.outline
         if button.id == "hints" and state.hints_enabled then
             tint = COLORS.success
@@ -1492,7 +1612,12 @@ local function draw_footer()
     local footer = state.layout.footer
     love.graphics.setFont(state.fonts.small)
     set_color(COLORS.muted)
-    local help = "S Start Game  1 draw  V hints  2/F flip  3/Delete discard  R reset  H/M/L/T/U/P/G/K move to zone"
+    local help
+    if state.mode == "GAMEPLAY" then
+        help = "S Start Game  Space △ move  Esc clear selection  R reset"
+    else
+        help = "S Start Game  1 draw  V hints  Space △ move  2/F flip  3/Delete discard  R reset  H/M/L/T/U/P/G/K move to zone"
+    end
     love.graphics.print(help, footer.x + math.floor(760 * state.layout.scale), footer.y + 14 * state.layout.scale)
 end
 
@@ -1515,6 +1640,10 @@ local function trigger_button(id)
     end
 
     if id == "draw" then
+        if state.mode ~= "DEV" then
+            state.message = "Draw button is DEV-only."
+            return
+        end
         if state.anim.locked then
             state.message = "Animation in progress."
             return
@@ -1524,6 +1653,11 @@ local function trigger_button(id)
     end
 
     if id == "hints" then
+        if state.mode == "GAMEPLAY" then
+            state.hints_enabled = true
+            state.message = "Hints are always on in gameplay."
+            return
+        end
         state.hints_enabled = not state.hints_enabled
         if not state.hints_enabled then
             clear_commit_state()
@@ -1533,7 +1667,16 @@ local function trigger_button(id)
         return
     end
 
+    if id == "move" then
+        launch_committed_play()
+        return
+    end
+
     if id == "flip" then
+        if state.mode ~= "DEV" then
+            state.message = "Manual flip is DEV-only."
+            return
+        end
         if state.anim.locked then
             state.message = "Animation in progress."
             return
@@ -1558,6 +1701,10 @@ local function trigger_button(id)
     end
 
     if id == "discard" then
+        if state.mode ~= "DEV" then
+            state.message = "Manual discard is DEV-only."
+            return
+        end
         if state.anim.locked then
             state.message = "Animation in progress."
             return
@@ -1631,49 +1778,57 @@ function love.mousepressed(x, y, button)
         local card_id, rect = pick_card(x, y)
         if card_id then
             local clicked = state.cards[card_id]
-            local selected = state.selected and state.cards[state.selected] or nil
             if state.mode == "GAMEPLAY"
                 and state.hints_enabled
                 and clicked
                 and clicked.zone == "manifest"
                 and clicked.slot
-                and not (selected and selected.zone == "hand")
             then
                 state.selected = nil
                 state.drag = nil
                 commit_manifest_card(card_id, clicked.slot)
                 return
             end
-            if state.mode == "GAMEPLAY"
-                and selected
-                and selected.zone == "hand"
-                and clicked
-                and clicked.zone == "manifest"
-                and clicked.slot
-            then
-                if not committed_play_allowed(state.selected, clicked.slot) then
-                    return
-                end
-                start_hand_manifest_play(state.selected, clicked.slot)
+            if state.mode == "GAMEPLAY" and clicked.zone == "hand" then
+                state.selected = nil
+                state.drag = {
+                    card_id = card_id,
+                    x = x,
+                    y = y,
+                    ox = x - rect.x,
+                    oy = y - rect.y,
+                    start_x = x,
+                    start_y = y,
+                    moved = false,
+                }
+                state.message = "Drag within hand to reorder. Use △ to cast the armed legal card."
                 return
             end
             state.selected = card_id
-            state.drag = {
-                card_id = card_id,
-                x = x,
-                y = y,
-                ox = x - rect.x,
-                oy = y - rect.y,
-                start_x = x,
-                start_y = y,
-                moved = false,
-            }
+            if state.mode ~= "GAMEPLAY" then
+                state.drag = {
+                    card_id = card_id,
+                    x = x,
+                    y = y,
+                    ox = x - rect.x,
+                    oy = y - rect.y,
+                    start_x = x,
+                    start_y = y,
+                    moved = false,
+                }
+            else
+                state.drag = nil
+            end
             state.message = "Selected " .. card_id .. "."
             return
         end
 
         local target = pick_drop_target(x, y)
         if target and state.selected then
+            if state.mode == "GAMEPLAY" then
+                state.message = "Free zone manipulation is disabled in gameplay."
+                return
+            end
             local selected_card = state.cards[state.selected]
             if state.mode == "GAMEPLAY"
                 and selected_card
@@ -1681,10 +1836,7 @@ function love.mousepressed(x, y, button)
                 and target.zone == "manifest"
                 and target.slot
             then
-                if not committed_play_allowed(state.selected, target.slot) then
-                    return
-                end
-                start_hand_manifest_play(state.selected, target.slot)
+                state.message = "Use △ to cast against the committed manifest slot."
             else
                 local slot = target.slot or first_open_slot(target.zone)
                 if slot or state.zones[target.zone].kind ~= "slots" then
@@ -1696,6 +1848,10 @@ function love.mousepressed(x, y, button)
 
         state.selected = nil
     elseif button == 2 then
+        if state.mode == "GAMEPLAY" then
+            state.message = "Manual flip is disabled in gameplay."
+            return
+        end
         local card_id = pick_card(x, y)
         if card_id then
             local card = state.cards[card_id]
@@ -1709,6 +1865,23 @@ end
 
 function love.mousereleased(x, y, button)
     if button ~= 1 or not state.drag then
+        return
+    end
+
+    if state.mode == "GAMEPLAY" then
+        local card_id = state.drag.card_id
+        if state.cards[card_id] and state.cards[card_id].zone == "hand" and state.drag.moved then
+            local target = pick_drop_target(x, y)
+            if target and target.zone == "hand" then
+                local insert_index = hand_insert_index_for_x(x, card_id)
+                state.drag = nil
+                state.hover_target = nil
+                insert_hand_card_at(card_id, insert_index, "hand-reorder")
+                return
+            end
+        end
+        state.drag = nil
+        state.hover_target = nil
         return
     end
 
@@ -1731,10 +1904,7 @@ function love.mousereleased(x, y, button)
             and target.zone == "manifest"
             and target.slot
         then
-            if not committed_play_allowed(card_id, target.slot) then
-                return
-            end
-            start_hand_manifest_play(card_id, target.slot)
+            state.message = "Use △ to cast against the committed manifest slot."
             return
         else
             local slot = target.slot or first_open_slot(target.zone)
@@ -1763,6 +1933,8 @@ function love.keypressed(key)
         trigger_button("draw")
     elseif key == "v" then
         trigger_button("hints")
+    elseif key == "space" then
+        trigger_button("move")
     elseif key == "2" or key == "f" then
         trigger_button("flip")
     elseif key == "3" or key == "delete" or key == "backspace" then
@@ -1774,6 +1946,8 @@ function love.keypressed(key)
         state.drag = nil
         clear_commit_state()
         state.message = "Selection cleared."
+    elseif state.mode ~= "DEV" and (key == "h" or key == "m" or key == "l" or key == "t" or key == "u" or key == "p" or key == "g" or key == "k") then
+        state.message = "Zone shortcuts are DEV-only."
     elseif key == "h" then
         zone_shortcut("hand")
     elseif key == "m" then
