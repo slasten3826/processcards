@@ -53,7 +53,7 @@ operator field color != glyph ink color
 - `☳ CHOOSE` живёт на красном поле,
   но красный glyph на красном поле даст плохую читаемость
 - `☴ OBSERVE` живёт на почти белом поле
-- `☱ RUNTIME` живёт на почти чёрном / графитовом поле
+- `☱ RUNTIME` живёт на тёмном steel-slate поле
 
 Один фиксированный universal glyph color тоже не подходит.
 

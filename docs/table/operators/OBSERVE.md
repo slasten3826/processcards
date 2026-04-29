@@ -11,11 +11,12 @@ Symbol:
 ```text
 canonical operator law
 aligned with hidden / known / revealed model
+aligned with play-zone execution shell
 ```
 
 ## 1. Core identity
 
-`☴` now reads through the new information-state model:
+`☴` now reads through the current information-state model:
 
 ```text
 hidden -> known
@@ -27,7 +28,7 @@ as vague “look at hidden card” language only.
 Short formula:
 
 ```text
-☴ = hidden to known
+☴ = choose one hidden card on board and make it known
 ```
 
 ## 2. What it is not
@@ -40,11 +41,29 @@ Short formula:
 - removal
 - free broad search
 
-## 3. Current playtest law
+## 3. Execution position
 
-If `☴` is the chosen operator effect,
-player chooses one legal hidden card
-and that card becomes:
+`☴` no longer resolves as abstract text detached from the played card.
+
+Current runtime shell is:
+
+```text
+hand -> play
+pending operator choice
+choose ☴
+resolve ☴ while the card remains in play
+then play -> grave
+```
+
+So `☴` is a real `play-zone` payload,
+not a free-floating inspection permission.
+
+## 4. Current runtime law
+
+If `☴` is the chosen operator effect:
+
+1. choose one legal hidden card on board
+2. that card becomes:
 
 ```text
 known
@@ -56,21 +75,44 @@ That means:
 
 - card identity is known
 - card may remain face-down on the table
-- a later visual layer may show ghost identity over the back
+- current visual branch should show ghost identity over the back
 
-## 4. Trump consequence
+## 5. Target class
 
-Because trump-law now triggers on `known`,
-`☴` can immediately cause trump-event behavior
-if the observed hidden card is a trump,
-unless zone override says otherwise.
+`☴` is defined by information class first,
+not by one special zone.
 
-Important special case:
+That means its target class is:
 
-- in `targets`, known trump stays there and becomes revealed
-- outside `targets`, known trump triggers prototype trump-event path
+```text
+hidden card on board
+```
 
-## 5. Pair law directions
+So `☴` is not restricted to only one concealed structure,
+unless a later law says otherwise.
+
+Current intended examples include:
+
+- hidden card in `latent`
+- hidden card in `targets`
+- hidden topdeck, if topdeck is currently a legal hidden board-object
+
+## 6. Trump consequence
+
+At the current stage,
+`☴` only upgrades information state:
+
+```text
+hidden -> known
+```
+
+It does not by itself imply mandatory public reveal.
+
+Any stronger trump-on-known consequence
+should be treated as a later runtime branch
+until explicitly promoted into current code and law.
+
+## 7. Pair law directions
 
 Example pair directions:
 
@@ -80,7 +122,7 @@ Example pair directions:
 - `☴☶` — observe while ignoring one normal observe restriction
 - `☴☱` — install observe as runtime-form behavior
 
-## 6. Physical execution law
+## 8. Physical execution law
 
 Observe must stay cardboard-playable.
 
@@ -92,20 +134,27 @@ That means:
 - if digital prototype shows ghost identity,
   that overlay must represent real knowledge, not fake engine clairvoyance
 
-## 7. Restrictions
+Current visual direction is fixed in:
+
+- [../../crystall/KNOWN_VISUALIZATION_SLICE.md](../../crystall/KNOWN_VISUALIZATION_SLICE.md)
+
+## 9. Restrictions
 
 - observe does not by itself move the card
 - observe does not by itself reveal the card to everyone
-- observe scope must be readable from table law or pair law
+- observe scope is `hidden card on board` by default
+- observe does not by itself trigger a second zone change unless another law says so
 
-## 8. Open questions
+## 10. Open questions
 
-- default observe scope in the new move branch
 - whether topdeck counts as ordinary observe target by default
 - whether some mixed pairs should escalate known directly into revealed
+- whether later current canon should make some trump behavior trigger on `known`
 
-## 9. Short formula
+## 11. Short formula
 
 ```text
-☴ OBSERVE = hidden becomes known without mandatory reveal
+☴ OBSERVE = choose one hidden card on board
+make it known
+without mandatory reveal
 ```

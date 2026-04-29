@@ -46,8 +46,18 @@ dark_a = lerp_color(op_color, COLORS.bg, 0.90)
 
 ## 3. Спец-случай RUNTIME
 
-RUNTIME-поле (`{0.18, 0.20, 0.24}`) после lerp 0.90 почти неотличимо от фона.
-Глиф RUNTIME рисуется белым контуром в режиме `"line"`.
+RUNTIME-поле больше не держится на почти чёрном графите.
+Current runtime color is shifted toward steel-slate:
+
+```text
+{0.40, 0.46, 0.52}
+```
+
+Это позволяет сохранить:
+
+- тёмную системную идентичность
+- line-mode glyph
+- but no forced white inversion
 
 См. [glyphs/RUNTIME_SPECIAL.md](./glyphs/RUNTIME_SPECIAL.md).
 

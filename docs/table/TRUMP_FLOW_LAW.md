@@ -1,4 +1,4 @@
-# Trump Chain Law
+# Trump Flow Law
 
 Статус:
 
@@ -67,7 +67,7 @@ all cards in trump flow are face-up
 
 ## 5. Entry law
 
-Если козырь становится `known`
+Если козырь становится `revealed`
 вне zone override,
 то он не должен сразу считаться residue в `trump zone`.
 
@@ -79,9 +79,9 @@ trump flow
 
 То есть:
 
-1. trump becomes `known`
+1. trump becomes `revealed`
 2. trump enters `trump flow`
-3. trump event resolves from there
+3. trump waits there until board closure allows resolution
 4. only then resolved trump may enter `trump zone`
 
 ## 6. Queue reading
@@ -133,7 +133,7 @@ zone = after
 
 `targets` по-прежнему переопределяют общий вход в `trump flow`.
 
-Если козырь становится `known` или `revealed` в `targets`,
+Если козырь становится `revealed` в `targets`,
 то:
 
 - он не входит в `trump flow`
@@ -144,7 +144,17 @@ zone = after
 
 - [TARGET_ZONE_LAW.md](./TARGET_ZONE_LAW.md)
 
-## 9. Chain close consequence
+## 9. Board closure gate
+
+Даже если trump уже вошёл в `trump flow`,
+он не должен начинать resolution,
+пока board не закрыт полностью.
+
+См.:
+
+- [BOARD_CLOSURE_LAW.md](./BOARD_CLOSURE_LAW.md)
+
+## 10. Chain close consequence
 
 While chain is still active:
 
@@ -157,7 +167,7 @@ When chain closes:
 - halted close flushes all non-`HALT` trumps into deck
 - only `HALT` itself may then enter ordinary ecology
 
-## 10. What this law does not decide yet
+## 11. What this law does not decide yet
 
 Этот документ пока не решает:
 
@@ -171,10 +181,12 @@ active trumps need their own visible flow zone
 separate from resolved trump residue
 ```
 
-## 11. Short formula
+## 12. Short formula
 
 ```text
 trump flow = visible active flow of resolving trumps
+revealed trump enters trump flow
+trump resolution waits for full board closure
 resolved trumps remain in-flight until chain close
 ordinary close parks them into trump zone
 halted close parks nothing except HALT itself

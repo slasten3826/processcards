@@ -22,6 +22,7 @@
 
 local glyphs = require("src.glyphs")
 local glyph_layout = require("src.glyph_layout")
+local core = require("src.core.api")
 
 local BASE_W = 1280
 local BASE_H = 720
@@ -102,7 +103,7 @@ local OP_COLORS = {
     OBSERVE = {0.86, 0.86, 0.84},
     LOGIC = {0.34, 0.68, 0.32},
     CYCLE = {0.84, 0.49, 0.18},
-    RUNTIME = {0.18, 0.20, 0.24},
+    RUNTIME = {0.40, 0.46, 0.52},
     MANIFEST = {0.86, 0.68, 0.26},
 }
 
@@ -124,10 +125,16 @@ local state = {
     committed = nil,
     legal_hints = {},
     armed_hand = nil,
+    pending_operator_choice = nil,
+    pending_hidden_choice = nil,
+    pending_hand_choice = nil,
+    pending_manifest_choice = nil,
+    pending_trump = nil,
     hover_target = nil,
     drag = nil,
     cards = {},
     zones = {},
+    core = nil,
     log = {},
     message = "DEV mode: free structural card manipulation.",
     layout = nil,
@@ -136,6 +143,7 @@ local state = {
     fonts = {},
     ui = {
         buttons = {},
+        operator_buttons = {},
     },
     anim = {
         queue = {},
@@ -149,6 +157,7 @@ local ZONE_META = {
     deck = {title = "DECK", kind = "stack"},
     runtime = {title = "RUNTIME", kind = "slots", slot_count = 1},
     play = {title = "PLAY", kind = "slots", slot_count = 1},
+    trump_flow = {title = "TRUMP FLOW", kind = "row"},
     trump = {title = "TRUMP ZONE", kind = "slots", slot_count = 2},
     targets = {title = "TARGETS", kind = "slots", slot_count = 3},
     manifest = {title = "MANIFEST", kind = "slots", slot_count = 6},
@@ -159,7 +168,11 @@ local ZONE_META = {
 
 local minor_pair_from_index
 local trump_pair_from_index
-local refresh_armed_hand_card
+local enqueue_move
+local enqueue_flip
+local enqueue_callback
+local start_next_anim
+local update_buttons
 
 local function push_log(text)
     table.insert(state.log, 1, text)
@@ -182,6 +195,15 @@ end
 
 local function rounded(mode, x, y, w, h, r)
     love.graphics.rectangle(mode, x, y, w, h, r, r)
+end
+
+local function draw_with_rounded_mask(rect, radius, draw_fn)
+    love.graphics.stencil(function()
+        rounded("fill", rect.x, rect.y, rect.w, rect.h, radius)
+    end, "replace", 1)
+    love.graphics.setStencilTest("greater", 0)
+    draw_fn()
+    love.graphics.setStencilTest()
 end
 
 local function set_color(c, alpha)
@@ -213,6 +235,11 @@ local function clear_runtime_state()
     state.committed = nil
     state.legal_hints = {}
     state.armed_hand = nil
+    state.pending_operator_choice = nil
+    state.pending_hidden_choice = nil
+    state.pending_hand_choice = nil
+    state.pending_manifest_choice = nil
+    state.pending_trump = nil
     state.hover_target = nil
     state.drag = nil
     state.cards = {}
@@ -220,6 +247,7 @@ local function clear_runtime_state()
         deck = new_zone("deck"),
         runtime = new_zone("runtime", {nil}),
         play = new_zone("play", {nil}),
+        trump_flow = new_zone("trump_flow"),
         trump = new_zone("trump", {nil, nil}),
         targets = new_zone("targets", {nil, nil, nil}),
         manifest = new_zone("manifest", {nil, nil, nil, nil, nil, nil}),
@@ -231,6 +259,104 @@ local function clear_runtime_state()
     state.anim.active = nil
     state.anim.locked = false
     state.anim.ghost = nil
+end
+
+local function sync_from_core(message)
+    local core_state = state.core
+    if not core_state then
+        return
+    end
+
+    state.cards = {}
+    for card_id, card in pairs(core_state.cards) do
+        state.cards[card_id] = {
+            id = card.id,
+            class = card.class,
+            op_a = card.op_a,
+            op_b = card.op_b,
+            trump_name = card.trump_name,
+            info_state = card.info_state,
+            face_up = card.face_up,
+            zone = card.zone,
+            slot = card.slot,
+        }
+    end
+
+    state.zones = {}
+    for zone_name, zone in pairs(core_state.zones) do
+        local clone = new_zone(zone_name)
+        if zone.kind == "slots" then
+            clone.cards = {}
+            for i = 1, zone.slot_count do
+                clone.cards[i] = zone.cards[i]
+            end
+        else
+            clone.cards = {}
+            for i, card_id in ipairs(zone.cards) do
+                clone.cards[i] = card_id
+            end
+        end
+        state.zones[zone_name] = clone
+    end
+
+    state.committed = core_state.committed and {
+        card_id = core_state.committed.card_id,
+        slot = core_state.committed.slot,
+    } or nil
+    state.legal_hints = {}
+    for card_id, legal in pairs(core_state.legal_hints or {}) do
+        if legal then
+            state.legal_hints[card_id] = true
+        end
+    end
+    state.armed_hand = core_state.armed_hand
+    state.pending_operator_choice = core_state.pending_operator_choice and {
+        card_id = core_state.pending_operator_choice.card_id,
+        choices = {
+            core_state.pending_operator_choice.choices[1],
+            core_state.pending_operator_choice.choices[2],
+        },
+    } or nil
+    state.pending_hidden_choice = core_state.pending_hidden_choice and {
+        card_id = core_state.pending_hidden_choice.card_id,
+        operator = core_state.pending_hidden_choice.operator,
+        legal_card_ids = core_state.pending_hidden_choice.legal_card_ids,
+    } or nil
+    state.pending_hand_choice = core_state.pending_hand_choice and {
+        card_id = core_state.pending_hand_choice.card_id,
+        operator = core_state.pending_hand_choice.operator,
+        legal_card_ids = core_state.pending_hand_choice.legal_card_ids,
+    } or nil
+    state.pending_manifest_choice = core_state.pending_manifest_choice and {
+        card_id = core_state.pending_manifest_choice.card_id,
+        operator = core_state.pending_manifest_choice.operator,
+        legal_slots = core_state.pending_manifest_choice.legal_slots,
+    } or nil
+    state.pending_trump = core_state.pending_trump
+    state.log = {}
+    for i = #core_state.log, 1, -1 do
+        state.log[#state.log + 1] = core_state.log[i]
+    end
+    state.anim.queue = {}
+    state.anim.active = nil
+    state.anim.locked = false
+    state.anim.ghost = nil
+    state.selected = nil
+    state.drag = nil
+    state.hover_target = nil
+    update_buttons()
+    if message then
+        state.message = message
+    end
+end
+
+local function inspect_rect()
+    return {
+        x = state.layout.center.combined.x + math.floor((state.layout.center.combined.w - state.layout.card_w) / 2),
+        y = state.layout.center.combined.y + math.floor((state.layout.center.combined.h - state.layout.card_h) / 2),
+        w = state.layout.card_w,
+        h = state.layout.card_h,
+    }
 end
 
 local function sync_zone_cards(zone_name)
@@ -259,6 +385,7 @@ local function create_card(id, class, op_a, op_b)
         class = class or "minor",
         op_a = op_a,
         op_b = op_b,
+        info_state = "hidden",
         face_up = false,
         zone = nil,
         slot = nil,
@@ -376,12 +503,21 @@ local function move_card(card_id, zone_name, slot, reason)
 end
 
 local function insert_hand_card_at(card_id, index, reason)
+    if state.mode == "GAMEPLAY" and state.core then
+        local result = core.reorder_hand(state.core, card_id, index)
+        if result and not result.summary.error then
+            sync_from_core(card_id .. " -> hand[" .. result.summary.index .. "]" .. (reason and (" (" .. reason .. ")") or ""))
+            return true
+        end
+        state.message = "Hand reorder rejected."
+        return false
+    end
+
     local hand = state.zones.hand
     remove_from_current_zone(card_id)
     local insert_at = math.max(1, math.min(index or (#hand.cards + 1), #hand.cards + 1))
     table.insert(hand.cards, insert_at, card_id)
     sync_zone_cards("hand")
-    refresh_armed_hand_card()
 
     local label = card_id .. " -> hand[" .. insert_at .. "]"
     if reason then
@@ -396,6 +532,7 @@ local function build_empty_surface()
     state.log = {}
     state.message = "DEV mode: free structural card manipulation."
     state.mode = "DEV"
+    state.core = nil
     clear_runtime_state()
 
     push_log("Layer 1 board skeleton booted.")
@@ -441,46 +578,18 @@ local function deal_from_deck(zone_name, slot, face_up)
 end
 
 local function start_game()
-    state.log = {}
-    state.message = "Start Game: building two-phase setup."
     state.mode = "GAMEPLAY"
-    clear_runtime_state()
-
-    append_minor_deck(state.zones.deck.cards)
-
-    shuffle_in_place(state.zones.deck.cards)
-    sync_zone_cards("deck")
-
-    for slot = 1, 6 do
-        deal_from_deck("manifest", slot, true)
-    end
-
-    for _ = 1, 6 do
-        deal_from_deck("hand", nil, true)
-    end
-
-    append_trump_deck(state.zones.deck.cards)
-
-    shuffle_in_place(state.zones.deck.cards)
-    sync_zone_cards("deck")
-
-    deal_from_deck("targets", 1, false)
-    deal_from_deck("targets", 2, false)
-    deal_from_deck("targets", 3, false)
-
-    for slot = 1, 6 do
-        deal_from_deck("latent", slot, false)
-    end
-
     state.selected = nil
     state.hover_target = nil
     state.drag = nil
     state.hints_enabled = true
-    state.message = "Start Game complete: two-phase opening board ready."
-    push_log("Start Game complete.")
-    push_log("Phase A: 100 minors -> 6 manifest, 6 hand.")
-    push_log("Phase B: +22 trumps -> 3 targets, 6 latent.")
-    push_log("Deck now holds 101 cards.")
+    state.core = core.new()
+    core.start_game(state.core, {
+        rng = function(max_n)
+            return love.math.random(max_n)
+        end,
+    })
+    sync_from_core("Start Game complete: two-phase opening board ready.")
 end
 
 local function zone_counts()
@@ -513,12 +622,17 @@ local function make_layout()
     local center_w = w - center_x - right_w - m - gap
     local left_x = m
     local right_x = w - m - right_w
+    local flow_w = math.floor(244 * s)
     local target_w = math.floor(300 * s)
     local trump_w = math.floor(190 * s)
     local table_w = math.floor(670 * s)
     local table_x = center_x + math.floor((center_w - table_w) / 2) - math.floor(10 * s)
-    local target_x = center_x + math.floor((center_w - target_w) / 2)
+    local top_group_gap = math.floor(18 * s)
+    local top_group_w = flow_w + top_group_gap + target_w + top_group_gap + trump_w
+    local flow_x = center_x + math.floor((center_w - top_group_w) / 2)
+    local target_x = flow_x + flow_w + top_group_gap
     local trump_x = right_x - trump_w - math.floor(20 * s)
+    trump_x = target_x + target_w + top_group_gap
     local combined_h = math.floor(298 * s)
     local manifest_h = math.floor(140 * s)
     local divider_h = math.floor(18 * s)
@@ -547,7 +661,7 @@ local function make_layout()
             runtime = {x = left_x, y = y3, w = runtime_w, h = bottom_h},
         },
         center = {
-            top = {x = target_x, y = y1, w = (trump_x + trump_w) - target_x, h = top_h},
+            trump_flow = {x = flow_x, y = y1, w = flow_w, h = top_h},
             targets = {x = target_x, y = y1, w = target_w, h = top_h},
             trump = {x = trump_x, y = y1, w = trump_w, h = top_h},
             combined = {x = table_x, y = y2, w = table_w, h = combined_h},
@@ -570,6 +684,7 @@ local function get_zone_rect(name)
     if name == "deck" then return l.left.deck end
     if name == "play" then return l.left.play end
     if name == "runtime" then return l.left.runtime end
+    if name == "trump_flow" then return l.center.trump_flow end
     if name == "trump" then return l.center.trump end
     if name == "targets" then return l.center.targets end
     if name == "manifest" then return l.center.manifest end
@@ -657,6 +772,26 @@ local function card_views()
         end
     end
 
+    local flow_rect = get_zone_rect("trump_flow")
+    if flow_rect then
+        local flow = state.zones.trump_flow.cards
+        local count = #flow
+        local visible_slots = 3
+        local slot_gap = math.floor(12 * state.layout.scale)
+        local slot_total = visible_slots * cw + (visible_slots - 1) * slot_gap
+        local slot_start = flow_rect.x + math.floor((flow_rect.w - slot_total) / 2)
+        local y = flow_rect.y + math.floor((flow_rect.h - ch) / 2)
+        local overlap_gap = math.floor(22 * state.layout.scale)
+        local used_gap = count <= visible_slots and slot_gap or overlap_gap
+        local total_w = count > 0 and (cw + (count - 1) * used_gap) or 0
+        local start_x = count <= visible_slots
+            and slot_start
+            or (flow_rect.x + math.floor((flow_rect.w - total_w) / 2))
+        for i, card_id in ipairs(flow) do
+            views[card_id] = {x = start_x + (i - 1) * used_gap, y = y, w = cw, h = ch}
+        end
+    end
+
     local hand_rect = get_zone_rect("hand")
     local count = #state.zones.hand.cards
     local gap = math.floor(12 * state.layout.scale)
@@ -691,17 +826,47 @@ local function clear_commit_state()
     state.armed_hand = nil
 end
 
-refresh_armed_hand_card = function()
-    state.armed_hand = nil
-    if not state.committed then
+local function zone_is_closed(zone_name)
+    local zone = state.zones[zone_name]
+    if zone.kind == "slots" then
+        for slot = 1, zone.slot_count do
+            if zone.cards[slot] == nil then
+                return false
+            end
+        end
+        return true
+    end
+    return #zone.cards > 0
+end
+
+local function is_board_closed()
+    return zone_is_closed("manifest")
+        and zone_is_closed("latent")
+        and zone_is_closed("targets")
+end
+
+local function first_trump_flow_card()
+    return state.zones.trump_flow.cards[1]
+end
+
+local function refresh_pending_trump()
+    if state.core then
+        state.pending_trump = state.core.pending_trump
         return
     end
-    for _, hand_card_id in ipairs(state.zones.hand.cards) do
-        if state.legal_hints[hand_card_id] then
-            state.armed_hand = hand_card_id
-            return
-        end
+    if state.pending_trump then
+        return
     end
+    if state.anim.locked or not is_board_closed() then
+        return
+    end
+    local card_id = first_trump_flow_card()
+    if not card_id then
+        return
+    end
+    state.pending_trump = card_id
+    state.message = card_id .. " pending in trump flow. Press △ to resolve."
+    push_log(card_id .. " pending trump event.")
 end
 
 local function topology_adjacent(op_a, op_b)
@@ -725,6 +890,14 @@ local function full_pair_fit(manifest_card_id, hand_card_id)
 end
 
 local function commit_manifest_card(card_id, slot)
+    if state.core then
+        local result = core.commit_manifest(state.core, slot)
+        sync_from_core((result and result.summary and result.summary.error)
+            and ("Commit rejected: " .. result.summary.error .. ".")
+            or (card_id .. " committed."))
+        return
+    end
+
     if not state.hints_enabled then
         state.message = "Hints are off."
         return
@@ -749,10 +922,45 @@ local function commit_manifest_card(card_id, slot)
             count = count + 1
         end
     end
-    refresh_armed_hand_card()
+    state.armed_hand = nil
 
     state.message = card_id .. " committed. Legal hand cards: " .. count .. "."
     push_log(card_id .. " commit -> " .. count .. " legal hand cards.")
+end
+
+local function arm_hand_card(card_id)
+    if state.core then
+        local result = core.arm_hand(state.core, card_id)
+        local message
+        if result and result.summary and result.summary.error then
+            message = card_id .. " is not legal for the committed manifest card."
+        elseif state.core.armed_hand == card_id then
+            message = card_id .. " armed for △."
+        else
+            message = card_id .. " unarmed."
+        end
+        sync_from_core(message)
+        return not (result and result.summary and result.summary.error)
+    end
+
+    if not state.committed then
+        state.message = "Commit one manifest card first."
+        return false
+    end
+    if not state.legal_hints[card_id] then
+        state.message = card_id .. " is not legal for the committed manifest card."
+        return false
+    end
+    if state.armed_hand == card_id then
+        state.armed_hand = nil
+        state.message = card_id .. " unarmed."
+        push_log(card_id .. " unarmed.")
+        return true
+    end
+    state.armed_hand = card_id
+    state.message = card_id .. " armed for △."
+    push_log(card_id .. " -> armed hand-card.")
+    return true
 end
 
 local function predicted_stack_rect(zone_name, count_after_insert)
@@ -811,6 +1019,513 @@ local function hand_insert_index_for_x(x, dragged_card_id)
     end
 
     return #ordered + 1
+end
+
+local function queue_trump_flow_entry(card_id, from_rect, reason)
+    local flow_rect = get_zone_rect("trump_flow")
+    local count = #state.zones.trump_flow.cards + 1
+    local gap = math.floor(12 * state.layout.scale)
+    local total_w = count > 0 and (count * state.layout.card_w + (count - 1) * gap) or 0
+    local start_x = flow_rect.x + math.floor((flow_rect.w - total_w) / 2)
+    local y = flow_rect.y + math.floor((flow_rect.h - state.layout.card_h) / 2)
+    local to_rect = {
+        x = start_x + (count - 1) * (state.layout.card_w + gap),
+        y = y,
+        w = state.layout.card_w,
+        h = state.layout.card_h,
+    }
+
+    enqueue_move(card_id, from_rect, to_rect, {
+        face_before = true,
+        face_after = true,
+        arc = math.floor(18 * state.layout.scale),
+        on_finish = function()
+            place_card(card_id, "trump_flow", nil)
+            push_log(card_id .. " -> trump flow" .. (reason and (" (" .. reason .. ")") or "") .. ".")
+        end,
+    })
+end
+
+local function queue_deck_reveal_to_manifest(card_id, slot)
+    local from_rect = current_card_rect(card_id)
+    local inspect = inspect_rect()
+    local manifest_slot_rect = slot_rects_for_zone("manifest")[slot]
+    enqueue_flip(card_id, from_rect, false, true, 0.22, function()
+        state.cards[card_id].face_up = true
+        enqueue_move(card_id, inspect, manifest_slot_rect, {
+            face_before = true,
+            face_after = true,
+            arc = math.floor(20 * state.layout.scale),
+            on_finish = function()
+                place_card(card_id, "manifest", slot)
+            end,
+        })
+        start_next_anim()
+    end)
+end
+
+local function queue_deck_reveal_to_flow(card_id, reason)
+    local from_rect = current_card_rect(card_id)
+    local inspect = inspect_rect()
+    enqueue_flip(card_id, from_rect, false, true, 0.22, function()
+        state.cards[card_id].face_up = true
+        queue_trump_flow_entry(card_id, inspect, reason)
+        start_next_anim()
+    end)
+end
+
+local function queue_deck_to_hand(card_id)
+    local from_rect = current_card_rect(card_id)
+    local inspect = inspect_rect()
+    local hand_to = predicted_hand_rect(1)
+    enqueue_flip(card_id, from_rect, false, true, 0.22, function()
+        state.cards[card_id].face_up = true
+        enqueue_move(card_id, inspect, hand_to, {
+            face_before = true,
+            face_after = true,
+            on_finish = function()
+                place_card(card_id, "hand", nil)
+            end,
+        })
+        start_next_anim()
+    end)
+end
+
+local function queue_concealed_refill_event(card_id, zone_name, slot)
+    local from_rect = current_card_rect(card_id)
+    local to_rect = slot_rects_for_zone(zone_name)[slot]
+    enqueue_move(card_id, from_rect, to_rect, {
+        face_before = false,
+        face_after = false,
+        arc = math.floor(18 * state.layout.scale),
+        on_start = function()
+            remove_from_current_zone(card_id)
+        end,
+        on_finish = function()
+            state.cards[card_id].face_up = false
+            place_card(card_id, zone_name, slot)
+        end,
+    })
+end
+
+local function queue_sync_from_core(message)
+    enqueue_callback(function()
+        sync_from_core(message)
+    end)
+end
+
+local function animate_core_draw(result, message)
+    local events = result and result.events or {}
+    local summary = result and result.summary or {}
+
+    for _, event in ipairs(events) do
+        if event.type == "draw_to_hand" then
+            queue_deck_to_hand(event.payload.card_id)
+        elseif event.type == "trump_flow_entry" then
+            queue_deck_reveal_to_flow(event.payload.card_id, event.payload.reason)
+        end
+    end
+
+    queue_sync_from_core(message)
+    start_next_anim()
+    if summary.pending_trump then
+        state.message = summary.pending_trump .. " pending in trump flow. Press △ to resolve."
+    else
+        state.message = message
+    end
+end
+
+local function animate_core_turn(result, message)
+    local events = result and result.events or {}
+    local latent_inspect_by_card = {}
+    local play_slot_rect = slot_rects_for_zone("play")[1]
+
+    for _, event in ipairs(events) do
+        local payload = event.payload or {}
+        if event.type == "hand_to_play" then
+            local from_rect = current_card_rect(payload.card_id)
+            enqueue_move(payload.card_id, from_rect, play_slot_rect, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "play", payload.slot or 1)
+                end,
+            })
+        elseif event.type == "manifest_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + 1)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = state.cards[payload.card_id].face_up,
+                face_after = true,
+                flip = not state.cards[payload.card_id].face_up,
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    state.cards[payload.card_id].face_up = true
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        elseif event.type == "latent_to_manifest" then
+            local from_rect = current_card_rect(payload.card_id)
+            local to_rect = slot_rects_for_zone("manifest")[payload.slot]
+            local face_before = state.cards[payload.card_id].face_up
+            enqueue_move(payload.card_id, from_rect, to_rect, {
+                face_before = face_before,
+                face_after = true,
+                flip = not face_before,
+                arc = math.floor(30 * state.layout.scale),
+                duration = 0.26,
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    state.cards[payload.card_id].face_up = true
+                    place_card(payload.card_id, "manifest", payload.slot)
+                end,
+            })
+        elseif event.type == "latent_trump_revealed" then
+            local from_rect = current_card_rect(payload.card_id)
+            local inspect = inspect_rect()
+            latent_inspect_by_card[payload.card_id] = inspect
+            local face_before = state.cards[payload.card_id].face_up
+            enqueue_move(payload.card_id, from_rect, inspect, {
+                face_before = face_before,
+                face_after = true,
+                flip = not face_before,
+                arc = math.floor(30 * state.layout.scale),
+                duration = 0.26,
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    state.cards[payload.card_id].face_up = true
+                end,
+            })
+        elseif event.type == "trump_flow_entry" then
+            if payload.reason == "latent ascent" and latent_inspect_by_card[payload.card_id] then
+                queue_trump_flow_entry(payload.card_id, latent_inspect_by_card[payload.card_id], payload.reason)
+            elseif payload.reason == "open closure" then
+                queue_deck_reveal_to_flow(payload.card_id, payload.reason)
+            end
+        elseif event.type == "manifest_closure" then
+            queue_deck_reveal_to_manifest(payload.card_id, payload.slot)
+        elseif event.type == "concealed_refill" then
+            queue_concealed_refill_event(payload.card_id, payload.zone, payload.slot)
+        elseif event.type == "play_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + 1)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        end
+    end
+
+    queue_sync_from_core(message)
+    start_next_anim()
+    state.message = message
+end
+
+local function animate_core_pending_trump(result, message)
+    local events = result and result.events or {}
+
+    for _, event in ipairs(events) do
+        if event.type == "trump_zone_entry" then
+            local payload = event.payload or {}
+            local from_rect = current_card_rect(payload.card_id)
+            local to_rect = slot_rects_for_zone("trump")[payload.slot or 1]
+            enqueue_move(payload.card_id, from_rect, to_rect, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(16 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "trump", payload.slot or 1)
+                end,
+            })
+        end
+    end
+
+    queue_sync_from_core(message)
+    start_next_anim()
+    state.message = message
+end
+
+local function animate_core_operator_choice(result, message)
+    local events = result and result.events or {}
+    for _, event in ipairs(events) do
+        local payload = event.payload or {}
+        if event.type == "draw_to_hand" then
+            queue_deck_to_hand(payload.card_id)
+        elseif event.type == "trump_flow_entry" then
+            queue_deck_reveal_to_flow(payload.card_id, payload.reason)
+        elseif event.type == "play_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + 1)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        end
+    end
+    queue_sync_from_core(message)
+    start_next_anim()
+    state.message = message
+end
+
+local function animate_core_hand_choice(result, message)
+    local events = result and result.events or {}
+    local grave_offset = 0
+    for _, event in ipairs(events) do
+        local payload = event.payload or {}
+        if event.type == "hand_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            grave_offset = grave_offset + 1
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + grave_offset)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        elseif event.type == "play_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            grave_offset = grave_offset + 1
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + grave_offset)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        end
+    end
+    queue_sync_from_core(message)
+    start_next_anim()
+    state.message = message
+end
+
+local function animate_core_hidden_choice(result, message)
+    local events = result and result.events or {}
+    local latent_inspect_by_card = {}
+    for _, event in ipairs(events) do
+        local payload = event.payload or {}
+        if event.type == "card_became_known" then
+            enqueue_callback(function()
+                local card = state.cards[payload.card_id]
+                if card then
+                    card.info_state = "known"
+                    card.face_up = false
+                end
+            end)
+        elseif event.type == "latent_trump_revealed" then
+            local from_rect = current_card_rect(payload.card_id)
+            local inspect = inspect_rect()
+            latent_inspect_by_card[payload.card_id] = inspect
+            local face_before = state.cards[payload.card_id].face_up
+            enqueue_move(payload.card_id, from_rect, inspect, {
+                face_before = face_before,
+                face_after = true,
+                flip = not face_before,
+                arc = math.floor(30 * state.layout.scale),
+                duration = 0.26,
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    state.cards[payload.card_id].face_up = true
+                    state.cards[payload.card_id].info_state = "revealed"
+                end,
+            })
+        elseif event.type == "trump_flow_entry" then
+            if latent_inspect_by_card[payload.card_id] then
+                queue_trump_flow_entry(payload.card_id, latent_inspect_by_card[payload.card_id], payload.reason)
+            end
+        elseif event.type == "card_revealed_in_place" then
+            enqueue_callback(function()
+                local card = state.cards[payload.card_id]
+                if card then
+                    card.info_state = "revealed"
+                    card.face_up = true
+                end
+            end)
+        elseif event.type == "concealed_refill" then
+            queue_concealed_refill_event(payload.card_id, payload.zone, payload.slot)
+        elseif event.type == "play_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + 1)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        end
+    end
+    queue_sync_from_core(message)
+    start_next_anim()
+    state.message = message
+end
+
+local function animate_core_manifest_choice(result, message)
+    local events = result and result.events or {}
+    local latent_inspect_by_card = {}
+
+    for _, event in ipairs(events) do
+        local payload = event.payload or {}
+        if event.type == "manifest_to_hand" then
+            local from_rect = current_card_rect(payload.card_id)
+            local hand_to = predicted_hand_rect(1)
+            enqueue_move(payload.card_id, from_rect, hand_to, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "hand", nil)
+                end,
+            })
+        elseif event.type == "latent_to_manifest" then
+            local from_rect = current_card_rect(payload.card_id)
+            local to_rect = slot_rects_for_zone("manifest")[payload.slot]
+            local face_before = state.cards[payload.card_id].face_up
+            enqueue_move(payload.card_id, from_rect, to_rect, {
+                face_before = face_before,
+                face_after = true,
+                flip = not face_before,
+                arc = math.floor(30 * state.layout.scale),
+                duration = 0.26,
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    state.cards[payload.card_id].face_up = true
+                    place_card(payload.card_id, "manifest", payload.slot)
+                end,
+            })
+        elseif event.type == "latent_trump_revealed" then
+            local from_rect = current_card_rect(payload.card_id)
+            local inspect = inspect_rect()
+            latent_inspect_by_card[payload.card_id] = inspect
+            local face_before = state.cards[payload.card_id].face_up
+            enqueue_move(payload.card_id, from_rect, inspect, {
+                face_before = face_before,
+                face_after = true,
+                flip = not face_before,
+                arc = math.floor(30 * state.layout.scale),
+                duration = 0.26,
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    state.cards[payload.card_id].face_up = true
+                end,
+            })
+        elseif event.type == "trump_flow_entry" then
+            if payload.reason == "latent ascent" and latent_inspect_by_card[payload.card_id] then
+                queue_trump_flow_entry(payload.card_id, latent_inspect_by_card[payload.card_id], payload.reason)
+            elseif payload.reason == "open closure" then
+                queue_deck_reveal_to_flow(payload.card_id, payload.reason)
+            end
+        elseif event.type == "manifest_closure" then
+            queue_deck_reveal_to_manifest(payload.card_id, payload.slot)
+        elseif event.type == "concealed_refill" then
+            queue_concealed_refill_event(payload.card_id, payload.zone, payload.slot)
+        elseif event.type == "play_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + 1)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        end
+    end
+    queue_sync_from_core(message)
+    start_next_anim()
+    state.message = message
+end
+
+local function queue_manifest_closure_from_deck(slot)
+    local deck = state.zones.deck.cards
+    if #deck == 0 then
+        push_log("Manifest[" .. slot .. "] closure skipped: deck empty.")
+        return
+    end
+
+    local card_id = deck[#deck]
+    local from_rect = current_card_rect(card_id)
+    local inspect_rect = {
+        x = state.layout.center.combined.x + math.floor((state.layout.center.combined.w - state.layout.card_w) / 2),
+        y = state.layout.center.combined.y + math.floor((state.layout.center.combined.h - state.layout.card_h) / 2),
+        w = state.layout.card_w,
+        h = state.layout.card_h,
+    }
+    local manifest_slot_rect = slot_rects_for_zone("manifest")[slot]
+
+    enqueue_flip(card_id, from_rect, false, true, 0.22, function()
+        local card = state.cards[card_id]
+        card.face_up = true
+        if card.class == "trump" then
+            queue_trump_flow_entry(card_id, inspect_rect, "open closure")
+            queue_manifest_closure_from_deck(slot)
+        else
+            enqueue_move(card_id, inspect_rect, manifest_slot_rect, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(20 * state.layout.scale),
+                on_finish = function()
+                    place_card(card_id, "manifest", slot)
+                    push_log(card_id .. " -> manifest[" .. slot .. "] (closure).")
+                end,
+            })
+        end
+        start_next_anim()
+    end)
 end
 
 local function point_in_rect(x, y, rect)
@@ -886,7 +1601,7 @@ local BUTTON_WIDTHS = {
     reset = 152,
 }
 
-local function update_buttons()
+update_buttons = function()
     if not state.layout then
         return
     end
@@ -897,6 +1612,7 @@ local function update_buttons()
     local bh = footer.h
     local x = footer.x
     state.ui.buttons = {}
+    state.ui.operator_buttons = {}
 
     for _, spec in ipairs(BUTTON_ORDER) do
         local bw = math.floor((BUTTON_WIDTHS[spec.id] or 152) * s)
@@ -908,6 +1624,26 @@ local function update_buttons()
         button.rect = {x = x, y = footer.y, w = bw, h = bh}
         x = x + bw + gap
         table.insert(state.ui.buttons, button)
+    end
+
+    if state.pending_operator_choice and state.pending_operator_choice.choices then
+        local play_rect = state.layout.left.play
+        local bs = math.floor(50 * s)
+        local ogap = math.floor(12 * s)
+        local total_w = bs * 2 + ogap
+        local ox = play_rect.x + math.floor((play_rect.w - total_w) / 2)
+        local oy = play_rect.y + play_rect.h - bs - math.floor(18 * s)
+        for i, op_name in ipairs(state.pending_operator_choice.choices) do
+            state.ui.operator_buttons[#state.ui.operator_buttons + 1] = {
+                op_name = op_name,
+                rect = {
+                    x = ox + (i - 1) * (bs + ogap),
+                    y = oy,
+                    w = bs,
+                    h = bs,
+                },
+            }
+        end
     end
 end
 
@@ -928,7 +1664,7 @@ local function enqueue_anim(step)
     state.anim.locked = true
 end
 
-local function start_next_anim()
+start_next_anim = function()
     if state.anim.active or #state.anim.queue == 0 then
         if not state.anim.active and #state.anim.queue == 0 then
             state.anim.locked = false
@@ -953,6 +1689,16 @@ end
 local function update_active_anim(dt)
     local step = state.anim.active
     if not step then
+        return
+    end
+
+    if step.kind == "callback" then
+        state.anim.ghost = nil
+        state.anim.active = nil
+        if step.on_finish then
+            step.on_finish()
+        end
+        start_next_anim()
         return
     end
 
@@ -1051,7 +1797,62 @@ local function resolve_trump_zone_entry(card_id)
     push_log("TRUMP zone overflow flush -> deck.")
 end
 
-local function enqueue_move(card_id, from_rect, to_rect, opts)
+local function start_pending_trump_resolution()
+    if state.pending_hidden_choice then
+        state.message = "Choose one hidden card on board first."
+        return
+    end
+    if state.pending_hand_choice then
+        state.message = "Choose one hand card to discard first."
+        return
+    end
+    if state.pending_operator_choice or state.pending_manifest_choice then
+        state.message = "Choose one operator first."
+        return
+    end
+    if state.core then
+        local result = core.resolve_pending_trump(state.core)
+        local message = (result and result.summary and result.summary.error)
+            and "Board must close before trump resolution."
+            or "Trump event resolved."
+        if result and result.summary and result.summary.error then
+            sync_from_core(message)
+        else
+            animate_core_pending_trump(result, message)
+        end
+        return
+    end
+
+    local card_id = state.pending_trump
+    if not card_id then
+        state.message = "No pending trump event."
+        return
+    end
+    if not is_board_closed() then
+        state.message = "Board must close before trump resolution."
+        return
+    end
+
+    local from_rect = current_card_rect(card_id)
+    local to_rect = slot_rects_for_zone("trump")[math.max(first_open_slot("trump") or 1, 1)]
+    state.pending_trump = nil
+
+    enqueue_move(card_id, from_rect, to_rect, {
+        face_before = true,
+        face_after = true,
+        arc = math.floor(16 * state.layout.scale),
+        on_start = function()
+            remove_from_current_zone(card_id)
+        end,
+        on_finish = function()
+            resolve_trump_zone_entry(card_id)
+            state.message = card_id .. " resolved from trump flow."
+        end,
+    })
+    start_next_anim()
+end
+
+enqueue_move = function(card_id, from_rect, to_rect, opts)
     opts = opts or {}
     enqueue_anim({
         kind = "move",
@@ -1068,7 +1869,7 @@ local function enqueue_move(card_id, from_rect, to_rect, opts)
     })
 end
 
-local function enqueue_flip(card_id, rect, face_before, face_after, duration, on_finish)
+enqueue_flip = function(card_id, rect, face_before, face_after, duration, on_finish)
     enqueue_anim({
         kind = "flip",
         card_id = card_id,
@@ -1080,6 +1881,14 @@ local function enqueue_flip(card_id, rect, face_before, face_after, duration, on
             remove_from_current_zone(card_id)
         end,
         on_finish = on_finish,
+    })
+end
+
+enqueue_callback = function(fn)
+    enqueue_anim({
+        kind = "callback",
+        duration = 0,
+        on_finish = fn,
     })
 end
 
@@ -1116,8 +1925,36 @@ local function queue_chain_repair(slot)
     end
 
     local from_rect = current_card_rect(latent_id)
+    local inspect_rect = {
+        x = state.layout.center.combined.x + math.floor((state.layout.center.combined.w - state.layout.card_w) / 2),
+        y = state.layout.center.combined.y + math.floor((state.layout.center.combined.h - state.layout.card_h) / 2),
+        w = state.layout.card_w,
+        h = state.layout.card_h,
+    }
     local manifest_slot_rect = slot_rects_for_zone("manifest")[slot]
     local face_before = state.cards[latent_id].face_up
+
+    if state.cards[latent_id].class == "trump" then
+        enqueue_move(latent_id, from_rect, inspect_rect, {
+            face_before = face_before,
+            face_after = true,
+            flip = not face_before,
+            arc = math.floor(30 * state.layout.scale),
+            duration = 0.26,
+            on_start = function()
+                remove_from_current_zone(latent_id)
+            end,
+            on_finish = function()
+                state.cards[latent_id].face_up = true
+                push_log(latent_id .. " revealed on latent ascent.")
+            end,
+        })
+        queue_trump_flow_entry(latent_id, inspect_rect, "latent ascent")
+        queue_manifest_closure_from_deck(slot)
+        queue_refill_latent(slot)
+        return
+    end
+
     enqueue_move(latent_id, from_rect, manifest_slot_rect, {
         face_before = face_before,
         face_after = true,
@@ -1206,7 +2043,125 @@ local function start_hand_manifest_play(card_id, slot)
     start_next_anim()
 end
 
+local function choose_pending_operator(op_name)
+    if not state.pending_operator_choice then
+        state.message = "No pending operator choice."
+        return
+    end
+    if state.core then
+        local result = core.choose_operator(state.core, op_name)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Operator choice rejected: " .. summary.error .. ".")
+            or ((summary.pending_manifest_choice and "Choose one revealed manifest card.")
+                or (summary.pending_hidden_choice and "Choose one hidden card on board.")
+                or (summary.pending_hand_choice and "Choose one hand card to discard.")
+                or ("Operator " .. op_name .. " chosen."))
+        if summary.error then
+            sync_from_core(message)
+        elseif summary.pending_manifest_choice then
+            sync_from_core(message)
+        elseif summary.pending_hidden_choice then
+            sync_from_core(message)
+        elseif summary.pending_hand_choice then
+            animate_core_operator_choice(result, message)
+        else
+            animate_core_operator_choice(result, message)
+        end
+        return
+    end
+end
+
+local function choose_pending_hidden_target(card_id)
+    if not state.pending_hidden_choice then
+        state.message = "No pending hidden choice."
+        return
+    end
+    if state.core then
+        local result = core.choose_hidden_target(state.core, card_id)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Hidden choice rejected: " .. summary.error .. ".")
+            or (card_id .. " observed.")
+        if summary.error then
+            sync_from_core(message)
+        else
+            animate_core_hidden_choice(result, message)
+        end
+        return
+    end
+end
+
+local function choose_pending_hand_target(card_id)
+    if not state.pending_hand_choice then
+        state.message = "No pending hand choice."
+        return
+    end
+    if state.core then
+        local result = core.choose_hand_target(state.core, card_id)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Hand choice rejected: " .. summary.error .. ".")
+            or (card_id .. " discarded by CYCLE.")
+        if summary.error then
+            sync_from_core(message)
+        else
+            animate_core_hand_choice(result, message)
+        end
+        return
+    end
+end
+
+local function choose_pending_manifest_target(slot)
+    if not state.pending_manifest_choice then
+        state.message = "No pending manifest choice."
+        return
+    end
+    if state.core then
+        local result = core.choose_manifest_target(state.core, slot)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Manifest choice rejected: " .. summary.error .. ".")
+            or ("CHOOSE reclaimed manifest[" .. slot .. "].")
+        if summary.error then
+            sync_from_core(message)
+        else
+            animate_core_manifest_choice(result, message)
+        end
+        return
+    end
+end
+
 local function start_draw_sequence()
+    if state.pending_hidden_choice then
+        state.message = "Choose one hidden card on board first."
+        return
+    end
+    if state.pending_hand_choice then
+        state.message = "Choose one hand card to discard first."
+        return
+    end
+    if state.pending_operator_choice or state.pending_manifest_choice then
+        state.message = "Choose one operator first."
+        return
+    end
+    if state.core then
+        local result = core.draw_to_hand(state.core)
+        local summary = result and result.summary or {}
+        local message
+        if summary.error == "deck_empty" then
+            message = "Deck is empty."
+        elseif summary.error == "trump_burn" then
+            message = (summary.pending_trump or state.core.pending_trump or "Trump") .. " entered trump flow."
+        elseif summary.card_id then
+            message = summary.card_id .. " drawn."
+        else
+            message = "Draw resolved."
+        end
+        if summary.error == "deck_empty" then
+            sync_from_core(message)
+        else
+            animate_core_draw(result, message)
+        end
+        return
+    end
+
     local deck = state.zones.deck.cards
     if #deck == 0 then
         state.message = "Deck is empty."
@@ -1230,14 +2185,8 @@ local function start_draw_sequence()
 
         if is_trump then
             clear_commit_state()
-            enqueue_move(card_id, inspect_rect, slot_rects_for_zone("trump")[math.max(first_open_slot("trump") or 1, 1)], {
-                face_before = true,
-                face_after = true,
-                on_finish = function()
-                    resolve_trump_zone_entry(card_id)
-                    state.message = card_id .. " triggered TRUMP event."
-                end,
-            })
+            queue_trump_flow_entry(card_id, inspect_rect, "draw")
+            state.message = card_id .. " entered trump flow."
         else
             local hand_to = predicted_hand_rect(1)
             enqueue_move(card_id, inspect_rect, hand_to, {
@@ -1272,6 +2221,18 @@ local function committed_play_allowed(hand_card_id, manifest_slot)
 end
 
 local function launch_committed_play()
+    if state.pending_hidden_choice then
+        state.message = "Choose one hidden card on board first."
+        return
+    end
+    if state.pending_hand_choice then
+        state.message = "Choose one hand card to discard first."
+        return
+    end
+    if state.pending_operator_choice or state.pending_manifest_choice then
+        state.message = "Choose one operator first."
+        return
+    end
     if state.anim.locked then
         state.message = "Animation in progress."
         return
@@ -1282,7 +2243,20 @@ local function launch_committed_play()
     end
     local hand_card_id = state.armed_hand
     if not hand_card_id then
-        state.message = "No legal hand card available for the committed manifest card."
+        state.message = "Choose one legal hand card first."
+        return
+    end
+
+    if state.core then
+        local result = core.resolve_turn(state.core, state.committed.slot, hand_card_id)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Turn rejected: " .. summary.error .. ".")
+            or (hand_card_id .. " cast against manifest[" .. state.committed.slot .. "].")
+        if summary.error then
+            sync_from_core(message)
+        else
+            animate_core_turn(result, message)
+        end
         return
     end
 
@@ -1350,6 +2324,27 @@ local function draw_panel(rect, title, subtitle)
     end
 end
 
+local function draw_panel_counter(rect, text, opts)
+    opts = opts or {}
+    love.graphics.setFont(opts.font or state.fonts.small)
+    set_color(opts.color or COLORS.muted, opts.alpha or 0.92)
+    if opts.align == "right" then
+        love.graphics.printf(
+            text,
+            rect.x + rect.w - (opts.width or (72 * state.layout.scale)) - 14 * state.layout.scale,
+            opts.y or (rect.y + 16 * state.layout.scale),
+            opts.width or (72 * state.layout.scale),
+            "right"
+        )
+    else
+        love.graphics.print(
+            text,
+            opts.x or (rect.x + 14 * state.layout.scale),
+            opts.y or (rect.y + 16 * state.layout.scale)
+        )
+    end
+end
+
 local function draw_slot_placeholder(rect, label, highlight)
     set_color(highlight and COLORS.drop or COLORS.outline, highlight and 0.55 or 0.8)
     love.graphics.setLineWidth(math.max(1, state.layout.scale * 2))
@@ -1360,17 +2355,212 @@ local function draw_slot_placeholder(rect, label, highlight)
 end
 
 local function glyph_color(op_name)
-    if op_name == "RUNTIME" then return {1, 1, 1} end
     return OP_COLORS[op_name]
+end
+
+local function frame_color_mix(ca, cb, t)
+    local u = 0.5 + 0.5 * math.sin(t)
+    return lerp_color(ca, cb, u)
+end
+
+local function frame_breath_phase()
+    return 0.5 + 0.5 * math.sin(love.timer.getTime() * 2.2)
+end
+
+local function draw_perimeter_segment(x, y, w, h, d1, d2)
+    local perimeter = 2 * (w + h)
+    if perimeter <= 0 then
+        return
+    end
+
+    local function point_at(d)
+        d = d % perimeter
+        if d <= w then
+            return x + d, y
+        end
+        d = d - w
+        if d <= h then
+            return x + w, y + d
+        end
+        d = d - h
+        if d <= w then
+            return x + w - d, y + h
+        end
+        d = d - w
+        return x, y + h - d
+    end
+
+    local p1x, p1y = point_at(d1)
+    local p2x, p2y = point_at(d2)
+    if d2 >= d1 and (
+        (d1 <= w and d2 <= w)
+        or (d1 > w and d1 <= w + h and d2 <= w + h)
+        or (d1 > w + h and d1 <= 2 * w + h and d2 <= 2 * w + h)
+        or (d1 > 2 * w + h and d2 <= perimeter)
+    ) then
+        love.graphics.line(p1x, p1y, p2x, p2y)
+        return
+    end
+
+    local side_breaks = {w, w + h, 2 * w + h, perimeter}
+    local start_d = d1
+    for _, edge_d in ipairs(side_breaks) do
+        if start_d < edge_d then
+            local end_d = math.min(d2, edge_d)
+            local sx, sy = point_at(start_d)
+            local ex, ey = point_at(end_d)
+            love.graphics.line(sx, sy, ex, ey)
+            start_d = end_d
+        end
+    end
+end
+
+local function draw_segmented_frame(rect, colors, phase, opts)
+    opts = opts or {}
+    local inset = opts.inset or 0
+    local width = opts.width or math.max(2, state.layout.scale * 2.2)
+    local segment_count = opts.segment_count or 14
+    local duty = opts.duty or 0.52
+    local x = rect.x + inset
+    local y = rect.y + inset
+    local w = rect.w - inset * 2
+    local h = rect.h - inset * 2
+    local perimeter = 2 * (w + h)
+    if w <= 0 or h <= 0 or perimeter <= 0 then
+        return
+    end
+
+    love.graphics.setLineWidth(width)
+    local step = perimeter / segment_count
+    local seg_len = step * duty
+    local shift = (phase % 1) * perimeter
+
+    for i = 0, segment_count - 1 do
+        local color = colors[(i % #colors) + 1]
+        local start_d = (i * step + shift) % perimeter
+        local end_d = start_d + seg_len
+        set_color(color, 0.98)
+        if end_d <= perimeter then
+            draw_perimeter_segment(x, y, w, h, start_d, end_d)
+        else
+            draw_perimeter_segment(x, y, w, h, start_d, perimeter)
+            draw_perimeter_segment(x, y, w, h, 0, end_d - perimeter)
+        end
+    end
+end
+
+local function draw_breath_halo(rect, color, phase)
+    local pulse = 0.40 + 0.60 * phase
+    local prev_blend = {love.graphics.getBlendMode()}
+    love.graphics.setBlendMode("add")
+    local steps = 12
+    local inner = 4
+    local outer = 42
+    for i = 1, steps do
+        local t = (i - 1) / (steps - 1)
+        local spread = inner + (outer - inner) * t
+        local fade = (1 - t)
+        local alpha = 0.11 * pulse * fade * fade
+        set_color(color, alpha)
+        rounded(
+            "fill",
+            rect.x - spread,
+            rect.y - spread,
+            rect.w + spread * 2,
+            rect.h + spread * 2,
+            10 + spread * 0.8
+        )
+    end
+    love.graphics.setBlendMode(prev_blend[1], prev_blend[2])
+end
+
+local function trump_flow_train_colors()
+    local colors = {}
+    for _, card_id in ipairs(state.zones.trump_flow.cards) do
+        local card = state.cards[card_id]
+        if card then
+            table.insert(colors, OP_COLORS[card.op_a] or COLORS.card)
+            table.insert(colors, OP_COLORS[card.op_b] or COLORS.card)
+        end
+    end
+    return colors
+end
+
+local function draw_hand_frame_mode(card, draw_rect, legal_hint, armed, selected)
+    local ca = OP_COLORS[card.op_a] or COLORS.card
+    local cb = OP_COLORS[card.op_b] or COLORS.card
+    local line_w = math.max(2, state.layout.scale * 2)
+    love.graphics.setLineWidth(line_w)
+
+    if armed then
+        local phase = frame_breath_phase()
+        local border_color = lerp_color(ca, cb, phase)
+        set_color(border_color, 0.98)
+        rounded("line", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
+        return
+    end
+
+    local border_color
+    if legal_hint then
+        local base = lerp_color(ca, cb, 0.5)
+        set_color(base, 0.20)
+        rounded("line", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
+        draw_segmented_frame(draw_rect, {ca, cb}, love.timer.getTime() / 6.08, {
+            width = math.max(2, state.layout.scale * 2.25),
+            segment_count = 14,
+            duty = 0.54,
+        })
+        return
+    elseif selected then
+        border_color = COLORS.select
+    else
+        border_color = lerp_color(ca, cb, 0.5)
+    end
+    set_color(border_color, legal_hint and 0.98 or 0.92)
+    rounded("line", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
 end
 
 local function draw_card(card_id, rect, dragged, opts)
     local card = state.cards[card_id]
     opts = opts or {}
-    local selected = state.selected == card_id
-    local committed = state.committed and state.committed.card_id == card_id
-    local legal_hint = state.legal_hints[card_id] == true
-    local armed = state.armed_hand == card_id
+    local effect_phase_active = state.pending_operator_choice ~= nil
+        or state.pending_hidden_choice ~= nil
+        or state.pending_hand_choice ~= nil
+        or state.pending_manifest_choice ~= nil
+    local selected = (not effect_phase_active) and state.selected == card_id
+    local committed = (not effect_phase_active)
+        and state.committed
+        and state.committed.card_id == card_id
+        and card.zone == "manifest"
+    local legal_hint = (not effect_phase_active) and state.legal_hints[card_id] == true
+    local armed = (not effect_phase_active) and state.armed_hand == card_id
+    local choose_target = false
+    if state.pending_manifest_choice and card.zone == "manifest" and card.slot then
+        for _, legal_slot in ipairs(state.pending_manifest_choice.legal_slots or {}) do
+            if legal_slot == card.slot then
+                choose_target = true
+                break
+            end
+        end
+    end
+    local cycle_target = false
+    if state.pending_hand_choice and card.zone == "hand" then
+        for _, legal_card_id in ipairs(state.pending_hand_choice.legal_card_ids or {}) do
+            if legal_card_id == card_id then
+                cycle_target = true
+                break
+            end
+        end
+    end
+    local observe_target = false
+    if state.pending_hidden_choice then
+        for _, legal_card_id in ipairs(state.pending_hidden_choice.legal_card_ids or {}) do
+            if legal_card_id == card_id then
+                observe_target = true
+                break
+            end
+        end
+    end
     local scale_x = opts.scale_x or 1
     local face_up = opts.face_up
     if face_up == nil then
@@ -1380,6 +2570,16 @@ local function draw_card(card_id, rect, dragged, opts)
     local draw_w = rect.w * scale_x
     local draw_x = cx - draw_w * 0.5
     local draw_rect = {x = draw_x, y = rect.y, w = draw_w, h = rect.h}
+    local gameplay_hand = state.mode == "GAMEPLAY"
+        and card.zone == "hand"
+        and not effect_phase_active
+    if gameplay_hand and armed then
+        local ca = OP_COLORS[card.op_a] or COLORS.card
+        local cb = OP_COLORS[card.op_b] or COLORS.card
+        local phase = frame_breath_phase()
+        local halo_color = lerp_color(ca, cb, phase)
+        draw_breath_halo(draw_rect, halo_color, phase)
+    end
 
     if face_up then
         local ca = OP_COLORS[card.op_a] or COLORS.card
@@ -1387,31 +2587,37 @@ local function draw_card(card_id, rect, dragged, opts)
         local dark_a = lerp_color(ca, COLORS.bg, 0.90)
         local dark_b = lerp_color(cb, COLORS.bg, 0.90)
 
-        if card.class == "trump" then
-            set_color(dark_a)
-            rounded("fill", draw_rect.x, draw_rect.y, draw_rect.w * 0.5, draw_rect.h, 10)
-            set_color(dark_b)
-            love.graphics.rectangle("fill", draw_rect.x + draw_rect.w * 0.5, draw_rect.y, draw_rect.w * 0.5, draw_rect.h, 10, 10)
-            set_color(lerp_color(ca, cb, 0.5), 0.18)
-            love.graphics.rectangle("fill", draw_rect.x + draw_rect.w * 0.47, draw_rect.y + 4, draw_rect.w * 0.06, draw_rect.h - 8)
-        else
-            set_color(dark_a)
-            love.graphics.polygon("fill",
-                draw_rect.x, draw_rect.y,
-                draw_rect.x + draw_rect.w, draw_rect.y,
-                draw_rect.x, draw_rect.y + draw_rect.h
-            )
-            set_color(dark_b)
-            love.graphics.polygon("fill",
-                draw_rect.x + draw_rect.w, draw_rect.y,
-                draw_rect.x + draw_rect.w, draw_rect.y + draw_rect.h,
-                draw_rect.x, draw_rect.y + draw_rect.h
-            )
-        end
+        draw_with_rounded_mask(draw_rect, 10, function()
+            if card.class == "trump" then
+                set_color(dark_a)
+                love.graphics.rectangle("fill", draw_rect.x, draw_rect.y, draw_rect.w * 0.5, draw_rect.h)
+                set_color(dark_b)
+                love.graphics.rectangle("fill", draw_rect.x + draw_rect.w * 0.5, draw_rect.y, draw_rect.w * 0.5, draw_rect.h)
+                set_color(lerp_color(ca, cb, 0.5), 0.18)
+                love.graphics.rectangle("fill", draw_rect.x + draw_rect.w * 0.47, draw_rect.y + 4, draw_rect.w * 0.06, draw_rect.h - 8)
+            else
+                set_color(dark_a)
+                love.graphics.polygon("fill",
+                    draw_rect.x, draw_rect.y,
+                    draw_rect.x + draw_rect.w, draw_rect.y,
+                    draw_rect.x, draw_rect.y + draw_rect.h
+                )
+                set_color(dark_b)
+                love.graphics.polygon("fill",
+                    draw_rect.x + draw_rect.w, draw_rect.y,
+                    draw_rect.x + draw_rect.w, draw_rect.y + draw_rect.h,
+                    draw_rect.x, draw_rect.y + draw_rect.h
+                )
+            end
+        end)
 
         -- Outer border
-        set_color(selected and COLORS.select or lerp_color(ca, cb, 0.5))
-        rounded("line", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
+        if gameplay_hand then
+            draw_hand_frame_mode(card, draw_rect, legal_hint, armed, selected)
+        else
+            set_color(selected and COLORS.select or lerp_color(ca, cb, 0.5))
+            rounded("line", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
+        end
         -- Inner frame
         set_color(COLORS.outline, 0.40)
         rounded("line", draw_rect.x + 4, draw_rect.y + 4, draw_rect.w - 8, draw_rect.h - 8, 8)
@@ -1446,23 +2652,115 @@ local function draw_card(card_id, rect, dragged, opts)
         rounded("fill", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
         set_color(selected and COLORS.select or COLORS.card_back_alt)
         rounded("line", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
+        if card.info_state == "known" then
+            local ca = OP_COLORS[card.op_a] or COLORS.card
+            local cb = OP_COLORS[card.op_b] or COLORS.card
+            local gs = math.floor(15 * state.layout.scale)
+            if card.class == "trump" then
+                local pos = glyph_layout.trump_pos(draw_rect)
+                set_color(ca, 0.26)
+                glyphs[card.op_a](pos.ax, pos.ay, gs)
+                set_color(cb, 0.26)
+                glyphs[card.op_b](pos.bx, pos.by, gs)
+            else
+                local pos = glyph_layout.minor_pos(draw_rect)
+                set_color(ca, 0.26)
+                glyphs[card.op_a](pos.ax, pos.ay, gs)
+                set_color(cb, 0.26)
+                glyphs[card.op_b](pos.bx, pos.by, gs)
+            end
+            set_color(lerp_color(ca, cb, 0.5), 0.42)
+            rounded("line", draw_rect.x + 3, draw_rect.y + 3, draw_rect.w - 6, draw_rect.h - 6, 9)
+        end
         love.graphics.setFont(state.fonts.body)
         love.graphics.printf(card.id, draw_rect.x, draw_rect.y + draw_rect.h * 0.42, draw_rect.w, "center")
     end
 
     if committed then
-        set_color(COLORS.drop, 0.75)
-        rounded("line", draw_rect.x - 3, draw_rect.y - 3, draw_rect.w + 6, draw_rect.h + 6, 12)
+        local commit_rect = {
+            x = draw_rect.x - 3,
+            y = draw_rect.y - 3,
+            w = draw_rect.w + 6,
+            h = draw_rect.h + 6,
+        }
+        local ca = OP_COLORS[card.op_a] or COLORS.drop
+        local cb = OP_COLORS[card.op_b] or COLORS.drop
+        local base = lerp_color(ca, cb, 0.5)
+        set_color(base, 0.22)
+        rounded("line", commit_rect.x, commit_rect.y, commit_rect.w, commit_rect.h, 12)
+        draw_segmented_frame(commit_rect, {ca, cb}, love.timer.getTime() / 6.08, {
+            width = math.max(2, state.layout.scale * 2.15),
+            segment_count = 14,
+            duty = 0.54,
+        })
+    end
+
+    if choose_target then
+        local cc = OP_COLORS.CHOOSE or COLORS.danger
+        local hot = lerp_color(cc, COLORS.accent, 0.22)
+        local choose_rect = {
+            x = draw_rect.x - 5,
+            y = draw_rect.y - 5,
+            w = draw_rect.w + 10,
+            h = draw_rect.h + 10,
+        }
+        set_color(cc, 0.18)
+        rounded("line", choose_rect.x, choose_rect.y, choose_rect.w, choose_rect.h, 14)
+        draw_segmented_frame(choose_rect, {cc, hot}, love.timer.getTime() / 3.04, {
+            width = math.max(2, state.layout.scale * 2.35),
+            segment_count = 14,
+            duty = 0.56,
+        })
+    end
+
+    if cycle_target then
+        local cc = OP_COLORS.CYCLE or COLORS.drop
+        local hot = lerp_color(cc, COLORS.accent, 0.22)
+        local cycle_rect = {
+            x = draw_rect.x - 5,
+            y = draw_rect.y - 5,
+            w = draw_rect.w + 10,
+            h = draw_rect.h + 10,
+        }
+        set_color(cc, 0.18)
+        rounded("line", cycle_rect.x, cycle_rect.y, cycle_rect.w, cycle_rect.h, 14)
+        draw_segmented_frame(cycle_rect, {cc, hot}, love.timer.getTime() / 3.04, {
+            width = math.max(2, state.layout.scale * 2.35),
+            segment_count = 14,
+            duty = 0.56,
+        })
+    end
+
+    if observe_target then
+        local cc = OP_COLORS.OBSERVE or COLORS.text
+        local hot = lerp_color(cc, COLORS.accent, 0.18)
+        local observe_rect = {
+            x = draw_rect.x - 5,
+            y = draw_rect.y - 5,
+            w = draw_rect.w + 10,
+            h = draw_rect.h + 10,
+        }
+        set_color(cc, 0.18)
+        rounded("line", observe_rect.x, observe_rect.y, observe_rect.w, observe_rect.h, 14)
+        draw_segmented_frame(observe_rect, {cc, hot}, love.timer.getTime() / 3.04, {
+            width = math.max(2, state.layout.scale * 2.35),
+            segment_count = 14,
+            duty = 0.56,
+        })
     end
 
     if legal_hint then
-        set_color(COLORS.success, 0.80)
-        rounded("line", draw_rect.x - 3, draw_rect.y - 3, draw_rect.w + 6, draw_rect.h + 6, 12)
+        if not (state.mode == "GAMEPLAY" and card.zone == "hand") then
+            set_color(COLORS.success, 0.80)
+            rounded("line", draw_rect.x - 3, draw_rect.y - 3, draw_rect.w + 6, draw_rect.h + 6, 12)
+        end
     end
 
     if armed then
-        set_color(COLORS.drop, 0.90)
-        rounded("line", draw_rect.x - 6, draw_rect.y - 6, draw_rect.w + 12, draw_rect.h + 12, 14)
+        if not (state.mode == "GAMEPLAY" and card.zone == "hand") then
+            set_color(COLORS.drop, 0.90)
+            rounded("line", draw_rect.x - 6, draw_rect.y - 6, draw_rect.w + 12, draw_rect.h + 12, 14)
+        end
     end
 
     if selected or dragged then
@@ -1475,7 +2773,7 @@ local function draw_zone_contents()
     local views = card_views()
     local drag_card = state.drag and state.drag.card_id or nil
 
-    for _, zone_name in ipairs({"deck", "runtime", "play", "trump", "targets", "manifest", "latent", "hand", "grave"}) do
+    for _, zone_name in ipairs({"deck", "runtime", "play", "trump_flow", "trump", "targets", "manifest", "latent", "hand", "grave"}) do
         local zone = state.zones[zone_name]
         if zone.kind == "slots" then
             local rects = slot_rects_for_zone(zone_name)
@@ -1531,6 +2829,7 @@ local function draw_system_panel()
         "Deck: " .. counts.deck,
         "Hand: " .. counts.hand,
         "Grave: " .. counts.grave,
+        "TrumpFlow: " .. #state.zones.trump_flow.cards,
     }
     local y = rect.y + 18 * state.layout.scale
     for _, line in ipairs(lines) do
@@ -1557,16 +2856,65 @@ local function draw_log_panel()
 end
 
 local function draw_left_column()
-    draw_panel(state.layout.left.deck, "DECK", "Draw pile")
+    draw_panel(state.layout.left.deck, "DECK", nil)
+    draw_panel_counter(state.layout.left.deck, tostring(#state.zones.deck.cards), {
+        align = "right",
+        width = 88 * state.layout.scale,
+        y = state.layout.left.deck.y + 54 * state.layout.scale,
+        font = state.fonts.body,
+        alpha = 0.96,
+    })
     draw_panel(state.layout.left.play, "PLAY", "1 slot")
     draw_panel(state.layout.left.runtime, "RUNTIME", "1 slot")
 end
 
 local function draw_center()
+    local flow_rect = state.layout.center.trump_flow
+    draw_panel(flow_rect, "TRUMP FLOW", "3 visible slots")
     draw_panel(state.layout.center.targets, "TARGETS", "3 slots")
     draw_panel(state.layout.center.trump, "TRUMP ZONE", "2 slots")
     draw_panel(state.layout.center.combined, "MANIFEST / LATENT", nil)
     draw_panel(state.layout.center.hand, "HAND", nil)
+
+    if #state.zones.trump_flow.cards > 0 then
+        local train_colors = trump_flow_train_colors()
+        if #train_colors > 0 then
+            local speed = 6.08 / 2
+            local frame_rect = {
+                x = flow_rect.x - 3,
+                y = flow_rect.y - 3,
+                w = flow_rect.w + 6,
+                h = flow_rect.h + 6,
+            }
+            local base = train_colors[1]
+            set_color(base, 0.18)
+            rounded("line", frame_rect.x, frame_rect.y, frame_rect.w, frame_rect.h, 12)
+            draw_segmented_frame(frame_rect, train_colors, love.timer.getTime() / speed, {
+                width = math.max(2, state.layout.scale * 2.5),
+                segment_count = math.max(12, #train_colors * 4),
+                duty = 0.56,
+            })
+        end
+        love.graphics.setFont(state.fonts.small)
+        set_color(COLORS.muted)
+        local subtitle = is_board_closed() and "Pending event" or "Waiting for board closure"
+        love.graphics.print(subtitle, flow_rect.x + 14 * state.layout.scale, flow_rect.y + 32 * state.layout.scale)
+    else
+        love.graphics.setFont(state.fonts.small)
+        set_color(COLORS.muted)
+        love.graphics.print("Idle", flow_rect.x + 14 * state.layout.scale, flow_rect.y + 32 * state.layout.scale)
+    end
+
+    local cw = state.layout.card_w
+    local ch = state.layout.card_h
+    local gap = math.floor(12 * state.layout.scale)
+    local total_w = 3 * cw + 2 * gap
+    local start_x = flow_rect.x + math.floor((flow_rect.w - total_w) / 2)
+    local y = flow_rect.y + math.floor((flow_rect.h - ch) / 2)
+    for slot = 1, 3 do
+        local rect = {x = start_x + (slot - 1) * (cw + gap), y = y, w = cw, h = ch}
+        draw_slot_placeholder(rect, tostring(slot), false)
+    end
 
     local divider = state.layout.center.divider
     set_color(COLORS.outline)
@@ -1582,11 +2930,12 @@ local function draw_footer()
         local active = false
         if button.id == "start" or button.id == "reset" then
             active = true
+        elseif button.id == "draw" then
+            active = not state.anim.locked
         elseif button.id == "move" then
-            active = state.committed and state.armed_hand ~= nil
+            active = state.pending_trump ~= nil or (state.committed and state.armed_hand ~= nil)
         elseif state.mode == "DEV" then
-            active = button.id == "draw"
-                or button.id == "hints"
+            active = button.id == "hints"
                 or button.id == "flip"
                 or button.id == "discard"
                 or (state.selected ~= nil)
@@ -1614,11 +2963,31 @@ local function draw_footer()
     set_color(COLORS.muted)
     local help
     if state.mode == "GAMEPLAY" then
-        help = "S Start Game  Space △ move  Esc clear selection  R reset"
+        help = "S Start Game  1 draw  Space △ move/confirm  Esc clear selection  R reset"
     else
-        help = "S Start Game  1 draw  V hints  Space △ move  2/F flip  3/Delete discard  R reset  H/M/L/T/U/P/G/K move to zone"
+        help = "S Start Game  1 draw  V hints  Space △ move/confirm  2/F flip  3/Delete discard  R reset  H/M/L/T/U/P/G/K move to zone"
     end
     love.graphics.print(help, footer.x + math.floor(760 * state.layout.scale), footer.y + 14 * state.layout.scale)
+end
+
+local function draw_operator_buttons()
+    if not state.pending_operator_choice then
+        return
+    end
+    for _, button in ipairs(state.ui.operator_buttons or {}) do
+        set_color(COLORS.panel_alt)
+        rounded("fill", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
+        set_color(COLORS.accent_soft)
+        rounded("line", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
+        local op_color = OP_COLORS[button.op_name] or COLORS.text
+        set_color(op_color)
+        love.graphics.setLineWidth(math.max(2, state.layout.scale * 2))
+        glyphs[button.op_name](
+            button.rect.x + button.rect.w * 0.5,
+            button.rect.y + button.rect.h * 0.5 + math.floor(2 * state.layout.scale),
+            math.floor(14 * state.layout.scale)
+        )
+    end
 end
 
 local function draw_top_header()
@@ -1640,8 +3009,8 @@ local function trigger_button(id)
     end
 
     if id == "draw" then
-        if state.mode ~= "DEV" then
-            state.message = "Draw button is DEV-only."
+        if state.pending_trump then
+            state.message = "Resolve pending trump event first."
             return
         end
         if state.anim.locked then
@@ -1668,7 +3037,11 @@ local function trigger_button(id)
     end
 
     if id == "move" then
-        launch_committed_play()
+        if state.pending_trump then
+            start_pending_trump_resolution()
+        else
+            launch_committed_play()
+        end
         return
     end
 
@@ -1738,6 +3111,7 @@ function love.update(dt)
     refresh_layout()
     update_active_anim(dt or 0)
     start_next_anim()
+    refresh_pending_trump()
     if state.drag then
         local x, y = love.mouse.getPosition()
         state.drag.x = x
@@ -1757,8 +3131,16 @@ function love.draw()
     draw_system_panel()
     draw_log_panel()
     draw_panel(state.layout.right.grave, "GRAVE", "Ordered discard pile")
+    draw_panel_counter(state.layout.right.grave, tostring(#state.zones.grave.cards), {
+        align = "right",
+        width = 88 * state.layout.scale,
+        y = state.layout.right.grave.y + state.layout.right.grave.h - 34 * state.layout.scale,
+        font = state.fonts.body,
+        alpha = 0.96,
+    })
     draw_zone_contents()
     draw_footer()
+    draw_operator_buttons()
 end
 
 function love.mousepressed(x, y, button)
@@ -1768,11 +3150,63 @@ function love.mousepressed(x, y, button)
     end
 
     if button == 1 then
+        for _, op_button in ipairs(state.ui.operator_buttons or {}) do
+            if point_in_rect(x, y, op_button.rect) then
+                choose_pending_operator(op_button.op_name)
+                return
+            end
+        end
         for _, spec in ipairs(state.ui.buttons) do
             if point_in_rect(x, y, spec.rect) then
                 trigger_button(spec.id)
                 return
             end
+        end
+
+        if state.pending_manifest_choice then
+            local card_id = pick_card(x, y)
+            if card_id then
+                local clicked = state.cards[card_id]
+                if clicked and clicked.zone == "manifest" and clicked.slot then
+                    choose_pending_manifest_target(clicked.slot)
+                    return
+                end
+            end
+            state.message = "Choose one revealed manifest card."
+            return
+        end
+
+        if state.pending_hidden_choice then
+            local card_id = pick_card(x, y)
+            if card_id then
+                choose_pending_hidden_target(card_id)
+                return
+            end
+            state.message = "Choose one hidden card on board."
+            return
+        end
+
+        if state.pending_hand_choice then
+            local card_id = pick_card(x, y)
+            if card_id then
+                local clicked = state.cards[card_id]
+                if clicked and clicked.zone == "hand" then
+                    choose_pending_hand_target(card_id)
+                    return
+                end
+            end
+            state.message = "Choose one hand card to discard."
+            return
+        end
+
+        if state.pending_operator_choice then
+            state.message = "Choose one operator first."
+            return
+        end
+
+        if state.mode == "GAMEPLAY" and state.pending_trump then
+            state.message = "Resolve pending trump event first."
+            return
         end
 
         local card_id, rect = pick_card(x, y)
@@ -1790,7 +3224,6 @@ function love.mousepressed(x, y, button)
                 return
             end
             if state.mode == "GAMEPLAY" and clicked.zone == "hand" then
-                state.selected = nil
                 state.drag = {
                     card_id = card_id,
                     x = x,
@@ -1801,7 +3234,8 @@ function love.mousepressed(x, y, button)
                     start_y = y,
                     moved = false,
                 }
-                state.message = "Drag within hand to reorder. Use △ to cast the armed legal card."
+                state.selected = nil
+                state.message = "Click a legal hand card to arm it, or drag within hand to reorder."
                 return
             end
             state.selected = card_id
@@ -1870,6 +3304,12 @@ function love.mousereleased(x, y, button)
 
     if state.mode == "GAMEPLAY" then
         local card_id = state.drag.card_id
+        if state.cards[card_id] and state.cards[card_id].zone == "hand" and not state.drag.moved then
+            state.drag = nil
+            state.hover_target = nil
+            arm_hand_card(card_id)
+            return
+        end
         if state.cards[card_id] and state.cards[card_id].zone == "hand" and state.drag.moved then
             local target = pick_drop_target(x, y)
             if target and target.zone == "hand" then

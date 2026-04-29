@@ -159,15 +159,16 @@ ui = process machine
 
 ### `☱ RUNTIME`
 
-- canonical color: dark graphite / black-metal
+- canonical color: steel slate / machine blue-gray
 - visual behavior:
-  - black-metal
   - dark steel lane
-  - midnight machine
+  - embedded machine surface
+  - cool slate module
   - subtle cool highlights
 - must not drift into:
   - plain empty black
-  - shadow with no operator identity
+  - observe-white
+  - encode-blue
 
 ### `△ MANIFEST`
 
@@ -440,7 +441,7 @@ It is already visible in accepted mockup direction.
 - `☴ OBSERVE` = white
 - `☶ LOGIC` = green
 - `☲ CYCLE` = orange
-- `☱ RUNTIME` = dark graphite / black-metal
+- `☱ RUNTIME` = steel slate / machine blue-gray
 - `△ MANIFEST` = gold
 
 ### Card classes

@@ -27,7 +27,7 @@ then end that one draw procedure
 Если revealed topdeck = minor-card,
 то:
 
-1. карта становится `known`
+1. карта становится `revealed`
 2. карта входит в `hand`
 3. конкретная draw procedure успешно даёт карту
 
@@ -36,8 +36,8 @@ then end that one draw procedure
 Если revealed topdeck = trump,
 то:
 
-1. карта становится `known`
-2. запускается обычный `TRUMP event` path
+1. карта становится `revealed`
+2. запускается обычный `trump flow` path
 3. карта **не** входит в `hand`
 4. именно эта конкретная draw procedure считается потраченной
 
@@ -46,6 +46,20 @@ then end that one draw procedure
 ```text
 trump burns that draw procedure
 ```
+
+При этом revealed trump
+не обязан сразу резолвиться.
+
+Он может только войти в `trump flow`
+и ждать:
+
+- полного board closure
+- player confirm
+
+См.:
+
+- [BOARD_CLOSURE_LAW.md](./BOARD_CLOSURE_LAW.md)
+- [TRUMP_RUNTIME_STUB_LAW.md](./TRUMP_RUNTIME_STUB_LAW.md)
 
 ## 4. Multi-draw consequence
 
@@ -87,7 +101,7 @@ draw 2
 Разделение такое:
 
 - `DRAW_PROCEDURE_LAW` = что значит один draw step
-- `TRUMP_EVENT_MINIMAL_LAW` = что происходит, если draw вскрыл trump
+- `TRUMP_RUNTIME_STUB_LAW` = что происходит, если draw вскрыл trump
 - `CARD_INFORMATION_STATE_LAW` = hidden / known / revealed model
 
 ## 7. Short formula
@@ -95,6 +109,6 @@ draw 2
 ```text
 each draw is one separate procedure
 minor enters hand
-trump triggers event and burns that one draw procedure
+trump enters trump flow and burns that one draw procedure
 remaining draw procedures still continue
 ```

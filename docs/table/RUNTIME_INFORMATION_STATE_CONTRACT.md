@@ -112,6 +112,32 @@ Runtime rendering should eventually be able to express:
 Exact art may evolve,
 but this middle layer must be representable.
 
+### Current promoted stance
+
+At the current branch,
+`known` should no longer remain permanently invisible.
+
+Current intended reading is:
+
+- `hidden` = ordinary card back
+- `known` = card back plus soft leaked identity
+- `revealed` = full face-up card
+
+`Known` should therefore not be rendered as:
+
+- fully face-up
+- disabled / faded-out card
+- plain transparency pass over the whole card
+
+Instead it should remain a concealed board-object
+while allowing identity to leak through.
+
+Current preferred direction:
+
+- keep the back-face geometry
+- add ghost operator identity over the back
+- keep the card clearly distinct from full `revealed`
+
 ## 7. Gameplay consequence
 
 Current gameplay work that depends on this contract:
@@ -134,6 +160,13 @@ not as a cosmetic render tweak.
 ```text
 this is machine truth
 not UI polish
+```
+
+Current migration consequence:
+
+```text
+implement known in core first
+then give it a distinct presentation layer
 ```
 
 ## 9. Short formula

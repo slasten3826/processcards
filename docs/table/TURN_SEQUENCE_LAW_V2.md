@@ -17,6 +17,8 @@ aligned with compiler/victory machine
 - [MOVE_FIT_LAW.md](./MOVE_FIT_LAW.md)
 - [CARD_INFORMATION_STATE_LAW.md](./CARD_INFORMATION_STATE_LAW.md)
 - [CHAIN_SURFACE_LAW.md](./CHAIN_SURFACE_LAW.md)
+- [REPAIR_PHASE_LAW.md](./REPAIR_PHASE_LAW.md)
+- [OPERATOR_PHASE_LAW.md](./OPERATOR_PHASE_LAW.md)
 - [RESOLUTION_ORDER_LAW.md](./RESOLUTION_ORDER_LAW.md)
 - [WIN_CHECK_LAW.md](./WIN_CHECK_LAW.md)
 
@@ -61,10 +63,12 @@ check victory after full closure
 1. committed `manifest[i]` уходит в `grave`
 2. `latent[i]` становится `revealed`, если была только `hidden` или `known`
 3. `latent[i] -> manifest[i]`
-4. `deck top -> latent[i]`
-5. played hand-card effect resolves
-6. played hand-card уходит в `grave`
-7. victory check may occur
+4. `deck top -> latent[i]` as concealed refill
+5. machine enters operator phase
+6. chosen operator resolves
+7. if needed, repair runs again
+8. played hand-card уходит в `grave`
+9. victory check may occur
 
 ## 4. World update before effect
 
@@ -83,7 +87,27 @@ card effect resolves second
 Later отдельные operator families
 могут явно переопределить этот timing.
 
-## 5. Hand-card spend timing
+## 5. Operator phase
+
+После первого repair machine now enters
+an explicit operator phase.
+
+That means:
+
+1. played hand-card remains in `play`
+2. player chooses exactly one operator
+3. chosen operator resolves from `play`
+4. if that operator reopens the board,
+   repair phase runs again
+
+Short form:
+
+```text
+world repair first
+operator phase second
+```
+
+## 6. Hand-card spend timing
 
 Сыгранная карта из руки не уходит в `grave` сразу в момент выбора.
 
@@ -101,7 +125,7 @@ the played card acts first
 then it is spent
 ```
 
-## 6. Column repair consequence
+## 7. Column repair consequence
 
 Так как commit consume-ит ровно одну manifest-card,
 repair в этой модели локален по одной колонке:
@@ -118,35 +142,32 @@ deck refills latent[i]
 - читаемым по анимации
 - глобальным по влиянию на directed sentence
 
-## 7. Refill information law
+## 8. Refill information law
 
 Когда `deck top` входит в `latent[i]`,
-карта не должна терять уже имеющийся information state.
+это concealed refill.
 
-То есть:
+Значит карта:
 
-- если topdeck был `hidden`, он входит в `latent` hidden
-- если topdeck уже был `known`, он входит в `latent` known
-- если topdeck уже был `revealed`, он входит в `latent` revealed
+- не reveal-ится предварительно
+- входит в `latent` сразу как `not-revealed`
+- может быть как `minor`, так и `trump`
 
 Коротко:
 
 ```text
-refill preserves the current information state of the drawn topdeck
+concealed refill enters as not-revealed
 ```
 
-## 8. No re-hide consequence
+## 9. No re-hide consequence
 
 Из этого следует:
 
-```text
-revealed cards do not re-hide just because they entered latent
-known cards do not become unknown just because they entered latent
-```
+Сам по себе такой concealed refill
+не запускает `trump flow`,
+даже если карта оказалась trump.
 
-Это особенно важно для later trump / unveil cases.
-
-## 9. Relationship to observe / know
+## 10. Relationship to observe / know
 
 Этот документ не заменяет [OBSERVE_VS_REVEAL_LAW.md](./OBSERVE_VS_REVEAL_LAW.md)
 и [CARD_INFORMATION_STATE_LAW.md](./CARD_INFORMATION_STATE_LAW.md).
@@ -155,9 +176,10 @@ known cards do not become unknown just because they entered latent
 
 - `observe` по умолчанию создаёт `known`
 - `reveal` создаёт `revealed`
-- refill не имеет права заново делать `known/revealed` карту полной `hidden`
+- open deck entry reveal-ит first
+- concealed deck entry кладёт directly as `not-revealed`
 
-## 10. Victory check timing
+## 11. Victory check timing
 
 Victory не проверяется на промежуточных состояниях sequence.
 
@@ -175,7 +197,7 @@ no mid-resolution victory
 check only after full turn closure
 ```
 
-## 11. Manifest sentence consequence
+## 12. Manifest sentence consequence
 
 Так как `manifest` теперь является
 6-slot visible sentence surface,
@@ -191,7 +213,7 @@ the turn updates the world
 and only then the sentence may be checked
 ```
 
-## 12. What this law does not decide yet
+## 13. What this law does not decide yet
 
 Этот current branch пока не решает:
 
@@ -200,14 +222,14 @@ and only then the sentence may be checked
 - whether later some operators may act before world update
 - whether rare trumps may alter the timing of win check
 
-## 13. Short formula
+## 14. Short formula
 
 ```text
 commit one manifest card
 fit one hand card
 send committed world-node to grave
 promote latent and refill the column
-resolve played card effect
+enter operator phase and resolve one chosen operator
 send the played card to grave
 then check victory against the compiled 6-slot manifest sentence
 ```

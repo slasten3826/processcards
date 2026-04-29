@@ -79,7 +79,7 @@ svyato mesto pusto ne byvaet
 2. поднятая карта раскрывается,
    если она была закрыта
 3. в `latent[i]` докладывается новая карта из `deck`
-   с сохранением её текущего information state
+   напрямую как `not-revealed`
 
 Короткая формула:
 
@@ -110,7 +110,7 @@ rewrites one slot of the current visible directed sentence
 
 1. слот `latent[i]` становится пуст
 2. в `latent[i]` докладывается новая карта из `deck`
-   с сохранением её текущего information state
+   напрямую как `not-revealed`
 
 То есть:
 
@@ -140,9 +140,12 @@ latent -> manifest = reveal on ascent
 - `latent` по умолчанию остаётся hidden reservoir
 - `deck` взаимодействует с `manifest` только опосредованно, через `latent`
 
-Но если карта из `deck` уже стала `known` или `revealed`
-по другому закону,
-repair не должен заново делать её полной hidden.
+Если concealed refill кладёт из `deck` trump-card,
+она всё равно спокойно входит в `latent`
+как `not-revealed`.
+
+Сам по себе concealed deck entry
+не запускает `trump flow`.
 
 ## 8. Victory relation
 
@@ -176,6 +179,6 @@ how manifest and latent structurally refill
 manifest is repaired by latent
 latent is repaired by deck
 latent rises revealed
-deck refill preserves current known/revealed state
+concealed deck refill enters as not-revealed
 manifest remains a 6-slot sentence surface while repairing
 ```

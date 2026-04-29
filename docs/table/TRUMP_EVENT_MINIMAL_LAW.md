@@ -11,7 +11,7 @@ canonical prototype table law
 
 ## 1. Core claim
 
-Если козырь становится `known`
+Если козырь становится `revealed`
 вне special-case override `targets`,
 то он не продолжает жить как обычная карта зоны.
 
@@ -32,8 +32,9 @@ TRUMP event
 Минимальный `TRUMP event` делает следующее:
 
 ```text
-known trump enters trump flow
-resolved trump remains in-flight
+revealed trump enters trump flow
+resolution waits for full board closure
+manual confirm starts stub event
 ordinary chain close may then move it to trump zone
 ```
 
@@ -49,14 +50,15 @@ ordinary chain close may then move it to trump zone
 
 ## 3. Observe path
 
-Если observe-path делает козырь `known`
+Если reveal-path делает козырь `revealed`
 вне `targets`,
 то:
 
 1. возникает `TRUMP event`
 2. этот козырь входит в `trump flow`
-3. после minimal resolution он остаётся in-flight
-4. after ordinary chain close he may enter `trump zone`
+3. он ждёт full board closure
+4. после confirm проходит stub resolution
+5. after ordinary chain close he may enter `trump zone`
 
 См. также:
 
@@ -66,7 +68,7 @@ ordinary chain close may then move it to trump zone
 
 Для `targets` этот общий закон не действует напрямую.
 
-Если козырь становится `known` в `targets`,
+Если козырь становится `revealed` в `targets`,
 то:
 
 - он не запускает `TRUMP event`
@@ -105,7 +107,7 @@ each draw is one separate draw procedure
 
 Сначала:
 
-1. card becomes known
+1. card becomes revealed
 2. if it is a trump, `TRUMP event` fires
 3. only non-trump card proceeds to ordinary hand entry
 
@@ -134,14 +136,15 @@ each draw is one separate draw procedure
 Он решает только:
 
 ```text
-what the prototype does the moment a trump becomes known outside targets
+what the prototype does the moment a trump becomes revealed outside targets
 ```
 
 ## 9. Short formula
 
 ```text
-known trump outside targets triggers TRUMP event
+revealed trump outside targets triggers TRUMP event
 minimal TRUMP event sends that trump into trump flow
+resolution waits for board closure and confirm
 resolved trump remains in-flight until chain close
 ordinary chain close may then move it to trump zone
 draw reveals first, then only non-trumps enter hand normally

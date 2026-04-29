@@ -80,3 +80,17 @@ ProcessCards is not about controlling a board.
 It is about sending interventions
 into a breathing world-strip
 that becomes alive only while it is being played.
+
+## 8. Visual note
+
+The current runtime should not present cards
+as flat rectangular color blocks with decorative rounded borders.
+
+The card surface itself is part of the machine reading:
+
+- one readable card frame
+- rounded clipped face fill
+- state expressed by frame behavior and light
+
+This is a canonical presentation principle,
+not only a cosmetic preference.

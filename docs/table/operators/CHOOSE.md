@@ -15,26 +15,21 @@ current turn-law branch
 
 ## 1. Core identity
 
-`☳` больше не читается как просто слабый оператор выбора
-для old weak/strong chassis.
+`☳` no longer reads well as latent-source redirection.
 
-В текущей новой ветке его лучший кандидат такой:
-
-```text
-☳ = redirect the source column of latent promotion
-```
-
-То есть `☳` не просто “выбери цель эффекта”,
-а:
+In the current machine branch,
+its better reading is:
 
 ```text
-choose where the next visible world layer comes from
+☳ = reclaim one revealed manifest card into hand
 ```
 
 Short formula:
 
 ```text
-☳ = repair redirection / promotion source selection
+choose one revealed manifest card
+take it into hand
+then repair that column
 ```
 
 ## 2. What it is not
@@ -43,87 +38,108 @@ Short formula:
 
 - draw
 - reveal
-- generic removal
-- abstract menu without board consequence
+- generic board rewrite
+- latent-source redirection
+- abstract menu without physical consequence
 
-## 3. Current playtest law
+## 3. Execution shell
 
-Если карта с `☳` сыграна в колонку `i`,
-то обычный repair:
-
-```text
-latent[i] -> manifest[i]
-```
-
-может быть переопределён.
-
-Игрок выбирает другую колонку `j`,
-и тогда происходит:
+Current runtime shell is:
 
 ```text
-latent[j] -> manifest[i]
-deck -> latent[j]
+hand -> play
+first repair
+choose ☳
+resolve ☳ while the card remains in play
+second repair if needed
+then play -> grave
 ```
 
-При этом:
+So `☳` is a true `play-zone` payload
+that may create a second repair phase.
 
-- `manifest[j]` не двигается
-- переносится только hidden source card
-- освобождённый `manifest[i]` получает latent-card из другой колонки
+## 4. Current runtime law
 
-Коротко:
+If `☳` is the chosen operator effect:
+
+1. choose one revealed manifest card
+2. move that card into hand
+3. this reopens that manifest slot
+4. machine enters repair again for that slot
+
+So current `☳` does not redirect repair.
+It:
 
 ```text
-☳ chooses which latent column feeds the consumed manifest slot
+reclaims a visible world-node back into hand
+and lets the machine close the new hole
 ```
 
-## 4. Why this fits the new move model
+## 5. Why this fits the new move model
 
-Этот оператор хорошо садится на новую ветку,
-потому что:
+This fits better because:
 
-- ход уже consume-ит один `manifest`-узел;
-- latent promotion уже и так есть;
-- `☳` не создаёт новую сущность,
-  а вмешивается в уже существующую фазу world update.
+- the move already consumes one world-node
+- the machine already knows how to repair manifest holes
+- `☳` becomes a hand-positive operator
+- `☳` now deserves its name:
+  the player really chooses which visible node to reclaim
 
-То есть `☳` теперь меняет не абстрактный target,
-а:
+So `☳` now reads as:
 
 ```text
-which hidden world layer becomes visible next
+choose what visible world-node becomes the next intervention packet
 ```
 
-## 5. Physical execution law
+## 6. Repair consequence
 
-Choose must point to visible legal options.
+`☳` depends directly on:
+
+- [../REPAIR_PHASE_LAW.md](../REPAIR_PHASE_LAW.md)
+
+Its full consequence is:
+
+1. first normal turn repair has already happened
+2. `☳` removes one revealed manifest card into hand
+3. that manifest slot reopens
+4. machine must repair it again
+5. any trump revealed during that repair enters `trump flow`
+6. trump flow still waits until `☳` fully finishes and the played card leaves play
+
+## 7. Physical execution law
+
+`☳` must stay cardboard-readable.
 
 That means:
 
-- player chooses one visible column
-- the chosen column must have a latent card
-- no invisible branch list is required
+- chosen manifest card is publicly visible
+- chosen manifest card physically goes into hand
+- the emptied column is physically repaired by the machine
+- no invisible source-redirection bookkeeping is required
 
-## 6. Restrictions
+## 8. Restrictions
 
 - `☳` should not become free wildcard text
-- it should not move whole manifest columns by itself
-- it should redirect latent promotion, not rewrite the whole board
+- it should not move whole manifest rows
+- it should not silently skip repair
+- it should not extract hidden cards by default
 
-## 7. Open questions
+## 9. Open questions
 
-- whether `☳` should always allow any other column,
-  or only adjacent / legal topology-related columns
-- whether `☳☳` should amplify this redirection or duplicate it
-- whether later some mixed pairs should choose other phases, not only repair source
+- whether `☳` should allow any revealed manifest card
+  or only the just-repaired column
+- whether `☳☳` should reclaim more than one node
+- whether later pair-laws may extend `☳` beyond manifest only
 
-## 8. Legacy relation
+## 10. Legacy relation
 
-Older readings of `☳` as weak-fragile selector
-or null weak modifier should now be treated as legacy-branch thinking.
+Older readings of `☳` as latent-source redirection
+should now be treated as superseded branch material.
 
-## 9. Short formula
+## 11. Short formula
 
 ```text
-☳ CHOOSE = choose which latent column feeds the next manifest repair
+☳ CHOOSE = choose one revealed manifest card
+take it into hand
+then repair that column
 ```
