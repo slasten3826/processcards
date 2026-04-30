@@ -86,12 +86,20 @@ function M.choose_manifest_target(state, slot)
     return turn.choose_manifest_target(state, slot)
 end
 
+function M.choose_public_target(state, card_id)
+    return turn.choose_public_target(state, card_id)
+end
+
 function M.choose_hand_target(state, card_id)
     return turn.choose_hand_target(state, card_id)
 end
 
 function M.choose_hidden_target(state, card_id)
     return turn.choose_hidden_target(state, card_id)
+end
+
+function M.choose_unrevealed_target(state, card_id)
+    return turn.choose_unrevealed_target(state, card_id)
 end
 
 function M.draw_to_hand(state)

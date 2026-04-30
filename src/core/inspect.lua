@@ -22,16 +22,18 @@ function M.snapshot(state)
     local lines = {}
     lines[#lines + 1] = "STATE SNAPSHOT"
     lines[#lines + 1] = string.format(
-        "board_closed=%s deck=%d hand=%d grave=%d trump_flow=%d pending_operator=%s pending_hidden=%s pending_hand=%s pending_manifest=%s pending_trump=%s",
+        "board_closed=%s deck=%d hand=%d grave=%d trump_flow=%d pending_operator=%s pending_public=%s pending_hidden=%s pending_hand=%s pending_manifest=%s pending_unrevealed=%s pending_trump=%s",
         state_lib.is_board_closed(state) and "true" or "false",
         #state.zones.deck.cards,
         #state.zones.hand.cards,
         #state.zones.grave.cards,
         #state.zones.trump_flow.cards,
         state.pending_operator_choice and "yes" or "no",
+        state.pending_public_choice and "yes" or "no",
         state.pending_hidden_choice and "yes" or "no",
         state.pending_hand_choice and "yes" or "no",
         state.pending_manifest_choice and "yes" or "no",
+        state.pending_unrevealed_choice and "yes" or "no",
         state.pending_trump and "yes" or "no"
     )
     lines[#lines + 1] = "manifest: " .. join_slots(state.zones.manifest)

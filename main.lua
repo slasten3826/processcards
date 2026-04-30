@@ -129,6 +129,7 @@ local state = {
     pending_hidden_choice = nil,
     pending_hand_choice = nil,
     pending_manifest_choice = nil,
+    pending_unrevealed_choice = nil,
     pending_trump = nil,
     hover_target = nil,
     drag = nil,
@@ -144,6 +145,13 @@ local state = {
     ui = {
         buttons = {},
         operator_buttons = {},
+        grave_viewer = {
+            open = false,
+            rect = nil,
+            content_rect = nil,
+            card_rects = {},
+            ordered_cards = {},
+        },
     },
     anim = {
         queue = {},
@@ -239,7 +247,13 @@ local function clear_runtime_state()
     state.pending_hidden_choice = nil
     state.pending_hand_choice = nil
     state.pending_manifest_choice = nil
+    state.pending_unrevealed_choice = nil
     state.pending_trump = nil
+    state.ui.grave_viewer.open = false
+    state.ui.grave_viewer.rect = nil
+    state.ui.grave_viewer.content_rect = nil
+    state.ui.grave_viewer.card_rects = {}
+    state.ui.grave_viewer.ordered_cards = {}
     state.hover_target = nil
     state.drag = nil
     state.cards = {}
@@ -331,6 +345,11 @@ local function sync_from_core(message)
         card_id = core_state.pending_manifest_choice.card_id,
         operator = core_state.pending_manifest_choice.operator,
         legal_slots = core_state.pending_manifest_choice.legal_slots,
+    } or nil
+    state.pending_unrevealed_choice = core_state.pending_unrevealed_choice and {
+        card_id = core_state.pending_unrevealed_choice.card_id,
+        operator = core_state.pending_unrevealed_choice.operator,
+        legal_card_ids = core_state.pending_unrevealed_choice.legal_card_ids,
     } or nil
     state.pending_trump = core_state.pending_trump
     state.log = {}
@@ -1403,6 +1422,87 @@ local function animate_core_hidden_choice(result, message)
     state.message = message
 end
 
+local function animate_core_unrevealed_choice(result, message)
+    local events = result and result.events or {}
+    local latent_inspect_by_card = {}
+    for _, event in ipairs(events) do
+        local payload = event.payload or {}
+        if event.type == "card_revealed_in_place" then
+            enqueue_callback(function()
+                local card = state.cards[payload.card_id]
+                if card then
+                    card.info_state = "revealed"
+                    card.face_up = true
+                end
+            end)
+        elseif event.type == "latent_trump_revealed" then
+            local from_rect = current_card_rect(payload.card_id)
+            local inspect = inspect_rect()
+            latent_inspect_by_card[payload.card_id] = inspect
+            local face_before = state.cards[payload.card_id].face_up
+            enqueue_move(payload.card_id, from_rect, inspect, {
+                face_before = face_before,
+                face_after = true,
+                flip = not face_before,
+                arc = math.floor(30 * state.layout.scale),
+                duration = 0.26,
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    state.cards[payload.card_id].face_up = true
+                    state.cards[payload.card_id].info_state = "revealed"
+                end,
+            })
+        elseif event.type == "trump_flow_entry" then
+            if latent_inspect_by_card[payload.card_id] then
+                queue_trump_flow_entry(payload.card_id, latent_inspect_by_card[payload.card_id], payload.reason)
+            else
+                local from_rect = current_card_rect(payload.card_id)
+                if from_rect then
+                    queue_trump_flow_entry(payload.card_id, from_rect, payload.reason)
+                end
+            end
+        elseif event.type == "concealed_refill" then
+            queue_concealed_refill_event(payload.card_id, payload.zone, payload.slot)
+        elseif event.type == "target_minor_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + 1)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = state.cards[payload.card_id].face_up,
+                face_after = true,
+                flip = not state.cards[payload.card_id].face_up,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    state.cards[payload.card_id].face_up = true
+                    state.cards[payload.card_id].info_state = "revealed"
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        elseif event.type == "play_to_grave" then
+            local from_rect = current_card_rect(payload.card_id)
+            local grave_to = predicted_stack_rect("grave", #state.zones.grave.cards + 1)
+            enqueue_move(payload.card_id, from_rect, grave_to, {
+                face_before = true,
+                face_after = true,
+                arc = math.floor(18 * state.layout.scale),
+                on_start = function()
+                    remove_from_current_zone(payload.card_id)
+                end,
+                on_finish = function()
+                    place_card(payload.card_id, "grave", nil)
+                end,
+            })
+        end
+    end
+    queue_sync_from_core(message)
+    start_next_anim()
+    state.message = message
+end
+
 local function animate_core_manifest_choice(result, message)
     local events = result and result.events or {}
     local latent_inspect_by_card = {}
@@ -1532,6 +1632,102 @@ local function point_in_rect(x, y, rect)
     return rect and x >= rect.x and x <= rect.x + rect.w and y >= rect.y and y <= rect.y + rect.h
 end
 
+local function ordered_grave_cards()
+    local ordered = {}
+    for i = #state.zones.grave.cards, 1, -1 do
+        ordered[#ordered + 1] = state.zones.grave.cards[i]
+    end
+    return ordered
+end
+
+local function compute_grave_viewer_layout()
+    local s = state.layout.scale
+    local overlay = {
+        x = state.layout.margin + math.floor(72 * s),
+        y = state.layout.margin + state.layout.top_bar_h + math.floor(18 * s),
+        w = state.layout_w - (state.layout.margin + math.floor(72 * s)) * 2,
+        h = state.layout_h - (state.layout.margin + state.layout.top_bar_h + math.floor(18 * s)) - (state.layout.footer.h + state.layout.margin + math.floor(18 * s)),
+    }
+    local content = {
+        x = overlay.x + math.floor(18 * s),
+        y = overlay.y + math.floor(54 * s),
+        w = overlay.w - math.floor(36 * s),
+        h = overlay.h - math.floor(72 * s),
+    }
+
+    local ordered = ordered_grave_cards()
+    local count = #ordered
+    local card_rects = {}
+
+    if count > 0 then
+        local aspect = state.layout.card_w / state.layout.card_h
+        local gap = math.max(4, math.floor(8 * s))
+        local best = nil
+
+        for cols = 1, count do
+            local rows = math.ceil(count / cols)
+            local max_w = (content.w - gap * (cols - 1)) / cols
+            local max_h = (content.h - gap * (rows - 1)) / rows
+            if max_w > 0 and max_h > 0 then
+                local card_w = math.min(max_w, max_h * aspect)
+                local card_h = card_w / aspect
+                if card_w > 0 and card_h > 0 then
+                    local area = card_w * card_h
+                    if not best or area > best.area then
+                        best = {
+                            cols = cols,
+                            rows = rows,
+                            card_w = math.floor(card_w),
+                            card_h = math.floor(card_h),
+                            gap = gap,
+                            area = area,
+                        }
+                    end
+                end
+            end
+        end
+
+        if best then
+            local total_w = best.cols * best.card_w + (best.cols - 1) * best.gap
+            local total_h = best.rows * best.card_h + (best.rows - 1) * best.gap
+            local start_x = content.x + math.floor((content.w - total_w) / 2)
+            local start_y = content.y + math.floor((content.h - total_h) / 2)
+
+            for idx, card_id in ipairs(ordered) do
+                local col = (idx - 1) % best.cols
+                local row = math.floor((idx - 1) / best.cols)
+                card_rects[card_id] = {
+                    x = start_x + col * (best.card_w + best.gap),
+                    y = start_y + row * (best.card_h + best.gap),
+                    w = best.card_w,
+                    h = best.card_h,
+                    order = idx,
+                }
+            end
+        end
+    end
+
+    state.ui.grave_viewer.rect = overlay
+    state.ui.grave_viewer.content_rect = content
+    state.ui.grave_viewer.card_rects = card_rects
+    state.ui.grave_viewer.ordered_cards = ordered
+end
+
+local function open_grave_viewer()
+    state.ui.grave_viewer.open = true
+    compute_grave_viewer_layout()
+    state.message = "Grave viewer opened."
+end
+
+local function close_grave_viewer()
+    state.ui.grave_viewer.open = false
+    state.ui.grave_viewer.rect = nil
+    state.ui.grave_viewer.content_rect = nil
+    state.ui.grave_viewer.card_rects = {}
+    state.ui.grave_viewer.ordered_cards = {}
+    state.message = "Grave viewer closed."
+end
+
 local function pick_card(x, y)
     local views = card_views()
     local ordered = {}
@@ -1657,6 +1853,9 @@ local function refresh_layout(force)
     state.layout_w = w
     state.layout_h = h
     update_buttons()
+    if state.ui.grave_viewer.open then
+        compute_grave_viewer_layout()
+    end
 end
 
 local function enqueue_anim(step)
@@ -1800,6 +1999,10 @@ end
 local function start_pending_trump_resolution()
     if state.pending_hidden_choice then
         state.message = "Choose one hidden card on board first."
+        return
+    end
+    if state.pending_unrevealed_choice then
+        state.message = "Choose one not-revealed card on board first."
         return
     end
     if state.pending_hand_choice then
@@ -2053,6 +2256,7 @@ local function choose_pending_operator(op_name)
         local summary = result and result.summary or {}
         local message = summary.error and ("Operator choice rejected: " .. summary.error .. ".")
             or ((summary.pending_manifest_choice and "Choose one revealed manifest card.")
+                or (summary.pending_unrevealed_choice and "Choose one not-revealed card on board.")
                 or (summary.pending_hidden_choice and "Choose one hidden card on board.")
                 or (summary.pending_hand_choice and "Choose one hand card to discard.")
                 or ("Operator " .. op_name .. " chosen."))
@@ -2060,12 +2264,33 @@ local function choose_pending_operator(op_name)
             sync_from_core(message)
         elseif summary.pending_manifest_choice then
             sync_from_core(message)
+        elseif summary.pending_unrevealed_choice then
+            sync_from_core(message)
         elseif summary.pending_hidden_choice then
             sync_from_core(message)
         elseif summary.pending_hand_choice then
             animate_core_operator_choice(result, message)
         else
             animate_core_operator_choice(result, message)
+        end
+        return
+    end
+end
+
+local function choose_pending_unrevealed_target(card_id)
+    if not state.pending_unrevealed_choice then
+        state.message = "No pending unrevealed choice."
+        return
+    end
+    if state.core then
+        local result = core.choose_unrevealed_target(state.core, card_id)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Manifest choice rejected: " .. summary.error .. ".")
+            or (card_id .. " manifested.")
+        if summary.error then
+            sync_from_core(message)
+        else
+            animate_core_unrevealed_choice(result, message)
         end
         return
     end
@@ -2131,6 +2356,10 @@ end
 local function start_draw_sequence()
     if state.pending_hidden_choice then
         state.message = "Choose one hidden card on board first."
+        return
+    end
+    if state.pending_unrevealed_choice then
+        state.message = "Choose one not-revealed card on board first."
         return
     end
     if state.pending_hand_choice then
@@ -2223,6 +2452,10 @@ end
 local function launch_committed_play()
     if state.pending_hidden_choice then
         state.message = "Choose one hidden card on board first."
+        return
+    end
+    if state.pending_unrevealed_choice then
+        state.message = "Choose one not-revealed card on board first."
         return
     end
     if state.pending_hand_choice then
@@ -2527,6 +2760,7 @@ local function draw_card(card_id, rect, dragged, opts)
         or state.pending_hidden_choice ~= nil
         or state.pending_hand_choice ~= nil
         or state.pending_manifest_choice ~= nil
+        or state.pending_unrevealed_choice ~= nil
     local selected = (not effect_phase_active) and state.selected == card_id
     local committed = (not effect_phase_active)
         and state.committed
@@ -2557,6 +2791,15 @@ local function draw_card(card_id, rect, dragged, opts)
         for _, legal_card_id in ipairs(state.pending_hidden_choice.legal_card_ids or {}) do
             if legal_card_id == card_id then
                 observe_target = true
+                break
+            end
+        end
+    end
+    local manifest_target = false
+    if state.pending_unrevealed_choice then
+        for _, legal_card_id in ipairs(state.pending_unrevealed_choice.legal_card_ids or {}) do
+            if legal_card_id == card_id then
+                manifest_target = true
                 break
             end
         end
@@ -2743,6 +2986,24 @@ local function draw_card(card_id, rect, dragged, opts)
         set_color(cc, 0.18)
         rounded("line", observe_rect.x, observe_rect.y, observe_rect.w, observe_rect.h, 14)
         draw_segmented_frame(observe_rect, {cc, hot}, love.timer.getTime() / 3.04, {
+            width = math.max(2, state.layout.scale * 2.35),
+            segment_count = 14,
+            duty = 0.56,
+        })
+    end
+
+    if manifest_target then
+        local cc = OP_COLORS.MANIFEST or COLORS.accent
+        local hot = lerp_color(cc, COLORS.text, 0.18)
+        local manifest_rect = {
+            x = draw_rect.x - 5,
+            y = draw_rect.y - 5,
+            w = draw_rect.w + 10,
+            h = draw_rect.h + 10,
+        }
+        set_color(cc, 0.18)
+        rounded("line", manifest_rect.x, manifest_rect.y, manifest_rect.w, manifest_rect.h, 14)
+        draw_segmented_frame(manifest_rect, {cc, hot}, love.timer.getTime() / 3.04, {
             width = math.max(2, state.layout.scale * 2.35),
             segment_count = 14,
             duty = 0.56,
@@ -2990,6 +3251,47 @@ local function draw_operator_buttons()
     end
 end
 
+local function draw_grave_viewer()
+    if not state.ui.grave_viewer.open then
+        return
+    end
+
+    local rect = state.ui.grave_viewer.rect
+    local content = state.ui.grave_viewer.content_rect
+    if not rect or not content then
+        return
+    end
+
+    set_color(COLORS.panel_alt)
+    rounded("fill", rect.x, rect.y, rect.w, rect.h, 14)
+    set_color(COLORS.outline)
+    rounded("line", rect.x, rect.y, rect.w, rect.h, 14)
+
+    love.graphics.setFont(state.fonts.title)
+    set_color(COLORS.text)
+    love.graphics.print("GRAVE", rect.x + 18 * state.layout.scale, rect.y + 12 * state.layout.scale)
+
+    love.graphics.setFont(state.fonts.small)
+    set_color(COLORS.muted)
+    love.graphics.print("Newest first. Click outside to close.", rect.x + 18 * state.layout.scale, rect.y + 32 * state.layout.scale)
+
+    for _, card_id in ipairs(state.ui.grave_viewer.ordered_cards or {}) do
+        local card_rect = state.ui.grave_viewer.card_rects[card_id]
+        if card_rect then
+            draw_card(card_id, card_rect, false)
+            love.graphics.setFont(state.fonts.small)
+            set_color(COLORS.muted, 0.92)
+            love.graphics.printf(
+                tostring(card_rect.order),
+                card_rect.x,
+                card_rect.y + card_rect.h - 16 * state.layout.scale,
+                card_rect.w - 4 * state.layout.scale,
+                "right"
+            )
+        end
+    end
+end
+
 local function draw_top_header()
     love.graphics.setFont(state.fonts.big)
     set_color(COLORS.text)
@@ -3139,6 +3441,7 @@ function love.draw()
         alpha = 0.96,
     })
     draw_zone_contents()
+    draw_grave_viewer()
     draw_footer()
     draw_operator_buttons()
 end
@@ -3150,6 +3453,13 @@ function love.mousepressed(x, y, button)
     end
 
     if button == 1 then
+        if state.ui.grave_viewer.open then
+            if not point_in_rect(x, y, state.ui.grave_viewer.rect) then
+                close_grave_viewer()
+            end
+            return
+        end
+
         for _, op_button in ipairs(state.ui.operator_buttons or {}) do
             if point_in_rect(x, y, op_button.rect) then
                 choose_pending_operator(op_button.op_name)
@@ -3161,6 +3471,11 @@ function love.mousepressed(x, y, button)
                 trigger_button(spec.id)
                 return
             end
+        end
+
+        if point_in_rect(x, y, state.layout.right.grave) then
+            open_grave_viewer()
+            return
         end
 
         if state.pending_manifest_choice then
@@ -3183,6 +3498,16 @@ function love.mousepressed(x, y, button)
                 return
             end
             state.message = "Choose one hidden card on board."
+            return
+        end
+
+        if state.pending_unrevealed_choice then
+            local card_id = pick_card(x, y)
+            if card_id then
+                choose_pending_unrevealed_target(card_id)
+                return
+            end
+            state.message = "Choose one not-revealed card on board."
             return
         end
 

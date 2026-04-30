@@ -45,9 +45,11 @@ function M.new_game()
         committed = nil,
         legal_hints = {},
         armed_hand = nil,
+        pending_public_choice = nil,
         pending_hidden_choice = nil,
         pending_hand_choice = nil,
         pending_manifest_choice = nil,
+        pending_unrevealed_choice = nil,
         pending_trump = nil,
         pending_operator_choice = nil,
     }

@@ -10,6 +10,11 @@ local SKIP_ERRORS = {
     no_latent_trump = true,
     no_pending_trump = true,
     no_legal_turn = true,
+    no_logic_turn = true,
+    no_logic_manifest_target = true,
+    no_logic_latent_target = true,
+    no_logic_grave_target = true,
+    no_logic_topdeck_target = true,
 }
 
 local function new_game(seed)

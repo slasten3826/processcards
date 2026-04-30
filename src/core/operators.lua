@@ -35,6 +35,14 @@ function M.finish_observe(state, observed_card_id)
     })
 end
 
+function M.finish_logic(state, target_card_id, inserted_card_id)
+    transition.emit(state, "operator_effect_end", {
+        operator = "LOGIC",
+        target_card_id = target_card_id,
+        inserted_card_id = inserted_card_id,
+    })
+end
+
 function M.resolve(state, op_name)
     if op_name == "CONNECT" then
         resolve_connect(state)

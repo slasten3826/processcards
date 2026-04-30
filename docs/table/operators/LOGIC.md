@@ -10,13 +10,14 @@ Symbol:
 
 ```text
 canonical operator law
+aligned with operator-phase shell
 current turn-law branch
 ```
 
 ## 1. Core identity
 
-`☶` now reads not as abstract exception text,
-but as a direct swap operator for revealed minor-cards.
+`☶` now reads as the machine's public/grave exchange operator
+for revealed minor-cards.
 
 Short formula:
 
@@ -49,6 +50,19 @@ This means:
 
 The inserted card does not separately resolve its own effect.
 
+Current runtime shell is:
+
+```text
+hand -> play
+repair phase
+choose ☶
+choose public/grave target
+choose hand target
+swap
+play -> grave
+then later trump flow may continue
+```
+
 ## 4. Legal target class
 
 `☶` may target only:
@@ -59,7 +73,7 @@ The inserted card does not separately resolve its own effect.
 Default legal public zones:
 
 - `manifest`
-- `revealed latent`
+- revealed `latent`
 - `grave`
 - revealed `topdeck`
 
@@ -71,7 +85,28 @@ It does **not** target:
 - `targets`
 - `trump zone`
 
-## 5. Why the trump exclusion is clean
+## 5. Why these zones are coherent
+
+`☶` is allowed to work with:
+
+- active public world surface (`manifest`)
+- surfaced hidden underlayer (`revealed latent`)
+- surfaced future card (`revealed topdeck`)
+- spent public residue (`grave`)
+
+This gives `☶` a distinct role:
+
+```text
+LOGIC is the only current operator
+that naturally works with grave material
+```
+
+It is therefore not just a generic swap effect.
+
+It is the machine's recovery / exchange operator
+for already surfaced minor cards.
+
+## 6. Why the trump exclusion is clean
 
 In current machine reality,
 revealed trumps live only in:
@@ -89,7 +124,7 @@ logic works only with revealed minor-cards
 
 without needing a second trump exception table.
 
-## 6. Physical execution law
+## 7. Physical execution law
 
 Logic must still be cardboard-playable.
 
@@ -100,7 +135,27 @@ That means:
 - the extracted revealed card really enters hand
 - the inserted hand-card really takes that exact public place
 
-## 7. Restrictions
+If the target came from `grave`,
+the chosen hand-card enters `grave` as revealed residue.
+
+If the target came from a board slot,
+the chosen hand-card takes that exact board slot as revealed.
+
+## 8. Repair consequence
+
+Default `☶` swap does not create an empty slot.
+
+So unlike `CHOOSE`,
+it does not normally create a second repair phase.
+
+Short formula:
+
+```text
+LOGIC exchanges material
+without reopening the board by default
+```
+
+## 9. Restrictions
 
 - `☶` does not ignore all rules
 - `☶` does not touch trumps by default
@@ -108,14 +163,16 @@ That means:
 - swap does not trigger a second play on the inserted hand-card
 - swap does not trigger chain repair if the slot never stays empty
 
-## 8. Open questions
+## 10. Open questions
 
-- whether revealed `topdeck` should be treated exactly like a public slot
+- exact targeting shape inside `grave`
+- whether `grave` targeting should later be whole-zone or top-item only
 - whether `☶☶` should amplify swap scope or stay simple
-- whether later some mixed pairs should extend legal public zones
 
-## 9. Short formula
+## 11. Short formula
 
 ```text
-☶ LOGIC = swap one revealed minor-card with one card from hand
+☶ LOGIC = swap one revealed minor-card
+from board or grave
+with one card from hand
 ```
