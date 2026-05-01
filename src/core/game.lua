@@ -56,6 +56,9 @@ function M.advance(state)
     end
 
     if ix.phase == "await_target" then
+        if state.pending_pair_card_choice then
+            return M.confirm_pair_card_target(state)
+        end
         if state.pending_manifest_choice then
             return M.confirm_manifest_target(state)
         end
@@ -101,6 +104,9 @@ function M.apply_action(state, action)
     end
     if kind == "arm_target" then
         local target = action.target or {}
+        if state.pending_pair_card_choice then
+            return M.arm_pair_card_target(state, target.card_id)
+        end
         if state.pending_manifest_choice then
             return M.arm_manifest_target(state, target.slot)
         end
@@ -210,6 +216,18 @@ end
 
 function M.arm_public_target(state, card_id)
     return turn.arm_public_target(state, card_id)
+end
+
+function M.choose_pair_card_target(state, card_id)
+    return turn.choose_pair_card_target(state, card_id)
+end
+
+function M.arm_pair_card_target(state, card_id)
+    return turn.arm_pair_card_target(state, card_id)
+end
+
+function M.confirm_pair_card_target(state)
+    return turn.confirm_pair_card_target(state)
 end
 
 function M.confirm_public_target(state)

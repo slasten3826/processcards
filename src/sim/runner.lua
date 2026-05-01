@@ -98,11 +98,8 @@ local function choose_protocol_action(ix)
     end
 
     if ix.phase == "await_target" then
-        if ix.armed.target then
-            if ix.advance and ix.advance.enabled then
-                return {kind = "advance"}
-            end
-            return nil, "target_armed_but_cannot_advance"
+        if ix.advance and ix.advance.enabled then
+            return {kind = "advance"}
         end
         local action = first_target_action(ix)
         if action then

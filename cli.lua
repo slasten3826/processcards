@@ -237,7 +237,7 @@ local function choose_cli_auto_action(ix)
     end
 
     if ix.phase == "await_target" then
-        if ix.armed.target and ix.advance and ix.advance.enabled then
+        if ix.advance and ix.advance.enabled then
             return {kind = "advance"}
         end
         if targets.slots and #targets.slots > 0 then

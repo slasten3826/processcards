@@ -132,6 +132,16 @@ function M.one_turn(state)
                 core.arm_hand_target(state, hand_target)
                 choose_result = core.confirm_hand_target(state)
             end
+        elseif state.pending_pair_card_choice then
+            local target_card_id = state.pending_pair_card_choice.legal_public_card_ids[1]
+            if target_card_id then
+                core.arm_pair_card_target(state, target_card_id)
+            end
+            local hand_target = state.pending_pair_card_choice.legal_hand_card_ids[1]
+            if hand_target then
+                core.arm_pair_card_target(state, hand_target)
+            end
+            choose_result = core.confirm_pair_card_target(state)
         elseif state.pending_hidden_choice then
             local target_card_id = state.pending_hidden_choice.legal_card_ids[1]
             core.arm_hidden_target(state, target_card_id)
@@ -258,7 +268,7 @@ function M.one_turn_via_protocol(state)
             end
 
         elseif ix.phase == "await_target" then
-            if not ix.armed.target then
+            if not (ix.advance and ix.advance.enabled) then
                 local action = first_target_action(ix)
                 if not action then
                     return nil, "no_target_action"
@@ -394,8 +404,8 @@ local function enter_logic_choice(state)
     if not choose_result then
         return nil, err or "logic_arm_failed"
     end
-    if not state.pending_public_choice then
-        return nil, "no_pending_public_choice"
+    if not state.pending_pair_card_choice then
+        return nil, "no_pending_pair_card_choice"
     end
     return choose_result
 end
@@ -480,17 +490,17 @@ function M.public_target_arm_toggle(state)
         return nil, choose_err
     end
 
-    local target_card_id = state.pending_public_choice.legal_card_ids[1]
+    local target_card_id = state.pending_pair_card_choice.legal_public_card_ids[1]
     if not target_card_id then
         return nil, "no_public_target"
     end
 
-    core.arm_public_target(state, target_card_id)
-    if state.pending_public_choice.armed_card_id ~= target_card_id then
+    core.arm_pair_card_target(state, target_card_id)
+    if state.pending_pair_card_choice.armed_public_card_id ~= target_card_id then
         return nil, "arm_public_target_failed"
     end
-    core.arm_public_target(state, target_card_id)
-    if state.pending_public_choice.armed_card_id ~= nil then
+    core.arm_pair_card_target(state, target_card_id)
+    if state.pending_pair_card_choice.armed_public_card_id ~= nil then
         return nil, "disarm_public_target_failed"
     end
 
@@ -511,27 +521,22 @@ function M.hand_target_arm_toggle(state)
         return nil, choose_err
     end
 
-    local public_target = state.pending_public_choice.legal_card_ids[1]
+    local public_target = state.pending_pair_card_choice.legal_public_card_ids[1]
     if not public_target then
         return nil, "no_public_target"
     end
-    core.arm_public_target(state, public_target)
-    core.confirm_public_target(state)
-    if not state.pending_hand_choice then
-        return nil, "no_pending_hand_choice"
-    end
-
-    local hand_target = state.pending_hand_choice.legal_card_ids[1]
+    local hand_target = state.pending_pair_card_choice.legal_hand_card_ids[1]
     if not hand_target then
         return nil, "no_hand_target"
     end
 
-    core.arm_hand_target(state, hand_target)
-    if state.pending_hand_choice.armed_card_id ~= hand_target then
+    core.arm_pair_card_target(state, public_target)
+    core.arm_pair_card_target(state, hand_target)
+    if state.pending_pair_card_choice.armed_hand_card_id ~= hand_target then
         return nil, "arm_hand_target_failed"
     end
-    core.arm_hand_target(state, hand_target)
-    if state.pending_hand_choice.armed_card_id ~= nil then
+    core.arm_pair_card_target(state, hand_target)
+    if state.pending_pair_card_choice.armed_hand_card_id ~= nil then
         return nil, "disarm_hand_target_failed"
     end
 
@@ -724,7 +729,7 @@ function M.logic_manifest_swap(state)
         return nil, choose_err
     end
     local target_card_id
-    for _, candidate in ipairs(state.pending_public_choice.legal_card_ids or {}) do
+    for _, candidate in ipairs(state.pending_pair_card_choice.legal_public_card_ids or {}) do
         if state.cards[candidate].zone == "manifest" then
             target_card_id = candidate
             break
@@ -734,14 +739,13 @@ function M.logic_manifest_swap(state)
         return nil, "no_logic_manifest_target"
     end
     local target_slot = state.cards[target_card_id].slot
-    core.arm_public_target(state, target_card_id)
-    local public_result = core.confirm_public_target(state)
-    local hand_target = state.pending_hand_choice and state.pending_hand_choice.legal_card_ids[1]
+    core.arm_pair_card_target(state, target_card_id)
+    local hand_target = state.pending_pair_card_choice and state.pending_pair_card_choice.legal_hand_card_ids[1]
     if not hand_target then
         return nil, "no_logic_hand_target"
     end
-    core.arm_hand_target(state, hand_target)
-    local hand_result = core.confirm_hand_target(state)
+    core.arm_pair_card_target(state, hand_target)
+    local hand_result = core.confirm_pair_card_target(state)
     if state.zones.manifest.cards[target_slot] ~= hand_target then
         return nil, "logic_manifest_swap_failed"
     end
@@ -752,7 +756,6 @@ function M.logic_manifest_swap(state)
         inserted_card_id = hand_target,
         prep = prep,
         choose_result = choose_result,
-        public_result = public_result,
         hand_result = hand_result,
     }
 end
@@ -780,14 +783,13 @@ function M.logic_latent_swap(state)
     if not choose_result then
         return nil, choose_err
     end
-    core.arm_public_target(state, target_card_id)
-    local public_result = core.confirm_public_target(state)
-    local hand_target = state.pending_hand_choice and state.pending_hand_choice.legal_card_ids[1]
+    core.arm_pair_card_target(state, target_card_id)
+    local hand_target = state.pending_pair_card_choice and state.pending_pair_card_choice.legal_hand_card_ids[1]
     if not hand_target then
         return nil, "no_logic_hand_target"
     end
-    core.arm_hand_target(state, hand_target)
-    local hand_result = core.confirm_hand_target(state)
+    core.arm_pair_card_target(state, hand_target)
+    local hand_result = core.confirm_pair_card_target(state)
     if state.zones.latent.cards[target_slot] ~= hand_target then
         return nil, "logic_latent_swap_failed"
     end
@@ -798,7 +800,6 @@ function M.logic_latent_swap(state)
         inserted_card_id = hand_target,
         prep = prep,
         choose_result = choose_result,
-        public_result = public_result,
         hand_result = hand_result,
     }
 end
@@ -813,7 +814,7 @@ function M.logic_grave_swap(state)
         return nil, choose_err
     end
     local target_card_id
-    for _, candidate in ipairs(state.pending_public_choice.legal_card_ids or {}) do
+    for _, candidate in ipairs(state.pending_pair_card_choice.legal_public_card_ids or {}) do
         if state.cards[candidate].zone == "grave" then
             target_card_id = candidate
             break
@@ -822,14 +823,13 @@ function M.logic_grave_swap(state)
     if not target_card_id then
         return nil, "no_logic_grave_target"
     end
-    core.arm_public_target(state, target_card_id)
-    local public_result = core.confirm_public_target(state)
-    local hand_target = state.pending_hand_choice and state.pending_hand_choice.legal_card_ids[1]
+    core.arm_pair_card_target(state, target_card_id)
+    local hand_target = state.pending_pair_card_choice and state.pending_pair_card_choice.legal_hand_card_ids[1]
     if not hand_target then
         return nil, "no_logic_hand_target"
     end
-    core.arm_hand_target(state, hand_target)
-    local hand_result = core.confirm_hand_target(state)
+    core.arm_pair_card_target(state, hand_target)
+    local hand_result = core.confirm_pair_card_target(state)
     if state.cards[hand_target].zone ~= "grave" then
         return nil, "logic_grave_swap_failed"
     end
@@ -839,7 +839,6 @@ function M.logic_grave_swap(state)
         inserted_card_id = hand_target,
         prep = prep,
         choose_result = choose_result,
-        public_result = public_result,
         hand_result = hand_result,
     }
 end
@@ -872,14 +871,13 @@ function M.logic_topdeck_swap(state)
     if not choose_result then
         return nil, choose_err
     end
-    core.arm_public_target(state, target_card_id)
-    local public_result = core.confirm_public_target(state)
-    local hand_target = state.pending_hand_choice and state.pending_hand_choice.legal_card_ids[1]
+    core.arm_pair_card_target(state, target_card_id)
+    local hand_target = state.pending_pair_card_choice and state.pending_pair_card_choice.legal_hand_card_ids[1]
     if not hand_target then
         return nil, "no_logic_hand_target"
     end
-    core.arm_hand_target(state, hand_target)
-    local hand_result = core.confirm_hand_target(state)
+    core.arm_pair_card_target(state, hand_target)
+    local hand_result = core.confirm_pair_card_target(state)
     if state.zones.deck.cards[#state.zones.deck.cards] ~= hand_target then
         return nil, "logic_topdeck_swap_failed"
     end
@@ -889,7 +887,6 @@ function M.logic_topdeck_swap(state)
         inserted_card_id = hand_target,
         prep = prep,
         choose_result = choose_result,
-        public_result = public_result,
         hand_result = hand_result,
     }
 end

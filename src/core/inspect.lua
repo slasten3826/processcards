@@ -22,7 +22,7 @@ function M.snapshot(state)
     local lines = {}
     lines[#lines + 1] = "STATE SNAPSHOT"
     lines[#lines + 1] = string.format(
-        "board_closed=%s deck=%d hand=%d grave=%d trump_flow=%d pending_operator=%s armed_operator=%s pending_public=%s pending_hidden=%s pending_hand=%s pending_manifest=%s pending_unrevealed=%s pending_trump=%s",
+        "board_closed=%s deck=%d hand=%d grave=%d trump_flow=%d pending_operator=%s armed_operator=%s pending_pair=%s pending_public=%s pending_hidden=%s pending_hand=%s pending_manifest=%s pending_unrevealed=%s pending_trump=%s",
         state_lib.is_board_closed(state) and "true" or "false",
         #state.zones.deck.cards,
         #state.zones.hand.cards,
@@ -30,6 +30,7 @@ function M.snapshot(state)
         #state.zones.trump_flow.cards,
         state.pending_operator_choice and "yes" or "no",
         state.pending_operator_choice and (state.pending_operator_choice.armed_operator or "none") or "-",
+        state.pending_pair_card_choice and "yes" or "no",
         state.pending_public_choice and "yes" or "no",
         state.pending_hidden_choice and "yes" or "no",
         state.pending_hand_choice and "yes" or "no",
@@ -48,6 +49,10 @@ function M.snapshot(state)
     lines[#lines + 1] = "flow:     " .. join_cards(state.zones.trump_flow.cards)
     if state.pending_manifest_choice then
         lines[#lines + 1] = "armed_manifest_slot: " .. tostring(state.pending_manifest_choice.armed_slot or "-")
+    end
+    if state.pending_pair_card_choice then
+        lines[#lines + 1] = "armed_pair_public: " .. tostring(state.pending_pair_card_choice.armed_public_card_id or "-")
+        lines[#lines + 1] = "armed_pair_hand: " .. tostring(state.pending_pair_card_choice.armed_hand_card_id or "-")
     end
     if state.pending_public_choice then
         lines[#lines + 1] = "armed_public_card: " .. tostring(state.pending_public_choice.armed_card_id or "-")

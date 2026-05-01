@@ -62,6 +62,12 @@ local function target_ref_for_slot(zone, slot)
     }
 end
 
+local function append_target_ref(list, ref)
+    if ref then
+        list[#list + 1] = ref
+    end
+end
+
 local function empty_interaction()
     return {
         phase = "idle",
@@ -75,6 +81,7 @@ local function empty_interaction()
             hand_card_id = nil,
             operator = nil,
             target = nil,
+            targets = {},
         },
         legal = {
             commit_slots = {},
@@ -100,10 +107,64 @@ function M.read(state)
     ix.armed.hand_card_id = state.armed_hand
     ix.armed.operator = state.pending_operator_choice and state.pending_operator_choice.armed_operator or nil
 
+    if state.pending_pair_card_choice then
+        local pending = state.pending_pair_card_choice
+        local armed_public = target_ref_for_card(state, pending.armed_public_card_id)
+        local armed_hand = target_ref_for_card(state, pending.armed_hand_card_id)
+
+        ix.phase = "await_target"
+        ix.legal.targets.kind = "pair_card"
+        append_target_ref(ix.armed.targets, armed_public)
+        append_target_ref(ix.armed.targets, armed_hand)
+        ix.armed.target = ix.armed.targets[1]
+
+        if pending.armed_public_card_id and pending.armed_hand_card_id then
+            ix.prompt = "Confirm the selected pair."
+            ix.advance.enabled = true
+            ix.advance.reason = "confirm_target"
+            ix.advance.label = "Confirm pair"
+            return ix
+        end
+
+        if pending.armed_public_card_id then
+            ix.prompt = "Choose one hand card."
+            ix.legal.targets.cards = pending.legal_hand_card_ids or {}
+            ix.legal.targets.zones.hand = (#ix.legal.targets.cards > 0)
+            return ix
+        end
+
+        if pending.armed_hand_card_id then
+            ix.prompt = "Choose one revealed minor card."
+            ix.legal.targets.cards = pending.legal_public_card_ids or {}
+            ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
+            if ix.legal.targets.zones.grave then
+                ix.overlays.grave_select_mode = true
+            end
+            return ix
+        end
+
+        ix.prompt = "Choose the first card of the pair."
+        for _, card_id in ipairs(pending.legal_public_card_ids or {}) do
+            ix.legal.targets.cards[#ix.legal.targets.cards + 1] = card_id
+        end
+        for _, card_id in ipairs(pending.legal_hand_card_ids or {}) do
+            ix.legal.targets.cards[#ix.legal.targets.cards + 1] = card_id
+        end
+        ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
+        if #(pending.legal_hand_card_ids or {}) > 0 then
+            ix.legal.targets.zones.hand = true
+        end
+        if ix.legal.targets.zones.grave then
+            ix.overlays.grave_select_mode = true
+        end
+        return ix
+    end
+
     if state.pending_manifest_choice then
         ix.phase = "await_target"
         ix.prompt = "Choose one revealed manifest card."
         ix.armed.target = target_ref_for_slot("manifest", state.pending_manifest_choice.armed_slot)
+        append_target_ref(ix.armed.targets, ix.armed.target)
         ix.legal.targets.kind = "manifest_slot"
         ix.legal.targets.slots = state.pending_manifest_choice.legal_slots or {}
         ix.legal.targets.zones.manifest = (#ix.legal.targets.slots > 0)
@@ -117,6 +178,7 @@ function M.read(state)
         ix.phase = "await_target"
         ix.prompt = "Choose one hidden card on board."
         ix.armed.target = target_ref_for_card(state, state.pending_hidden_choice.armed_card_id)
+        append_target_ref(ix.armed.targets, ix.armed.target)
         ix.legal.targets.kind = "hidden_card"
         ix.legal.targets.cards = state.pending_hidden_choice.legal_card_ids or {}
         ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
@@ -130,6 +192,7 @@ function M.read(state)
         ix.phase = "await_target"
         ix.prompt = "Choose one not-revealed card on board."
         ix.armed.target = target_ref_for_card(state, state.pending_unrevealed_choice.armed_card_id)
+        append_target_ref(ix.armed.targets, ix.armed.target)
         ix.legal.targets.kind = "unrevealed_card"
         ix.legal.targets.cards = state.pending_unrevealed_choice.legal_card_ids or {}
         ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
@@ -143,6 +206,7 @@ function M.read(state)
         ix.phase = "await_target"
         ix.prompt = "Choose one revealed minor card."
         ix.armed.target = target_ref_for_card(state, state.pending_public_choice.armed_card_id)
+        append_target_ref(ix.armed.targets, ix.armed.target)
         ix.legal.targets.kind = "public_minor_card"
         ix.legal.targets.cards = state.pending_public_choice.legal_card_ids or {}
         ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
@@ -157,8 +221,13 @@ function M.read(state)
 
     if state.pending_hand_choice then
         ix.phase = "await_target"
-        ix.prompt = "Choose one hand card."
+        if state.pending_hand_choice.operator == "CYCLE" then
+            ix.prompt = "Choose one hand card to discard."
+        else
+            ix.prompt = "Choose one hand card."
+        end
         ix.armed.target = target_ref_for_card(state, state.pending_hand_choice.armed_card_id)
+        append_target_ref(ix.armed.targets, ix.armed.target)
         ix.legal.targets.kind = "hand_card"
         ix.legal.targets.cards = state.pending_hand_choice.legal_card_ids or {}
         ix.legal.targets.zones.hand = (#ix.legal.targets.cards > 0)
@@ -185,8 +254,8 @@ function M.read(state)
 
     if state.committed then
         ix.phase = "await_hand"
-        ix.prompt = "Choose one hand card."
-        ix.legal.commit_slots = {state.committed.slot}
+        ix.prompt = "Choose one hand card or recommit manifest slot."
+        ix.legal.commit_slots = occupied_manifest_slots(state)
         ix.legal.hand_cards = legal_hand_cards_from_hints(state)
         ix.advance.enabled = state.armed_hand ~= nil
         ix.advance.reason = "confirm_turn"
@@ -218,6 +287,7 @@ function M.format(interaction)
     local targets = legal.targets or {}
     local armed = interaction.armed or {}
     local armed_target = armed.target
+    local armed_target_bits = {}
 
     local function join(list)
         local out = {}
@@ -254,6 +324,15 @@ function M.format(interaction)
             tostring(armed_target.card_id or armed_target.slot or "-")
         ) or "-"
     )
+    for _, ref in ipairs(armed.targets or {}) do
+        armed_target_bits[#armed_target_bits + 1] = string.format(
+            "%s:%s:%s",
+            tostring(ref.kind or "-"),
+            tostring(ref.zone or "-"),
+            tostring(ref.card_id or ref.slot or "-")
+        )
+    end
+    lines[#lines + 1] = "armed_targets=" .. (#armed_target_bits > 0 and table.concat(armed_target_bits, ", ") or "-")
     lines[#lines + 1] = "legal commit_slots=" .. join(legal.commit_slots)
     lines[#lines + 1] = "legal hand_cards=" .. join(legal.hand_cards)
     lines[#lines + 1] = "legal operators=" .. join(legal.operators)
