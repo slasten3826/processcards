@@ -43,10 +43,10 @@ end
 function M.advance(state)
     local ix = interaction.read(state)
 
-    if ix.phase == "await_hand" then
+    if ix.phase == "await_ready" then
         if not state.committed or not state.armed_hand then
             transition.begin(state, "advance", {phase = ix.phase})
-            return transition.finish(state, {error = "no_armed_hand"})
+            return transition.finish(state, {error = "selection_incomplete"})
         end
         return turn.resolve_turn(state, state.committed.slot, state.armed_hand)
     end
@@ -98,6 +98,21 @@ function M.apply_action(state, action)
     end
     if kind == "arm_hand" then
         return M.arm_hand(state, action.card_id)
+    end
+    if kind == "clear_selection" then
+        transition.begin(state, "clear_selection", {})
+        turn.clear_selection(state)
+        return transition.finish(state, {})
+    end
+    if kind == "clear_committed" then
+        transition.begin(state, "clear_committed", {})
+        turn.clear_committed(state)
+        return transition.finish(state, {})
+    end
+    if kind == "clear_armed" then
+        transition.begin(state, "clear_armed", {})
+        turn.clear_armed(state)
+        return transition.finish(state, {})
     end
     if kind == "arm_operator" then
         return M.arm_operator(state, action.operator)

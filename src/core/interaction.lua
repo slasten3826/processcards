@@ -252,14 +252,33 @@ function M.read(state)
         return ix
     end
 
-    if state.committed then
-        ix.phase = "await_hand"
-        ix.prompt = "Choose one hand card or recommit manifest slot."
+    if state.committed and state.armed_hand then
+        ix.phase = "await_ready"
+        ix.prompt = "Press △ to cast."
         ix.legal.commit_slots = occupied_manifest_slots(state)
         ix.legal.hand_cards = legal_hand_cards_from_hints(state)
-        ix.advance.enabled = state.armed_hand ~= nil
+        ix.advance.enabled = true
         ix.advance.reason = "confirm_turn"
-        ix.advance.label = "Confirm turn"
+        ix.advance.label = "△ Cast"
+        return ix
+    end
+
+    if state.committed then
+        ix.phase = "await_complete"
+        ix.prompt = "Choose a hand card or click to deselect."
+        ix.legal.commit_slots = occupied_manifest_slots(state)
+        ix.legal.hand_cards = legal_hand_cards_from_hints(state)
+        ix.advance.enabled = false
+        return ix
+    end
+
+    if state.armed_hand then
+        ix.phase = "await_complete"
+        ix.prompt = "Choose a manifest slot or click to deselect."
+        ix.armed.hand_card_id = state.armed_hand
+        ix.legal.commit_slots = rules.legal_manifest_slots_for_hand(state, state.armed_hand)
+        ix.legal.hand_cards = {}
+        ix.advance.enabled = false
         return ix
     end
 
@@ -272,8 +291,8 @@ function M.read(state)
         return ix
     end
 
-    ix.phase = "await_commit"
-    ix.prompt = "Choose one manifest slot."
+    ix.phase = "await_start"
+    ix.prompt = "Choose a manifest slot or a hand card."
     ix.legal.commit_slots = occupied_manifest_slots(state)
     ix.advance.enabled = false
     ix.advance.reason = nil

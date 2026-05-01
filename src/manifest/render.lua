@@ -201,6 +201,10 @@ local function card_state_flags(app, card_id)
     for _, id in ipairs(ix.legal.hand_cards or {}) do
         legal_hand[id] = true
     end
+    local legal_commit_slots_set = {}
+    for _, slot in ipairs(ix.legal.commit_slots or {}) do
+        legal_commit_slots_set[slot] = true
+    end
     local armed_target_cards = {}
     local armed_target_manifest_slots = {}
     for _, ref in ipairs(ix.armed.targets or {}) do
@@ -212,8 +216,13 @@ local function card_state_flags(app, card_id)
     end
 
     return {
-        legal_hand = ix.phase == "await_hand" and legal_hand[card_id] or false,
+        legal_hand = (ix.phase == "await_complete" or ix.phase == "await_ready") and legal_hand[card_id] or false,
         armed_hand = ix.armed.hand_card_id == card_id,
+        legal_commit_slot = (ix.phase == "await_complete" or ix.phase == "await_ready")
+            and ix.armed.hand_card_id ~= nil
+            and card.zone == "manifest" and card.slot and legal_commit_slots_set[card.slot]
+            and (ix.phase ~= "await_ready" or card.slot == (app.game.committed and app.game.committed.slot))
+            or false,
         legal_target_card = ix.phase == "await_target" and legal_target_cards[card_id] or false,
         armed_target_card = armed_target_cards[card_id] or false,
         legal_target_slot = ix.phase == "await_target" and ix.legal.targets.kind == "manifest_slot"
@@ -299,6 +308,12 @@ local function draw_card(app, card_id, rect)
     if flags.legal_hand then
         set_color(COLORS.success, 0.95)
         rounded("line", rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 12)
+    end
+    if flags.legal_commit_slot then
+        set_color(COLORS.drop, 0.95)
+        love.graphics.setLineWidth(math.max(2, app.layout.scale * 2.5))
+        rounded("line", rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6, 12)
+        love.graphics.setLineWidth(1)
     end
     if flags.legal_target_card or flags.legal_target_slot then
         local op = app.interaction.armed.operator or "MANIFEST"

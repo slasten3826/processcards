@@ -158,15 +158,15 @@ function M.click(app, x, y)
         return
     end
 
-    if ix.phase == "await_commit" then
+    if ix.phase == "await_start" then
         local slot = M.pick_manifest_slot(app, x, y)
         local legal_slots = legal_slot_set(ix.legal.commit_slots)
         if slot and legal_slots[slot] then
-            app:trace("commit_click", "slot=" .. tostring(slot))
-            app:apply_action({kind = "commit_manifest", slot = slot}, "Commit manifest")
+            app:trace("start_commit", "slot=" .. tostring(slot))
+            app:apply_action({kind = "commit_manifest", slot = slot}, "Commit")
             return
         elseif slot then
-            app:trace("commit_click_noop", "slot=" .. tostring(slot) .. " not legal")
+            app:trace("start_commit_noop", "slot=" .. tostring(slot) .. " not legal")
             return
         end
     end
@@ -195,58 +195,120 @@ function M.click(app, x, y)
     end
 
     local card = app.game.cards[card_id]
-    if card and card.zone == "manifest" then
-        if ix.phase == "await_commit" then
-            local legal_slots = legal_slot_set(ix.legal.commit_slots)
-            if legal_slots[card.slot] then
-                app:trace("commit_card_click", "slot=" .. tostring(card.slot) .. " card=" .. tostring(card_id))
-                app:apply_action({kind = "commit_manifest", slot = card.slot}, "Commit manifest")
-                return
-            end
-            app:trace("commit_card_click_noop", "slot=" .. tostring(card.slot) .. " card=" .. tostring(card_id) .. " not legal")
-            return
-        end
-
-        if ix.phase == "await_hand" then
-            local legal_slots = legal_slot_set(ix.legal.commit_slots)
-            if legal_slots[card.slot] then
-                app:trace("recommit_card_click", "slot=" .. tostring(card.slot) .. " card=" .. tostring(card_id))
-                app:apply_action({kind = "commit_manifest", slot = card.slot}, "Recommit manifest")
-                return
-            end
-            app:trace("recommit_card_click_noop", "slot=" .. tostring(card.slot) .. " card=" .. tostring(card_id) .. " not legal")
-            return
-        end
+    if not card then
+        app:trace("click_no_card_data", "phase=" .. tostring(ix.phase))
+        return
     end
 
-    if ix.phase == "await_commit" then
-        if card and card.zone == "hand" then
-            app:set_message("Choose a manifest card first.")
-            app:trace("await_commit_hand_block", "card=" .. tostring(card_id))
+    if ix.phase == "await_start" then
+        if card.zone == "manifest" then
+            local legal_slots = legal_slot_set(ix.legal.commit_slots)
+            if legal_slots[card.slot] then
+                app:trace("start_commit_card", "slot=" .. tostring(card.slot) .. " card=" .. tostring(card_id))
+                app:apply_action({kind = "commit_manifest", slot = card.slot}, "Commit")
+            else
+                app:trace("start_commit_card_noop", "not legal")
+            end
             return
         end
-        if card then
-            app:set_message("Choose a manifest card first.")
-            app:trace("await_commit_zone_block", "card=" .. tostring(card_id) .. " zone=" .. tostring(card.zone))
+        if card.zone == "hand" then
+            app:trace("start_arm", "card=" .. tostring(card_id))
+            app:apply_action({kind = "arm_hand", card_id = card_id}, "Arm")
             return
         end
+        return
     end
 
-    if ix.phase == "await_hand" then
-        local slot = M.pick_manifest_slot(app, x, y)
-        local legal_slots = legal_slot_set(ix.legal.commit_slots)
-        if slot and legal_slots[slot] then
-            app:trace("recommit_click", "slot=" .. tostring(slot))
-            app:apply_action({kind = "commit_manifest", slot = slot}, "Recommit manifest")
+    if ix.phase == "await_complete" then
+        local is_committed_card = app.game.committed and app.game.committed.card_id == card_id
+        local is_armed_card = app.game.armed_hand == card_id
+
+        if is_committed_card then
+            app:trace("complete_deselect_commit", "card=" .. tostring(card_id))
+            app:apply_action({kind = "clear_selection"}, "Deselect")
             return
         end
-        local legal = legal_card_set(ix.legal.hand_cards)
-        if legal[card_id] then
-            app:trace("hand_click", "card=" .. tostring(card_id))
-            app:apply_action({kind = "arm_hand", card_id = card_id}, "Arm hand")
-        else
-            app:set_message("Choose a legal hand card or recommit manifest.")
-            app:trace("hand_click_noop", "card=" .. tostring(card_id) .. " not legal")
+        if is_armed_card then
+            app:trace("complete_deselect_arm", "card=" .. tostring(card_id))
+            app:apply_action({kind = "clear_selection"}, "Deselect")
+            return
+        end
+
+        if app.game.committed then
+            if card.zone == "manifest" then
+                local legal_slots = legal_slot_set(ix.legal.commit_slots)
+                if legal_slots[card.slot] then
+                    app:trace("complete_recommit", "slot=" .. tostring(card.slot) .. " card=" .. tostring(card_id))
+                    app:apply_action({kind = "commit_manifest", slot = card.slot}, "Recommit")
+                    return
+                end
+            end
+            if card.zone == "hand" then
+                local legal = legal_card_set(ix.legal.hand_cards)
+                if legal[card_id] then
+                    app:trace("complete_arm", "card=" .. tostring(card_id))
+                    app:apply_action({kind = "arm_hand", card_id = card_id}, "Arm")
+                else
+                    app:set_message("This hand card does not fit the committed manifest.")
+                end
+                return
+            end
+            return
+        end
+
+        if app.game.armed_hand then
+            if card.zone == "manifest" then
+                local legal_slots = legal_slot_set(ix.legal.commit_slots)
+                if legal_slots[card.slot] then
+                    app:trace("complete_commit_from_hand", "slot=" .. tostring(card.slot) .. " card=" .. tostring(card_id))
+                    app:apply_action({kind = "commit_manifest", slot = card.slot}, "Commit")
+                    return
+                end
+                return
+            end
+            if card.zone == "hand" then
+                app:trace("complete_rearm", "card=" .. tostring(card_id))
+                app:apply_action({kind = "arm_hand", card_id = card_id}, "Rearm")
+                return
+            end
+            return
+        end
+        return
+    end
+
+    if ix.phase == "await_ready" then
+        local is_committed_card = app.game.committed and app.game.committed.card_id == card_id
+        local is_armed_card = app.game.armed_hand == card_id
+
+        if is_committed_card then
+            app:trace("ready_deselect_commit", "card=" .. tostring(card_id))
+            app:apply_action({kind = "clear_committed"}, "Deselect commit")
+            return
+        end
+        if is_armed_card then
+            app:trace("ready_deselect_arm", "card=" .. tostring(card_id))
+            app:apply_action({kind = "clear_armed"}, "Deselect arm")
+            return
+        end
+        if card.zone == "manifest" then
+            local legal_slots = legal_slot_set(ix.legal.commit_slots)
+            if legal_slots[card.slot] then
+                app:trace("ready_recommit", "slot=" .. tostring(card.slot) .. " card=" .. tostring(card_id))
+                app:apply_action({kind = "clear_selection"}, "Clear")
+                app:apply_action({kind = "commit_manifest", slot = card.slot}, "Recommit")
+                return
+            end
+            return
+        end
+        if card.zone == "hand" then
+            local legal = legal_card_set(ix.legal.hand_cards)
+            if legal[card_id] then
+                app:trace("ready_rearm", "card=" .. tostring(card_id))
+                app:apply_action({kind = "clear_selection"}, "Clear")
+                app:apply_action({kind = "arm_hand", card_id = card_id}, "Rearm")
+                return
+            end
+            return
         end
         return
     end

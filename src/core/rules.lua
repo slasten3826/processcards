@@ -41,4 +41,21 @@ function M.legal_hand_ids(state, manifest_card_id)
     return result
 end
 
+function M.legal_manifest_slots_for_hand(state, hand_card_id)
+    local result = {}
+    local hand_card = state.cards[hand_card_id]
+    if not hand_card then
+        return result
+    end
+    for slot = 1, state.zones.manifest.slot_count do
+        local manifest_card_id = state.zones.manifest.cards[slot]
+        if manifest_card_id and state.cards[manifest_card_id] then
+            if M.full_pair_fit(state.cards[manifest_card_id], hand_card) then
+                result[#result + 1] = slot
+            end
+        end
+    end
+    return result
+end
+
 return M

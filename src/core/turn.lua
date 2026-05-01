@@ -19,13 +19,17 @@ function M.commit_manifest(state, slot)
     for _, hand_card_id in ipairs(legal) do
         state.legal_hints[hand_card_id] = true
     end
-    state.armed_hand = nil
     return legal
 end
 
 function M.arm_hand(state, card_id)
     if not state.committed then
-        return nil, "no_commit"
+        if state.armed_hand == card_id then
+            state.armed_hand = nil
+        else
+            state.armed_hand = card_id
+        end
+        return state.armed_hand
     end
     if not state.legal_hints[card_id] then
         return nil, "illegal_hand_card"
@@ -36,6 +40,21 @@ function M.arm_hand(state, card_id)
         state.armed_hand = card_id
     end
     return state.armed_hand
+end
+
+function M.clear_selection(state)
+    state.committed = nil
+    state.legal_hints = {}
+    state.armed_hand = nil
+end
+
+function M.clear_committed(state)
+    state.committed = nil
+    state.legal_hints = {}
+end
+
+function M.clear_armed(state)
+    state.armed_hand = nil
 end
 
 function M.reorder_hand(state, card_id, index)
