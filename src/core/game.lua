@@ -1,6 +1,7 @@
 local state_lib = require("src.core.state")
 local setup = require("src.core.setup")
 local inspect = require("src.core.inspect")
+local interaction = require("src.core.interaction")
 local transition = require("src.core.transition")
 local turn = require("src.core.turn")
 local draw = require("src.core.draw")
@@ -29,6 +30,107 @@ end
 
 function M.snapshot(state)
     return inspect.snapshot(state)
+end
+
+function M.interaction(state)
+    return interaction.read(state)
+end
+
+function M.interaction_text(state)
+    return interaction.format(interaction.read(state))
+end
+
+function M.advance(state)
+    local ix = interaction.read(state)
+
+    if ix.phase == "await_hand" then
+        if not state.committed or not state.armed_hand then
+            transition.begin(state, "advance", {phase = ix.phase})
+            return transition.finish(state, {error = "no_armed_hand"})
+        end
+        return turn.resolve_turn(state, state.committed.slot, state.armed_hand)
+    end
+
+    if ix.phase == "await_operator" then
+        return M.confirm_operator_phase(state)
+    end
+
+    if ix.phase == "await_target" then
+        if state.pending_manifest_choice then
+            return M.confirm_manifest_target(state)
+        end
+        if state.pending_hidden_choice then
+            return M.confirm_hidden_target(state)
+        end
+        if state.pending_unrevealed_choice then
+            return M.confirm_unrevealed_target(state)
+        end
+        if state.pending_public_choice then
+            return M.confirm_public_target(state)
+        end
+        if state.pending_hand_choice then
+            return M.confirm_hand_target(state)
+        end
+        transition.begin(state, "advance", {phase = ix.phase})
+        return transition.finish(state, {error = "missing_target_phase"})
+    end
+
+    if ix.phase == "await_trump" then
+        return M.resolve_pending_trump(state)
+    end
+
+    transition.begin(state, "advance", {phase = ix.phase})
+    return transition.finish(state, {error = "advance_not_available"})
+end
+
+function M.apply_action(state, action)
+    if type(action) ~= "table" then
+        transition.begin(state, "apply_action", {})
+        return transition.finish(state, {error = "invalid_action"})
+    end
+
+    local kind = action.kind
+    if kind == "commit_manifest" then
+        return M.commit_manifest(state, action.slot)
+    end
+    if kind == "arm_hand" then
+        return M.arm_hand(state, action.card_id)
+    end
+    if kind == "arm_operator" then
+        return M.arm_operator(state, action.operator)
+    end
+    if kind == "arm_target" then
+        local target = action.target or {}
+        if state.pending_manifest_choice then
+            return M.arm_manifest_target(state, target.slot)
+        end
+        if state.pending_hidden_choice then
+            return M.arm_hidden_target(state, target.card_id)
+        end
+        if state.pending_unrevealed_choice then
+            return M.arm_unrevealed_target(state, target.card_id)
+        end
+        if state.pending_public_choice then
+            return M.arm_public_target(state, target.card_id)
+        end
+        if state.pending_hand_choice then
+            return M.arm_hand_target(state, target.card_id)
+        end
+        transition.begin(state, "apply_action", {kind = kind})
+        return transition.finish(state, {error = "no_pending_target_phase"})
+    end
+    if kind == "advance" then
+        return M.advance(state)
+    end
+    if kind == "draw" then
+        return M.draw_to_hand(state)
+    end
+    if kind == "resolve_pending_trump" then
+        return M.resolve_pending_trump(state)
+    end
+
+    transition.begin(state, "apply_action", {kind = tostring(kind)})
+    return transition.finish(state, {error = "unknown_action"})
 end
 
 function M.commit_manifest(state, slot)
@@ -82,24 +184,72 @@ function M.choose_operator(state, op_name)
     return turn.choose_operator(state, op_name)
 end
 
+function M.arm_operator(state, op_name)
+    return turn.arm_operator(state, op_name)
+end
+
+function M.confirm_operator_phase(state)
+    return turn.confirm_operator_phase(state)
+end
+
 function M.choose_manifest_target(state, slot)
     return turn.choose_manifest_target(state, slot)
+end
+
+function M.arm_manifest_target(state, slot)
+    return turn.arm_manifest_target(state, slot)
+end
+
+function M.confirm_manifest_target(state)
+    return turn.confirm_manifest_target(state)
 end
 
 function M.choose_public_target(state, card_id)
     return turn.choose_public_target(state, card_id)
 end
 
+function M.arm_public_target(state, card_id)
+    return turn.arm_public_target(state, card_id)
+end
+
+function M.confirm_public_target(state)
+    return turn.confirm_public_target(state)
+end
+
 function M.choose_hand_target(state, card_id)
     return turn.choose_hand_target(state, card_id)
+end
+
+function M.arm_hand_target(state, card_id)
+    return turn.arm_hand_target(state, card_id)
+end
+
+function M.confirm_hand_target(state)
+    return turn.confirm_hand_target(state)
 end
 
 function M.choose_hidden_target(state, card_id)
     return turn.choose_hidden_target(state, card_id)
 end
 
+function M.arm_hidden_target(state, card_id)
+    return turn.arm_hidden_target(state, card_id)
+end
+
+function M.confirm_hidden_target(state)
+    return turn.confirm_hidden_target(state)
+end
+
 function M.choose_unrevealed_target(state, card_id)
     return turn.choose_unrevealed_target(state, card_id)
+end
+
+function M.arm_unrevealed_target(state, card_id)
+    return turn.arm_unrevealed_target(state, card_id)
+end
+
+function M.confirm_unrevealed_target(state)
+    return turn.confirm_unrevealed_target(state)
 end
 
 function M.draw_to_hand(state)

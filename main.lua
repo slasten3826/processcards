@@ -126,6 +126,7 @@ local state = {
     legal_hints = {},
     armed_hand = nil,
     pending_operator_choice = nil,
+    pending_public_choice = nil,
     pending_hidden_choice = nil,
     pending_hand_choice = nil,
     pending_manifest_choice = nil,
@@ -151,6 +152,11 @@ local state = {
             content_rect = nil,
             card_rects = {},
             ordered_cards = {},
+        },
+        armed_target = {
+            kind = nil,
+            card_id = nil,
+            slot = nil,
         },
     },
     anim = {
@@ -181,6 +187,53 @@ local enqueue_flip
 local enqueue_callback
 local start_next_anim
 local update_buttons
+local TRACE_PATH = "love_trace.log"
+
+local function trace_line(tag, details)
+    local file = io.open(TRACE_PATH, "a")
+    if not file then
+        return
+    end
+    local play_card = state.zones and state.zones.play and state.zones.play.cards and state.zones.play.cards[1] or "-"
+    local armed_operator = state.pending_operator_choice and state.pending_operator_choice.armed_operator or "-"
+    local armed_target = "-"
+    local armed_target_id = "-"
+    if state.pending_public_choice and state.pending_public_choice.armed_card_id then
+        armed_target = "public"
+        armed_target_id = state.pending_public_choice.armed_card_id
+    elseif state.pending_hidden_choice and state.pending_hidden_choice.armed_card_id then
+        armed_target = "hidden"
+        armed_target_id = state.pending_hidden_choice.armed_card_id
+    elseif state.pending_hand_choice and state.pending_hand_choice.armed_card_id then
+        armed_target = "hand"
+        armed_target_id = state.pending_hand_choice.armed_card_id
+    elseif state.pending_manifest_choice and state.pending_manifest_choice.armed_slot then
+        armed_target = "manifest"
+        armed_target_id = state.pending_manifest_choice.armed_slot
+    elseif state.pending_unrevealed_choice and state.pending_unrevealed_choice.armed_card_id then
+        armed_target = "unrevealed"
+        armed_target_id = state.pending_unrevealed_choice.armed_card_id
+    end
+    file:write(string.format(
+        "%s | mode=%s msg=%s pending_op=%s armed_op=%s pending_public=%s pending_hidden=%s pending_hand=%s pending_manifest=%s pending_unrevealed=%s pending_trump=%s play=%s armed_target=%s:%s | %s\n",
+        tag,
+        tostring(state.mode),
+        tostring(state.message),
+        state.pending_operator_choice and "yes" or "no",
+        tostring(armed_operator),
+        state.pending_public_choice and "yes" or "no",
+        state.pending_hidden_choice and "yes" or "no",
+        state.pending_hand_choice and "yes" or "no",
+        state.pending_manifest_choice and "yes" or "no",
+        state.pending_unrevealed_choice and "yes" or "no",
+        state.pending_trump and "yes" or "no",
+        tostring(play_card),
+        tostring(armed_target),
+        tostring(armed_target_id),
+        details or ""
+    ))
+    file:close()
+end
 
 local function push_log(text)
     table.insert(state.log, 1, text)
@@ -244,6 +297,7 @@ local function clear_runtime_state()
     state.legal_hints = {}
     state.armed_hand = nil
     state.pending_operator_choice = nil
+    state.pending_public_choice = nil
     state.pending_hidden_choice = nil
     state.pending_hand_choice = nil
     state.pending_manifest_choice = nil
@@ -254,6 +308,9 @@ local function clear_runtime_state()
     state.ui.grave_viewer.content_rect = nil
     state.ui.grave_viewer.card_rects = {}
     state.ui.grave_viewer.ordered_cards = {}
+    state.ui.armed_target.kind = nil
+    state.ui.armed_target.card_id = nil
+    state.ui.armed_target.slot = nil
     state.hover_target = nil
     state.drag = nil
     state.cards = {}
@@ -330,26 +387,37 @@ local function sync_from_core(message)
             core_state.pending_operator_choice.choices[1],
             core_state.pending_operator_choice.choices[2],
         },
+        armed_operator = core_state.pending_operator_choice.armed_operator,
+    } or nil
+    state.pending_public_choice = core_state.pending_public_choice and {
+        card_id = core_state.pending_public_choice.card_id,
+        operator = core_state.pending_public_choice.operator,
+        legal_card_ids = core_state.pending_public_choice.legal_card_ids,
+        armed_card_id = core_state.pending_public_choice.armed_card_id,
     } or nil
     state.pending_hidden_choice = core_state.pending_hidden_choice and {
         card_id = core_state.pending_hidden_choice.card_id,
         operator = core_state.pending_hidden_choice.operator,
         legal_card_ids = core_state.pending_hidden_choice.legal_card_ids,
+        armed_card_id = core_state.pending_hidden_choice.armed_card_id,
     } or nil
     state.pending_hand_choice = core_state.pending_hand_choice and {
         card_id = core_state.pending_hand_choice.card_id,
         operator = core_state.pending_hand_choice.operator,
         legal_card_ids = core_state.pending_hand_choice.legal_card_ids,
+        armed_card_id = core_state.pending_hand_choice.armed_card_id,
     } or nil
     state.pending_manifest_choice = core_state.pending_manifest_choice and {
         card_id = core_state.pending_manifest_choice.card_id,
         operator = core_state.pending_manifest_choice.operator,
         legal_slots = core_state.pending_manifest_choice.legal_slots,
+        armed_slot = core_state.pending_manifest_choice.armed_slot,
     } or nil
     state.pending_unrevealed_choice = core_state.pending_unrevealed_choice and {
         card_id = core_state.pending_unrevealed_choice.card_id,
         operator = core_state.pending_unrevealed_choice.operator,
         legal_card_ids = core_state.pending_unrevealed_choice.legal_card_ids,
+        armed_card_id = core_state.pending_unrevealed_choice.armed_card_id,
     } or nil
     state.pending_trump = core_state.pending_trump
     state.log = {}
@@ -363,6 +431,9 @@ local function sync_from_core(message)
     state.selected = nil
     state.drag = nil
     state.hover_target = nil
+    state.ui.armed_target.kind = nil
+    state.ui.armed_target.card_id = nil
+    state.ui.armed_target.slot = nil
     update_buttons()
     if message then
         state.message = message
@@ -556,6 +627,7 @@ local function build_empty_surface()
 
     push_log("Layer 1 board skeleton booted.")
     push_log("DEV mode active. Gameplay legality is deferred.")
+    trace_line("build_empty_surface", "")
 end
 
 local function shuffle_in_place(list)
@@ -609,6 +681,7 @@ local function start_game()
         end,
     })
     sync_from_core("Start Game complete: two-phase opening board ready.")
+    trace_line("start_game", "core.start_game complete")
 end
 
 local function zone_counts()
@@ -1822,21 +1895,40 @@ update_buttons = function()
         table.insert(state.ui.buttons, button)
     end
 
+    local button_choices = nil
     if state.pending_operator_choice and state.pending_operator_choice.choices then
+        button_choices = state.pending_operator_choice.choices
+    else
+        local play_card_id = state.zones.play.cards[1]
+        local play_card = play_card_id and state.cards[play_card_id] or nil
+        if play_card then
+            local active_operator = (state.pending_public_choice and state.pending_public_choice.operator)
+                or (state.pending_hidden_choice and state.pending_hidden_choice.operator)
+                or (state.pending_hand_choice and state.pending_hand_choice.operator)
+                or (state.pending_manifest_choice and state.pending_manifest_choice.operator)
+                or (state.pending_unrevealed_choice and state.pending_unrevealed_choice.operator)
+            if active_operator then
+                button_choices = {play_card.op_a, play_card.op_b}
+            end
+        end
+    end
+
+    if button_choices then
         local play_rect = state.layout.left.play
-        local bs = math.floor(50 * s)
-        local ogap = math.floor(12 * s)
+        local bs = math.floor(74 * s)
+        local bh = math.floor(96 * s)
+        local ogap = math.floor(18 * s)
         local total_w = bs * 2 + ogap
         local ox = play_rect.x + math.floor((play_rect.w - total_w) / 2)
-        local oy = play_rect.y + play_rect.h - bs - math.floor(18 * s)
-        for i, op_name in ipairs(state.pending_operator_choice.choices) do
+        local oy = state.layout.center.combined.y + math.floor(56 * s)
+        for i, op_name in ipairs(button_choices) do
             state.ui.operator_buttons[#state.ui.operator_buttons + 1] = {
                 op_name = op_name,
                 rect = {
                     x = ox + (i - 1) * (bs + ogap),
                     y = oy,
                     w = bs,
-                    h = bs,
+                    h = bh,
                 },
             }
         end
@@ -2007,6 +2099,10 @@ local function start_pending_trump_resolution()
     end
     if state.pending_hand_choice then
         state.message = "Choose one hand card to discard first."
+        return
+    end
+    if state.pending_public_choice then
+        state.message = "Choose one revealed minor card first."
         return
     end
     if state.pending_operator_choice or state.pending_manifest_choice then
@@ -2252,21 +2348,45 @@ local function choose_pending_operator(op_name)
         return
     end
     if state.core then
-        local result = core.choose_operator(state.core, op_name)
+        local result = core.arm_operator(state.core, op_name)
         local summary = result and result.summary or {}
-        local message = summary.error and ("Operator choice rejected: " .. summary.error .. ".")
-            or ((summary.pending_manifest_choice and "Choose one revealed manifest card.")
-                or (summary.pending_unrevealed_choice and "Choose one not-revealed card on board.")
-                or (summary.pending_hidden_choice and "Choose one hidden card on board.")
-                or (summary.pending_hand_choice and "Choose one hand card to discard.")
-                or ("Operator " .. op_name .. " chosen."))
+        local armed = summary.pending_operator_choice and summary.pending_operator_choice.armed_operator or nil
+        local message = summary.error and ("Operator arm rejected: " .. summary.error .. ".")
+            or (summary.pending_public_choice and "Choose one revealed minor card.")
+            or (summary.pending_manifest_choice and "Choose one revealed manifest card.")
+            or (summary.pending_unrevealed_choice and "Choose one not-revealed card on board.")
+            or (summary.pending_hidden_choice and "Choose one hidden card on board.")
+            or (armed and ("Armed " .. armed .. ". Press △ to confirm.") or "No operator armed. Press △ to discharge.")
+        trace_line("arm_operator", "op=" .. tostring(op_name) .. " error=" .. tostring(summary.error) .. " armed=" .. tostring(armed))
         if summary.error then
             sync_from_core(message)
-        elseif summary.pending_manifest_choice then
+        else
             sync_from_core(message)
-        elseif summary.pending_unrevealed_choice then
+        end
+        return
+    end
+end
+
+local function confirm_pending_operator_phase()
+    if not state.pending_operator_choice then
+        state.message = "No pending operator choice."
+        return
+    end
+    if state.core then
+        local result = core.confirm_operator_phase(state.core)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Operator confirm rejected: " .. summary.error .. ".")
+            or ((summary.pending_public_choice and "Choose one revealed minor card.")
+                or (summary.pending_manifest_choice and "Choose one revealed manifest card.")
+                or (summary.pending_unrevealed_choice and "Choose one not-revealed card on board.")
+                or (summary.pending_hidden_choice and "Choose one hidden card on board.")
+                or (summary.pending_hand_choice and "Choose one hand card.")
+                or (summary.operator and ("Operator " .. summary.operator .. " confirmed."))
+                or "Played card discharged.")
+        trace_line("confirm_operator_phase", "error=" .. tostring(summary.error) .. " operator=" .. tostring(summary.operator))
+        if summary.error then
             sync_from_core(message)
-        elseif summary.pending_hidden_choice then
+        elseif summary.pending_public_choice or summary.pending_manifest_choice or summary.pending_unrevealed_choice or summary.pending_hidden_choice then
             sync_from_core(message)
         elseif summary.pending_hand_choice then
             animate_core_operator_choice(result, message)
@@ -2296,16 +2416,77 @@ local function choose_pending_unrevealed_target(card_id)
     end
 end
 
-local function choose_pending_hidden_target(card_id)
+local function arm_pending_unrevealed_target(card_id)
+    if not state.pending_unrevealed_choice then
+        state.message = "No pending unrevealed choice."
+        return
+    end
+    if state.core then
+        local result = core.arm_unrevealed_target(state.core, card_id)
+        local summary = result and result.summary or {}
+        local armed = summary.pending_unrevealed_choice and summary.pending_unrevealed_choice.armed_card_id or nil
+        local message = summary.error and ("MANIFEST target rejected: " .. summary.error .. ".")
+            or (armed and (card_id .. " armed for MANIFEST. Press △ to confirm.") or "MANIFEST target cleared.")
+        trace_line("arm_unrevealed_target", "card=" .. tostring(card_id) .. " error=" .. tostring(summary.error) .. " armed=" .. tostring(armed))
+        if summary.error then
+            sync_from_core(message)
+        else
+            sync_from_core(message)
+        end
+        return
+    end
+end
+
+local function confirm_pending_unrevealed_target()
+    if not state.pending_unrevealed_choice then
+        state.message = "No pending unrevealed choice."
+        return
+    end
+    if state.core then
+        local result = core.confirm_unrevealed_target(state.core)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Manifest choice rejected: " .. summary.error .. ".")
+            or "MANIFEST confirmed."
+        trace_line("confirm_unrevealed_target", "error=" .. tostring(summary.error))
+        if summary.error then
+            sync_from_core(message)
+        else
+            animate_core_unrevealed_choice(result, message)
+        end
+        return
+    end
+end
+
+local function arm_pending_hidden_target(card_id)
     if not state.pending_hidden_choice then
         state.message = "No pending hidden choice."
         return
     end
     if state.core then
-        local result = core.choose_hidden_target(state.core, card_id)
+        local result = core.arm_hidden_target(state.core, card_id)
+        local summary = result and result.summary or {}
+        local armed = summary.pending_hidden_choice and summary.pending_hidden_choice.armed_card_id or nil
+        local message = summary.error and ("Hidden target rejected: " .. summary.error .. ".")
+            or (armed and (card_id .. " armed for OBSERVE. Press △ to confirm.") or "OBSERVE target cleared.")
+        if summary.error then
+            sync_from_core(message)
+        else
+            sync_from_core(message)
+        end
+        return
+    end
+end
+
+local function confirm_pending_hidden_target()
+    if not state.pending_hidden_choice then
+        state.message = "No pending hidden choice."
+        return
+    end
+    if state.core then
+        local result = core.confirm_hidden_target(state.core)
         local summary = result and result.summary or {}
         local message = summary.error and ("Hidden choice rejected: " .. summary.error .. ".")
-            or (card_id .. " observed.")
+            or "Target observed."
         if summary.error then
             sync_from_core(message)
         else
@@ -2315,16 +2496,40 @@ local function choose_pending_hidden_target(card_id)
     end
 end
 
-local function choose_pending_hand_target(card_id)
+local function arm_pending_hand_target(card_id)
     if not state.pending_hand_choice then
         state.message = "No pending hand choice."
         return
     end
     if state.core then
-        local result = core.choose_hand_target(state.core, card_id)
+        local result = core.arm_hand_target(state.core, card_id)
         local summary = result and result.summary or {}
+        local armed = summary.pending_hand_choice and summary.pending_hand_choice.armed_card_id or nil
+        local operator = state.pending_hand_choice and state.pending_hand_choice.operator or nil
+        local verb = operator == "LOGIC" and "LOGIC" or "CYCLE"
+        local message = summary.error and ("Hand target rejected: " .. summary.error .. ".")
+            or (armed and (card_id .. " armed for " .. verb .. ". Press △ to confirm.") or (verb .. " target cleared."))
+        if summary.error then
+            sync_from_core(message)
+        else
+            sync_from_core(message)
+        end
+        return
+    end
+end
+
+local function confirm_pending_hand_target()
+    if not state.pending_hand_choice then
+        state.message = "No pending hand choice."
+        return
+    end
+    if state.core then
+        local result = core.confirm_hand_target(state.core)
+        local summary = result and result.summary or {}
+        local operator = state.pending_hand_choice and state.pending_hand_choice.operator or nil
         local message = summary.error and ("Hand choice rejected: " .. summary.error .. ".")
-            or (card_id .. " discarded by CYCLE.")
+            or ((operator == "LOGIC" and "LOGIC swap confirmed.")
+                or "CYCLE discard confirmed.")
         if summary.error then
             sync_from_core(message)
         else
@@ -2334,20 +2539,82 @@ local function choose_pending_hand_target(card_id)
     end
 end
 
-local function choose_pending_manifest_target(slot)
+local function arm_pending_manifest_target(slot)
     if not state.pending_manifest_choice then
         state.message = "No pending manifest choice."
         return
     end
     if state.core then
-        local result = core.choose_manifest_target(state.core, slot)
+        local result = core.arm_manifest_target(state.core, slot)
+        local summary = result and result.summary or {}
+        local armed = summary.pending_manifest_choice and summary.pending_manifest_choice.armed_slot or nil
+        local message = summary.error and ("Manifest target rejected: " .. summary.error .. ".")
+            or (armed and ("manifest[" .. slot .. "] armed for CHOOSE. Press △ to confirm.") or "CHOOSE target cleared.")
+        if summary.error then
+            sync_from_core(message)
+        else
+            sync_from_core(message)
+        end
+        return
+    end
+end
+
+local function confirm_pending_manifest_target()
+    if not state.pending_manifest_choice then
+        state.message = "No pending manifest choice."
+        return
+    end
+    if state.core then
+        local result = core.confirm_manifest_target(state.core)
         local summary = result and result.summary or {}
         local message = summary.error and ("Manifest choice rejected: " .. summary.error .. ".")
-            or ("CHOOSE reclaimed manifest[" .. slot .. "].")
+            or "CHOOSE confirmed."
         if summary.error then
             sync_from_core(message)
         else
             animate_core_manifest_choice(result, message)
+        end
+        return
+    end
+end
+
+local function arm_pending_public_target(card_id)
+    if not state.pending_public_choice then
+        state.message = "No pending public choice."
+        return
+    end
+    if state.core then
+        local result = core.arm_public_target(state.core, card_id)
+        local summary = result and result.summary or {}
+        local armed = summary.pending_public_choice and summary.pending_public_choice.armed_card_id or nil
+        local message = summary.error and ("Public target rejected: " .. summary.error .. ".")
+            or (armed and (card_id .. " armed for LOGIC. Press △ to confirm.") or "LOGIC target cleared.")
+        trace_line("arm_public_target", "card=" .. tostring(card_id) .. " error=" .. tostring(summary.error) .. " armed=" .. tostring(armed))
+        if summary.error then
+            sync_from_core(message)
+        else
+            sync_from_core(message)
+        end
+        return
+    end
+end
+
+local function confirm_pending_public_target()
+    if not state.pending_public_choice then
+        state.message = "No pending public choice."
+        return
+    end
+    if state.core then
+        local result = core.confirm_public_target(state.core)
+        local summary = result and result.summary or {}
+        local message = summary.error and ("Public choice rejected: " .. summary.error .. ".")
+            or (summary.pending_hand_choice and "Choose one hand card for LOGIC.")
+            or "LOGIC public target confirmed."
+        trace_line("confirm_public_target", "error=" .. tostring(summary.error))
+        if summary.error then
+            sync_from_core(message)
+        else
+            sync_from_core(message)
         end
         return
     end
@@ -2364,6 +2631,10 @@ local function start_draw_sequence()
     end
     if state.pending_hand_choice then
         state.message = "Choose one hand card to discard first."
+        return
+    end
+    if state.pending_public_choice then
+        state.message = "Choose one revealed minor card first."
         return
     end
     if state.pending_operator_choice or state.pending_manifest_choice then
@@ -2460,6 +2731,10 @@ local function launch_committed_play()
     end
     if state.pending_hand_choice then
         state.message = "Choose one hand card to discard first."
+        return
+    end
+    if state.pending_public_choice then
+        state.message = "Choose one revealed minor card first."
         return
     end
     if state.pending_operator_choice or state.pending_manifest_choice then
@@ -2756,11 +3031,13 @@ end
 local function draw_card(card_id, rect, dragged, opts)
     local card = state.cards[card_id]
     opts = opts or {}
-    local effect_phase_active = state.pending_operator_choice ~= nil
+    local effect_target_pending = state.pending_public_choice ~= nil
         or state.pending_hidden_choice ~= nil
         or state.pending_hand_choice ~= nil
         or state.pending_manifest_choice ~= nil
         or state.pending_unrevealed_choice ~= nil
+    local effect_phase_active = state.pending_operator_choice ~= nil
+        or effect_target_pending
     local selected = (not effect_phase_active) and state.selected == card_id
     local committed = (not effect_phase_active)
         and state.committed
@@ -2803,6 +3080,60 @@ local function draw_card(card_id, rect, dragged, opts)
                 break
             end
         end
+    end
+    local armed_choose_target = state.pending_manifest_choice
+        and state.pending_manifest_choice.armed_slot == card.slot
+    local armed_cycle_target = state.pending_hand_choice
+        and state.pending_hand_choice.armed_card_id == card_id
+    local armed_observe_target = state.pending_hidden_choice
+        and state.pending_hidden_choice.armed_card_id == card_id
+    local armed_unrevealed_target = state.pending_unrevealed_choice
+        and state.pending_unrevealed_choice.armed_card_id == card_id
+    local logic_target = false
+    if state.pending_public_choice then
+        for _, legal_card_id in ipairs(state.pending_public_choice.legal_card_ids or {}) do
+            if legal_card_id == card_id then
+                logic_target = true
+                break
+            end
+        end
+    end
+    if state.pending_operator_choice and not state.pending_public_choice then
+        local armed_operator = state.pending_operator_choice.armed_operator
+        local is_topdeck = card.zone == "deck" and state.zones.deck.cards[#state.zones.deck.cards] == card_id
+        if armed_operator == "CHOOSE" then
+            choose_target = card.zone == "manifest" and card.slot ~= nil and card.face_up
+        elseif armed_operator == "OBSERVE" then
+            observe_target = card.info_state == "hidden"
+                and (card.zone ~= "deck" or is_topdeck)
+        elseif armed_operator == "MANIFEST" then
+            manifest_target = not card.face_up
+                and (card.zone ~= "deck" or is_topdeck)
+        elseif armed_operator == "LOGIC" then
+            logic_target = card.class == "minor"
+                and card.face_up
+                and (card.zone == "manifest"
+                    or card.zone == "latent"
+                    or card.zone == "grave"
+                    or (card.zone == "deck" and is_topdeck))
+        end
+    end
+    if armed_choose_target then
+        choose_target = false
+    end
+    if armed_cycle_target then
+        cycle_target = false
+    end
+    if armed_observe_target then
+        observe_target = false
+    end
+    if armed_unrevealed_target then
+        manifest_target = false
+    end
+    local armed_logic_target = state.pending_public_choice
+        and state.pending_public_choice.armed_card_id == card_id
+    if armed_logic_target then
+        logic_target = false
     end
     local scale_x = opts.scale_x or 1
     local face_up = opts.face_up
@@ -3010,6 +3341,35 @@ local function draw_card(card_id, rect, dragged, opts)
         })
     end
 
+    if logic_target then
+        local cc = OP_COLORS.LOGIC or COLORS.success
+        local hot = lerp_color(cc, COLORS.text, 0.18)
+        local logic_rect = {
+            x = draw_rect.x - 5,
+            y = draw_rect.y - 5,
+            w = draw_rect.w + 10,
+            h = draw_rect.h + 10,
+        }
+        set_color(cc, 0.18)
+        rounded("line", logic_rect.x, logic_rect.y, logic_rect.w, logic_rect.h, 14)
+        draw_segmented_frame(logic_rect, {cc, hot}, love.timer.getTime() / 3.04, {
+            width = math.max(2, state.layout.scale * 2.35),
+            segment_count = 14,
+            duty = 0.56,
+        })
+    end
+
+    if armed_choose_target or armed_cycle_target or armed_observe_target or armed_unrevealed_target or armed_logic_target then
+        local ca = OP_COLORS[card.op_a] or COLORS.card
+        local cb = OP_COLORS[card.op_b] or COLORS.card
+        local phase = frame_breath_phase()
+        local halo_color = lerp_color(ca, cb, phase)
+        draw_breath_halo(draw_rect, halo_color, phase)
+        local border_color = lerp_color(ca, cb, phase)
+        set_color(border_color, 0.98)
+        rounded("line", draw_rect.x, draw_rect.y, draw_rect.w, draw_rect.h, 10)
+    end
+
     if legal_hint then
         if not (state.mode == "GAMEPLAY" and card.zone == "hand") then
             set_color(COLORS.success, 0.80)
@@ -3194,7 +3554,9 @@ local function draw_footer()
         elseif button.id == "draw" then
             active = not state.anim.locked
         elseif button.id == "move" then
-            active = state.pending_trump ~= nil or (state.committed and state.armed_hand ~= nil)
+            active = state.pending_operator_choice ~= nil
+                or state.pending_trump ~= nil
+                or (state.committed and state.armed_hand ~= nil)
         elseif state.mode == "DEV" then
             active = button.id == "hints"
                 or button.id == "flip"
@@ -3232,22 +3594,39 @@ local function draw_footer()
 end
 
 local function draw_operator_buttons()
-    if not state.pending_operator_choice then
+    if #state.ui.operator_buttons == 0 then
         return
     end
+    local armed_operator = state.pending_operator_choice and state.pending_operator_choice.armed_operator or nil
+    if not armed_operator then
+        armed_operator = (state.pending_public_choice and state.pending_public_choice.operator)
+            or (state.pending_hidden_choice and state.pending_hidden_choice.operator)
+            or (state.pending_hand_choice and state.pending_hand_choice.operator)
+            or (state.pending_manifest_choice and state.pending_manifest_choice.operator)
+            or (state.pending_unrevealed_choice and state.pending_unrevealed_choice.operator)
+    end
     for _, button in ipairs(state.ui.operator_buttons or {}) do
-        set_color(COLORS.panel_alt)
-        rounded("fill", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
-        set_color(COLORS.accent_soft)
-        rounded("line", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
+        local armed = armed_operator == button.op_name
         local op_color = OP_COLORS[button.op_name] or COLORS.text
+        set_color(armed and COLORS.panel or COLORS.panel_alt)
+        rounded("fill", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
+        set_color(armed and op_color or COLORS.accent_soft)
+        rounded("line", button.rect.x, button.rect.y, button.rect.w, button.rect.h, 12)
         set_color(op_color)
         love.graphics.setLineWidth(math.max(2, state.layout.scale * 2))
         glyphs[button.op_name](
             button.rect.x + button.rect.w * 0.5,
-            button.rect.y + button.rect.h * 0.5 + math.floor(2 * state.layout.scale),
-            math.floor(14 * state.layout.scale)
+            button.rect.y + button.rect.h * 0.5 + math.floor(6 * state.layout.scale),
+            math.floor(18 * state.layout.scale)
         )
+        if armed then
+            draw_segmented_frame(button.rect, {op_color}, love.timer.getTime() / 1.4, {
+                width = math.max(2, state.layout.scale * 2.1),
+                segment_count = 12,
+                duty = 0.58,
+                inset = 2,
+            })
+        end
     end
 end
 
@@ -3305,6 +3684,7 @@ local function draw_top_header()
 end
 
 local function trigger_button(id)
+    trace_line("trigger_button", "id=" .. tostring(id))
     if id == "start" then
         start_game()
         return
@@ -3339,7 +3719,19 @@ local function trigger_button(id)
     end
 
     if id == "move" then
-        if state.pending_trump then
+        if state.pending_public_choice then
+            confirm_pending_public_target()
+        elseif state.pending_manifest_choice then
+            confirm_pending_manifest_target()
+        elseif state.pending_hidden_choice then
+            confirm_pending_hidden_target()
+        elseif state.pending_unrevealed_choice then
+            confirm_pending_unrevealed_target()
+        elseif state.pending_hand_choice then
+            confirm_pending_hand_target()
+        elseif state.pending_operator_choice then
+            confirm_pending_operator_phase()
+        elseif state.pending_trump then
             start_pending_trump_resolution()
         else
             launch_committed_play()
@@ -3400,9 +3792,15 @@ end
 
 function love.load()
     love.graphics.setBackgroundColor(COLORS.bg)
+    local reset = io.open(TRACE_PATH, "w")
+    if reset then
+        reset:write("")
+        reset:close()
+    end
     init_fonts()
     build_empty_surface()
     refresh_layout(true)
+    trace_line("love_load", "")
 end
 
 function love.resize()
@@ -3440,6 +3838,24 @@ function love.draw()
         font = state.fonts.body,
         alpha = 0.96,
     })
+    if state.pending_public_choice or (state.pending_operator_choice and state.pending_operator_choice.armed_operator == "LOGIC") then
+        local rect = state.layout.right.grave
+        local cc = OP_COLORS.LOGIC or COLORS.success
+        local hot = lerp_color(cc, COLORS.text, 0.18)
+        local logic_rect = {
+            x = rect.x - 4,
+            y = rect.y - 4,
+            w = rect.w + 8,
+            h = rect.h + 8,
+        }
+        set_color(cc, 0.16)
+        rounded("line", logic_rect.x, logic_rect.y, logic_rect.w, logic_rect.h, 14)
+        draw_segmented_frame(logic_rect, {cc, hot}, love.timer.getTime() / 3.04, {
+            width = math.max(2, state.layout.scale * 2.25),
+            segment_count = 14,
+            duty = 0.56,
+        })
+    end
     draw_zone_contents()
     draw_grave_viewer()
     draw_footer()
@@ -3447,6 +3863,7 @@ function love.draw()
 end
 
 function love.mousepressed(x, y, button)
+    trace_line("mousepressed", string.format("x=%d y=%d button=%d", x, y, button))
     if state.anim.locked then
         state.message = "Animation in progress."
         return
@@ -3456,6 +3873,15 @@ function love.mousepressed(x, y, button)
         if state.ui.grave_viewer.open then
             if not point_in_rect(x, y, state.ui.grave_viewer.rect) then
                 close_grave_viewer()
+                return
+            end
+            if state.pending_public_choice then
+                for card_id, rect in pairs(state.ui.grave_viewer.card_rects or {}) do
+                    if point_in_rect(x, y, rect) then
+                        arm_pending_public_target(card_id)
+                        return
+                    end
+                end
             end
             return
         end
@@ -3478,12 +3904,25 @@ function love.mousepressed(x, y, button)
             return
         end
 
+        if state.pending_public_choice then
+            local card_id = pick_card(x, y)
+            if card_id then
+                local clicked = state.cards[card_id]
+                if clicked and (clicked.zone == "manifest" or clicked.zone == "latent" or clicked.zone == "deck") then
+                    arm_pending_public_target(card_id)
+                    return
+                end
+            end
+            state.message = "Choose one revealed minor card."
+            return
+        end
+
         if state.pending_manifest_choice then
             local card_id = pick_card(x, y)
             if card_id then
                 local clicked = state.cards[card_id]
                 if clicked and clicked.zone == "manifest" and clicked.slot then
-                    choose_pending_manifest_target(clicked.slot)
+                    arm_pending_manifest_target(clicked.slot)
                     return
                 end
             end
@@ -3494,7 +3933,7 @@ function love.mousepressed(x, y, button)
         if state.pending_hidden_choice then
             local card_id = pick_card(x, y)
             if card_id then
-                choose_pending_hidden_target(card_id)
+                arm_pending_hidden_target(card_id)
                 return
             end
             state.message = "Choose one hidden card on board."
@@ -3504,7 +3943,7 @@ function love.mousepressed(x, y, button)
         if state.pending_unrevealed_choice then
             local card_id = pick_card(x, y)
             if card_id then
-                choose_pending_unrevealed_target(card_id)
+                arm_pending_unrevealed_target(card_id)
                 return
             end
             state.message = "Choose one not-revealed card on board."
@@ -3516,7 +3955,7 @@ function love.mousepressed(x, y, button)
             if card_id then
                 local clicked = state.cards[card_id]
                 if clicked and clicked.zone == "hand" then
-                    choose_pending_hand_target(card_id)
+                    arm_pending_hand_target(card_id)
                     return
                 end
             end
@@ -3525,7 +3964,7 @@ function love.mousepressed(x, y, button)
         end
 
         if state.pending_operator_choice then
-            state.message = "Choose one operator first."
+            state.message = "Arm an operator or none, then press △."
             return
         end
 
@@ -3687,6 +4126,7 @@ function love.mousereleased(x, y, button)
 end
 
 function love.keypressed(key)
+    trace_line("keypressed", "key=" .. tostring(key))
     if state.anim.locked and key ~= "escape" then
         state.message = "Animation in progress."
         return

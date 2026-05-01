@@ -2,8 +2,9 @@
 
 ## Status
 
-Law candidate. This document describes the intended replacement
-for the current immediate operator-choice shell.
+Current table law for the shared core / CLI branch.
+
+LOVE manifestation is still pending migration.
 
 ## Core statement
 
@@ -82,3 +83,14 @@ arm one possible effect or arm none
 confirm with △
 then let the machine continue
 ```
+
+## Current implementation note
+
+This law is already reflected in the shared core branch:
+
+- operator choice stores an armed state
+- the armed state may be `A`, `B`, or `none`
+- confirmation is separate from arming
+- confirming `none` discharges the played card without operator payload
+
+The remaining migration work is mainly in LOVE manifestation.

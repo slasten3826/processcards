@@ -2,7 +2,9 @@
 
 ## Status
 
-Law candidate. Not yet implemented in full.
+Current law candidate with partial core / CLI implementation.
+
+It is not yet fully manifested in LOVE.
 
 ## Core statement
 
@@ -33,6 +35,14 @@ machine advances
 - no-operator discharge confirmation
 - trump-flow continuation
 - other future visible chain continuations
+
+Current partial implementation already supports this direction in the shared core branch:
+
+- operator confirmation
+- no-operator discharge confirmation
+
+Turn launch and trump continuation still need the full LOVE migration
+before this law becomes completely legible in play.
 
 ## Operator-phase implication
 

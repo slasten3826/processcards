@@ -63,6 +63,15 @@ function M.new_game()
     return state
 end
 
+function M.set_armed_operator(state, op_name)
+    local pending = state.pending_operator_choice
+    if not pending then
+        return nil
+    end
+    pending.armed_operator = op_name
+    return pending.armed_operator
+end
+
 function M.push_log(state, text)
     state.log[#state.log + 1] = text
 end

@@ -79,7 +79,7 @@ function M.resolve_pending_trump(state)
     }
 end
 
-function M.one_turn(state)
+function M.one_turn_setup_only(state)
     local slot
     local hand_card_id
     local legal
@@ -99,35 +99,235 @@ function M.one_turn(state)
     core.commit_manifest(state, slot)
     core.arm_hand(state, hand_card_id)
     local result = core.resolve_turn(state, slot, hand_card_id)
-    local choose_result = nil
-    if state.pending_operator_choice then
-        local op_name = state.pending_operator_choice.choices[1]
-        choose_result = core.choose_operator(state, op_name)
-        if state.pending_manifest_choice then
-            local target_slot = state.pending_manifest_choice.legal_slots[1]
-            choose_result = core.choose_manifest_target(state, target_slot)
-        elseif state.pending_public_choice then
-            local target_card_id = state.pending_public_choice.legal_card_ids[1]
-            choose_result = core.choose_public_target(state, target_card_id)
-            if state.pending_hand_choice then
-                local hand_target = state.pending_hand_choice.legal_card_ids[1]
-                choose_result = core.choose_hand_target(state, hand_target)
-            end
-        elseif state.pending_hidden_choice then
-            local target_card_id = state.pending_hidden_choice.legal_card_ids[1]
-            choose_result = core.choose_hidden_target(state, target_card_id)
-        elseif state.pending_hand_choice then
-            local target_card_id = state.pending_hand_choice.legal_card_ids[1]
-            choose_result = core.choose_hand_target(state, target_card_id)
-        end
-    end
+
     return {
-        name = "one_turn",
+        name = "one_turn_setup_only",
         slot = slot,
         hand_card_id = hand_card_id,
         legal_count = legal and #legal or 0,
         result = result,
+    }
+end
+
+function M.one_turn(state)
+    local setup, err = M.one_turn_setup_only(state)
+    if not setup then
+        return nil, err
+    end
+
+    local choose_result = nil
+    if state.pending_operator_choice then
+        local op_name = state.pending_operator_choice.choices[1]
+        core.arm_operator(state, op_name)
+        if state.pending_manifest_choice then
+            local target_slot = state.pending_manifest_choice.legal_slots[1]
+            core.arm_manifest_target(state, target_slot)
+            choose_result = core.confirm_manifest_target(state)
+        elseif state.pending_public_choice then
+            local target_card_id = state.pending_public_choice.legal_card_ids[1]
+            core.arm_public_target(state, target_card_id)
+            choose_result = core.confirm_public_target(state)
+            if state.pending_hand_choice then
+                local hand_target = state.pending_hand_choice.legal_card_ids[1]
+                core.arm_hand_target(state, hand_target)
+                choose_result = core.confirm_hand_target(state)
+            end
+        elseif state.pending_hidden_choice then
+            local target_card_id = state.pending_hidden_choice.legal_card_ids[1]
+            core.arm_hidden_target(state, target_card_id)
+            choose_result = core.confirm_hidden_target(state)
+        elseif state.pending_unrevealed_choice then
+            local target_card_id = state.pending_unrevealed_choice.legal_card_ids[1]
+            core.arm_unrevealed_target(state, target_card_id)
+            choose_result = core.confirm_unrevealed_target(state)
+        else
+            choose_result = core.confirm_operator_phase(state)
+            if state.pending_hand_choice then
+                local target_card_id = state.pending_hand_choice.legal_card_ids[1]
+                core.arm_hand_target(state, target_card_id)
+                choose_result = core.confirm_hand_target(state)
+            end
+        end
+    end
+    return {
+        name = "one_turn",
+        slot = setup.slot,
+        hand_card_id = setup.hand_card_id,
+        legal_count = setup.legal_count,
+        result = setup.result,
         choose_result = choose_result,
+    }
+end
+
+local function first_target_action(interaction)
+    local targets = interaction.legal and interaction.legal.targets or {}
+    if targets.slots and #targets.slots > 0 then
+        return {
+            kind = "arm_target",
+            target = {
+                kind = "slot",
+                zone = targets.zones and targets.zones.manifest and "manifest" or nil,
+                slot = targets.slots[1],
+            },
+        }
+    end
+    if targets.cards and #targets.cards > 0 then
+        return {
+            kind = "arm_target",
+            target = {
+                kind = "card",
+                card_id = targets.cards[1],
+            },
+        }
+    end
+    return nil
+end
+
+function M.one_turn_via_protocol(state)
+    local step_limit = 24
+    local actions = {}
+    local committed_slot = nil
+    local played_hand = nil
+
+    for _ = 1, step_limit do
+        local ix = core.interaction(state)
+
+        if ix.phase == "await_commit" then
+            local slot = ix.legal.commit_slots[1]
+            if not slot then
+                return nil, "no_legal_turn"
+            end
+            committed_slot = slot
+            local result = core.apply_action(state, {
+                kind = "commit_manifest",
+                slot = slot,
+            })
+            if result.summary and result.summary.error then
+                return nil, result.summary.error
+            end
+            actions[#actions + 1] = "commit:" .. tostring(slot)
+
+        elseif ix.phase == "await_hand" then
+            if not ix.armed.hand_card_id then
+                local card_id = ix.legal.hand_cards[1]
+                if not card_id then
+                    return nil, "no_legal_turn"
+                end
+                played_hand = card_id
+                local result = core.apply_action(state, {
+                    kind = "arm_hand",
+                    card_id = card_id,
+                })
+                if result.summary and result.summary.error then
+                    return nil, result.summary.error
+                end
+                actions[#actions + 1] = "arm_hand:" .. tostring(card_id)
+            else
+                local result = core.apply_action(state, {kind = "advance"})
+                if result.summary and result.summary.error then
+                    return nil, result.summary.error
+                end
+                actions[#actions + 1] = "advance:turn"
+            end
+
+        elseif ix.phase == "await_operator" then
+            if not ix.armed.operator then
+                local op_name = ix.legal.operators[1]
+                if op_name then
+                    local result = core.apply_action(state, {
+                        kind = "arm_operator",
+                        operator = op_name,
+                    })
+                    if result.summary and result.summary.error then
+                        return nil, result.summary.error
+                    end
+                    actions[#actions + 1] = "arm_operator:" .. tostring(op_name)
+                else
+                    local result = core.apply_action(state, {kind = "advance"})
+                    if result.summary and result.summary.error then
+                        return nil, result.summary.error
+                    end
+                    actions[#actions + 1] = "advance:discharge"
+                end
+            else
+                local result = core.apply_action(state, {kind = "advance"})
+                if result.summary and result.summary.error then
+                    return nil, result.summary.error
+                end
+                actions[#actions + 1] = "advance:operator"
+            end
+
+        elseif ix.phase == "await_target" then
+            if not ix.armed.target then
+                local action = first_target_action(ix)
+                if not action then
+                    return nil, "no_target_action"
+                end
+                local result = core.apply_action(state, action)
+                if result.summary and result.summary.error then
+                    return nil, result.summary.error
+                end
+                local target_desc = action.target.card_id or action.target.slot
+                actions[#actions + 1] = "arm_target:" .. tostring(target_desc)
+            else
+                local result = core.apply_action(state, {kind = "advance"})
+                if result.summary and result.summary.error then
+                    return nil, result.summary.error
+                end
+                actions[#actions + 1] = "advance:target"
+            end
+
+        elseif ix.phase == "await_trump" or ix.phase == "idle" or ix.phase == "terminal" then
+            break
+        else
+            return nil, "unknown_phase_" .. tostring(ix.phase)
+        end
+    end
+
+    return {
+        name = "one_turn_via_protocol",
+        slot = committed_slot,
+        hand_card_id = played_hand,
+        actions = actions,
+    }
+end
+
+function M.unrevealed_target_arm_toggle(state)
+    local info, err = M.one_turn_setup_only(state)
+    if not info then
+        return nil, err
+    end
+
+    local op_name = state.pending_operator_choice.choices[1]
+    if op_name ~= "MANIFEST" and state.pending_operator_choice.choices[2] == "MANIFEST" then
+        op_name = "MANIFEST"
+    end
+    if op_name ~= "MANIFEST" then
+        return nil, "no_manifest_operator"
+    end
+
+    core.arm_operator(state, op_name)
+    if not state.pending_unrevealed_choice then
+        return nil, "no_pending_unrevealed_choice"
+    end
+
+    local target_card_id = state.pending_unrevealed_choice.legal_card_ids[1]
+    if not target_card_id then
+        return nil, "no_unrevealed_target"
+    end
+    core.arm_unrevealed_target(state, target_card_id)
+    if state.pending_unrevealed_choice.armed_card_id ~= target_card_id then
+        return nil, "arm_unrevealed_target_failed"
+    end
+    core.arm_unrevealed_target(state, target_card_id)
+    if state.pending_unrevealed_choice.armed_card_id ~= nil then
+        return nil, "disarm_unrevealed_target_failed"
+    end
+
+    return {
+        name = "unrevealed_target_arm_toggle",
+        hand_card_id = info.hand_card_id,
+        target_card_id = target_card_id,
     }
 end
 
@@ -167,12 +367,351 @@ local function prepare_logic_turn(state)
     }
 end
 
+local function arm_named_operator_choice(state, wanted)
+    local pending = state.pending_operator_choice
+    if not pending then
+        return nil, "no_pending_operator_choice"
+    end
+
+    local op_name
+    if pending.choices[1] == wanted then
+        op_name = wanted
+    elseif pending.choices[2] == wanted then
+        op_name = wanted
+    else
+        return nil, "missing_operator_" .. wanted
+    end
+
+    local arm_result = core.arm_operator(state, op_name)
+    if not arm_result then
+        return nil, "operator_arm_failed_" .. wanted
+    end
+    return arm_result, nil, op_name
+end
+
 local function enter_logic_choice(state)
-    local choose_result = core.choose_operator(state, "LOGIC")
+    local choose_result, err = arm_named_operator_choice(state, "LOGIC")
+    if not choose_result then
+        return nil, err or "logic_arm_failed"
+    end
     if not state.pending_public_choice then
         return nil, "no_pending_public_choice"
     end
     return choose_result
+end
+
+function M.manifest_target_arm_toggle(state)
+    local info, err = M.one_turn_setup_only(state)
+    if not info then
+        return nil, err
+    end
+
+    local choose_result, choose_err = arm_named_operator_choice(state, "CHOOSE")
+    if not choose_result then
+        return nil, choose_err
+    end
+    if not state.pending_manifest_choice then
+        return nil, "no_pending_manifest_choice"
+    end
+
+    local slot = state.pending_manifest_choice.legal_slots[1]
+    if not slot then
+        return nil, "no_manifest_target"
+    end
+
+    core.arm_manifest_target(state, slot)
+    if state.pending_manifest_choice.armed_slot ~= slot then
+        return nil, "arm_manifest_target_failed"
+    end
+    core.arm_manifest_target(state, slot)
+    if state.pending_manifest_choice.armed_slot ~= nil then
+        return nil, "disarm_manifest_target_failed"
+    end
+
+    return {
+        name = "manifest_target_arm_toggle",
+        hand_card_id = info.hand_card_id,
+        target_slot = slot,
+    }
+end
+
+function M.hidden_target_arm_toggle(state)
+    local info, err = M.one_turn_setup_only(state)
+    if not info then
+        return nil, err
+    end
+
+    local choose_result, choose_err = arm_named_operator_choice(state, "OBSERVE")
+    if not choose_result then
+        return nil, choose_err
+    end
+    if not state.pending_hidden_choice then
+        return nil, "no_pending_hidden_choice"
+    end
+
+    local target_card_id = state.pending_hidden_choice.legal_card_ids[1]
+    if not target_card_id then
+        return nil, "no_hidden_target"
+    end
+
+    core.arm_hidden_target(state, target_card_id)
+    if state.pending_hidden_choice.armed_card_id ~= target_card_id then
+        return nil, "arm_hidden_target_failed"
+    end
+    core.arm_hidden_target(state, target_card_id)
+    if state.pending_hidden_choice.armed_card_id ~= nil then
+        return nil, "disarm_hidden_target_failed"
+    end
+
+    return {
+        name = "hidden_target_arm_toggle",
+        hand_card_id = info.hand_card_id,
+        target_card_id = target_card_id,
+    }
+end
+
+function M.public_target_arm_toggle(state)
+    local prep, err = prepare_logic_turn(state)
+    if not prep then
+        return nil, err
+    end
+    local choose_result, choose_err = enter_logic_choice(state)
+    if not choose_result then
+        return nil, choose_err
+    end
+
+    local target_card_id = state.pending_public_choice.legal_card_ids[1]
+    if not target_card_id then
+        return nil, "no_public_target"
+    end
+
+    core.arm_public_target(state, target_card_id)
+    if state.pending_public_choice.armed_card_id ~= target_card_id then
+        return nil, "arm_public_target_failed"
+    end
+    core.arm_public_target(state, target_card_id)
+    if state.pending_public_choice.armed_card_id ~= nil then
+        return nil, "disarm_public_target_failed"
+    end
+
+    return {
+        name = "public_target_arm_toggle",
+        hand_card_id = prep.hand_card_id,
+        target_card_id = target_card_id,
+    }
+end
+
+function M.hand_target_arm_toggle(state)
+    local prep, err = prepare_logic_turn(state)
+    if not prep then
+        return nil, err
+    end
+    local choose_result, choose_err = enter_logic_choice(state)
+    if not choose_result then
+        return nil, choose_err
+    end
+
+    local public_target = state.pending_public_choice.legal_card_ids[1]
+    if not public_target then
+        return nil, "no_public_target"
+    end
+    core.arm_public_target(state, public_target)
+    core.confirm_public_target(state)
+    if not state.pending_hand_choice then
+        return nil, "no_pending_hand_choice"
+    end
+
+    local hand_target = state.pending_hand_choice.legal_card_ids[1]
+    if not hand_target then
+        return nil, "no_hand_target"
+    end
+
+    core.arm_hand_target(state, hand_target)
+    if state.pending_hand_choice.armed_card_id ~= hand_target then
+        return nil, "arm_hand_target_failed"
+    end
+    core.arm_hand_target(state, hand_target)
+    if state.pending_hand_choice.armed_card_id ~= nil then
+        return nil, "disarm_hand_target_failed"
+    end
+
+    return {
+        name = "hand_target_arm_toggle",
+        hand_card_id = prep.hand_card_id,
+        target_card_id = hand_target,
+    }
+end
+
+function M.operator_arm_toggle(state)
+    local info, err = M.one_turn_setup_only(state)
+    if not info then
+        return nil, err
+    end
+
+    local op_a = state.pending_operator_choice.choices[1]
+    local arm_a = core.arm_operator(state, op_a)
+    if state.pending_operator_choice.armed_operator ~= op_a then
+        return nil, "arm_operator_a_failed"
+    end
+
+    local disarm = core.arm_operator(state, op_a)
+    if state.pending_operator_choice.armed_operator ~= nil then
+        return nil, "disarm_operator_failed"
+    end
+
+    local op_b = state.pending_operator_choice.choices[2]
+    local arm_b = core.arm_operator(state, op_b)
+    if state.pending_operator_choice.armed_operator ~= op_b then
+        return nil, "arm_operator_b_failed"
+    end
+
+    return {
+        name = "operator_arm_toggle",
+        slot = info.slot,
+        hand_card_id = info.hand_card_id,
+        arm_a = arm_a,
+        disarm = disarm,
+        arm_b = arm_b,
+    }
+end
+
+function M.operator_skip_discharge(state)
+    local info, err = M.one_turn_setup_only(state)
+    if not info then
+        return nil, err
+    end
+
+    local play_card_id = state.zones.play.cards[1]
+    if not play_card_id then
+        return nil, "missing_play_card"
+    end
+
+    local result = core.confirm_operator_phase(state)
+    if state.pending_operator_choice then
+        return nil, "pending_operator_not_cleared"
+    end
+    if state.cards[play_card_id].zone ~= "grave" then
+        return nil, "operator_skip_did_not_discharge"
+    end
+
+    return {
+        name = "operator_skip_discharge",
+        slot = info.slot,
+        hand_card_id = info.hand_card_id,
+        play_card_id = play_card_id,
+        result = result,
+    }
+end
+
+function M.action_protocol_skip_turn(state)
+    local slot
+    local hand_card_id
+    for i = 1, 6 do
+        local candidate, _ = first_legal_hand(state, i)
+        if candidate then
+            slot = i
+            hand_card_id = candidate
+            break
+        end
+    end
+    if not slot or not hand_card_id then
+        return nil, "no_legal_turn"
+    end
+
+    local result
+    result = core.apply_action(state, {kind = "commit_manifest", slot = slot})
+    if result.summary and result.summary.error then
+        return nil, result.summary.error
+    end
+
+    result = core.apply_action(state, {kind = "arm_hand", card_id = hand_card_id})
+    if result.summary and result.summary.error then
+        return nil, result.summary.error
+    end
+
+    result = core.apply_action(state, {kind = "advance"})
+    if result.summary and result.summary.error then
+        return nil, result.summary.error
+    end
+
+    if not state.pending_operator_choice then
+        return nil, "missing_operator_phase"
+    end
+
+    local play_card_id = state.zones.play.cards[1]
+    result = core.apply_action(state, {kind = "advance"})
+    if result.summary and result.summary.error then
+        return nil, result.summary.error
+    end
+
+    if state.pending_operator_choice then
+        return nil, "pending_operator_not_cleared"
+    end
+    if state.cards[play_card_id].zone ~= "grave" then
+        return nil, "operator_skip_did_not_discharge"
+    end
+
+    return {
+        name = "action_protocol_skip_turn",
+        slot = slot,
+        hand_card_id = hand_card_id,
+        play_card_id = play_card_id,
+    }
+end
+
+function M.action_protocol_manifest_target(state)
+    local info, err = M.one_turn_setup_only(state)
+    if not info then
+        return nil, err
+    end
+
+    local pending = state.pending_operator_choice
+    local op_name
+    if pending.choices[1] == "MANIFEST" then
+        op_name = "MANIFEST"
+    elseif pending.choices[2] == "MANIFEST" then
+        op_name = "MANIFEST"
+    else
+        return nil, "no_manifest_operator"
+    end
+
+    local result = core.apply_action(state, {kind = "arm_operator", operator = op_name})
+    if result.summary and result.summary.error then
+        return nil, result.summary.error
+    end
+    if not state.pending_unrevealed_choice then
+        return nil, "no_pending_unrevealed_choice"
+    end
+
+    local target_card_id = state.pending_unrevealed_choice.legal_card_ids[1]
+    if not target_card_id then
+        return nil, "no_unrevealed_target"
+    end
+
+    result = core.apply_action(state, {
+        kind = "arm_target",
+        target = {kind = "card", card_id = target_card_id},
+    })
+    if result.summary and result.summary.error then
+        return nil, result.summary.error
+    end
+    if state.pending_unrevealed_choice.armed_card_id ~= target_card_id then
+        return nil, "arm_unrevealed_target_failed"
+    end
+
+    result = core.apply_action(state, {kind = "advance"})
+    if result.summary and result.summary.error then
+        return nil, result.summary.error
+    end
+    if state.pending_unrevealed_choice or state.pending_operator_choice then
+        return nil, "manifest_target_not_resolved"
+    end
+
+    return {
+        name = "action_protocol_manifest_target",
+        hand_card_id = info.hand_card_id,
+        target_card_id = target_card_id,
+    }
 end
 
 function M.logic_manifest_swap(state)
@@ -195,12 +734,14 @@ function M.logic_manifest_swap(state)
         return nil, "no_logic_manifest_target"
     end
     local target_slot = state.cards[target_card_id].slot
-    local public_result = core.choose_public_target(state, target_card_id)
+    core.arm_public_target(state, target_card_id)
+    local public_result = core.confirm_public_target(state)
     local hand_target = state.pending_hand_choice and state.pending_hand_choice.legal_card_ids[1]
     if not hand_target then
         return nil, "no_logic_hand_target"
     end
-    local hand_result = core.choose_hand_target(state, hand_target)
+    core.arm_hand_target(state, hand_target)
+    local hand_result = core.confirm_hand_target(state)
     if state.zones.manifest.cards[target_slot] ~= hand_target then
         return nil, "logic_manifest_swap_failed"
     end
@@ -239,12 +780,14 @@ function M.logic_latent_swap(state)
     if not choose_result then
         return nil, choose_err
     end
-    local public_result = core.choose_public_target(state, target_card_id)
+    core.arm_public_target(state, target_card_id)
+    local public_result = core.confirm_public_target(state)
     local hand_target = state.pending_hand_choice and state.pending_hand_choice.legal_card_ids[1]
     if not hand_target then
         return nil, "no_logic_hand_target"
     end
-    local hand_result = core.choose_hand_target(state, hand_target)
+    core.arm_hand_target(state, hand_target)
+    local hand_result = core.confirm_hand_target(state)
     if state.zones.latent.cards[target_slot] ~= hand_target then
         return nil, "logic_latent_swap_failed"
     end
@@ -279,12 +822,14 @@ function M.logic_grave_swap(state)
     if not target_card_id then
         return nil, "no_logic_grave_target"
     end
-    local public_result = core.choose_public_target(state, target_card_id)
+    core.arm_public_target(state, target_card_id)
+    local public_result = core.confirm_public_target(state)
     local hand_target = state.pending_hand_choice and state.pending_hand_choice.legal_card_ids[1]
     if not hand_target then
         return nil, "no_logic_hand_target"
     end
-    local hand_result = core.choose_hand_target(state, hand_target)
+    core.arm_hand_target(state, hand_target)
+    local hand_result = core.confirm_hand_target(state)
     if state.cards[hand_target].zone ~= "grave" then
         return nil, "logic_grave_swap_failed"
     end
@@ -327,12 +872,14 @@ function M.logic_topdeck_swap(state)
     if not choose_result then
         return nil, choose_err
     end
-    local public_result = core.choose_public_target(state, target_card_id)
+    core.arm_public_target(state, target_card_id)
+    local public_result = core.confirm_public_target(state)
     local hand_target = state.pending_hand_choice and state.pending_hand_choice.legal_card_ids[1]
     if not hand_target then
         return nil, "no_logic_hand_target"
     end
-    local hand_result = core.choose_hand_target(state, hand_target)
+    core.arm_hand_target(state, hand_target)
+    local hand_result = core.confirm_hand_target(state)
     if state.zones.deck.cards[#state.zones.deck.cards] ~= hand_target then
         return nil, "logic_topdeck_swap_failed"
     end

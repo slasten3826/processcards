@@ -3,15 +3,15 @@
 Status:
 
 ```text
-current design review
-not yet promoted into code
+review promoted into shared core / CLI branch
+LOVE migration still pending
 ```
 
 ## Current question
 
 Should operator effect resolution be mandatory?
 
-Current runtime still assumes:
+Old runtime assumed:
 
 ```text
 choose operator A or operator B
@@ -110,7 +110,12 @@ This review does **not** yet decide:
 - whether skip should be a third button
 - whether some future laws may force operator use
 
-It only records that:
+It now records two things:
+
+1. optional operator use was coherent with the live operator family
+2. that reading has now been promoted into the shared core / CLI branch
+
+So:
 
 ```text
 optional operator use now reads as coherent with the live operator family
@@ -122,4 +127,11 @@ optional operator use now reads as coherent with the live operator family
 current implemented operators already read as features,
 not taxes.
 therefore optional operator use is now a coherent next law candidate.
+```
+
+Current update:
+
+```text
+that candidate has now become the active shared core / CLI branch
+through armed operator state and confirmable no-operator discharge
 ```

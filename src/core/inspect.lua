@@ -22,13 +22,14 @@ function M.snapshot(state)
     local lines = {}
     lines[#lines + 1] = "STATE SNAPSHOT"
     lines[#lines + 1] = string.format(
-        "board_closed=%s deck=%d hand=%d grave=%d trump_flow=%d pending_operator=%s pending_public=%s pending_hidden=%s pending_hand=%s pending_manifest=%s pending_unrevealed=%s pending_trump=%s",
+        "board_closed=%s deck=%d hand=%d grave=%d trump_flow=%d pending_operator=%s armed_operator=%s pending_public=%s pending_hidden=%s pending_hand=%s pending_manifest=%s pending_unrevealed=%s pending_trump=%s",
         state_lib.is_board_closed(state) and "true" or "false",
         #state.zones.deck.cards,
         #state.zones.hand.cards,
         #state.zones.grave.cards,
         #state.zones.trump_flow.cards,
         state.pending_operator_choice and "yes" or "no",
+        state.pending_operator_choice and (state.pending_operator_choice.armed_operator or "none") or "-",
         state.pending_public_choice and "yes" or "no",
         state.pending_hidden_choice and "yes" or "no",
         state.pending_hand_choice and "yes" or "no",
@@ -45,6 +46,21 @@ function M.snapshot(state)
     lines[#lines + 1] = "hand:     " .. join_cards(state.zones.hand.cards)
     lines[#lines + 1] = "grave:    " .. join_cards(state.zones.grave.cards)
     lines[#lines + 1] = "flow:     " .. join_cards(state.zones.trump_flow.cards)
+    if state.pending_manifest_choice then
+        lines[#lines + 1] = "armed_manifest_slot: " .. tostring(state.pending_manifest_choice.armed_slot or "-")
+    end
+    if state.pending_public_choice then
+        lines[#lines + 1] = "armed_public_card: " .. tostring(state.pending_public_choice.armed_card_id or "-")
+    end
+    if state.pending_hidden_choice then
+        lines[#lines + 1] = "armed_hidden_card: " .. tostring(state.pending_hidden_choice.armed_card_id or "-")
+    end
+    if state.pending_unrevealed_choice then
+        lines[#lines + 1] = "armed_unrevealed_card: " .. tostring(state.pending_unrevealed_choice.armed_card_id or "-")
+    end
+    if state.pending_hand_choice then
+        lines[#lines + 1] = "armed_hand_target: " .. tostring(state.pending_hand_choice.armed_card_id or "-")
+    end
     return table.concat(lines, "\n")
 end
 

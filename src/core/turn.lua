@@ -30,7 +30,11 @@ function M.arm_hand(state, card_id)
     if not state.legal_hints[card_id] then
         return nil, "illegal_hand_card"
     end
-    state.armed_hand = (state.armed_hand == card_id) and nil or card_id
+    if state.armed_hand == card_id then
+        state.armed_hand = nil
+    else
+        state.armed_hand = card_id
+    end
     return state.armed_hand
 end
 
@@ -60,6 +64,43 @@ local function operator_choices_for_card(state, card_id)
         return nil
     end
     return {card.op_a, card.op_b}
+end
+
+local function operator_choice_is_legal(choices, op_name)
+    return op_name == choices[1] or op_name == choices[2]
+end
+
+local function card_choice_is_legal(legal_card_ids, card_id)
+    for _, legal_card_id in ipairs(legal_card_ids or {}) do
+        if legal_card_id == card_id then
+            return true
+        end
+    end
+    return false
+end
+
+local function slot_choice_is_legal(legal_slots, slot)
+    for _, legal_slot in ipairs(legal_slots or {}) do
+        if legal_slot == slot then
+            return true
+        end
+    end
+    return false
+end
+
+local function clear_operator_target_phases(state)
+    state.pending_public_choice = nil
+    state.pending_hidden_choice = nil
+    state.pending_hand_choice = nil
+    state.pending_manifest_choice = nil
+    state.pending_unrevealed_choice = nil
+end
+
+local function operator_opens_target_phase(op_name)
+    return op_name == "CHOOSE"
+        or op_name == "OBSERVE"
+        or op_name == "LOGIC"
+        or op_name == "MANIFEST"
 end
 
 local function legal_hidden_board_card_ids(state)
@@ -177,14 +218,17 @@ function M.resolve_turn(state, slot, hand_card_id)
     })
 
     repair.repair_manifest_slot(state, slot)
+    state_lib.clear_gameplay_selection(state)
 
     state.pending_operator_choice = {
         card_id = hand_card_id,
         choices = operator_choices_for_card(state, hand_card_id),
+        armed_operator = nil,
     }
     transition.emit(state, "operator_choice_pending", {
         card_id = hand_card_id,
         choices = state.pending_operator_choice.choices,
+        armed_operator = state.pending_operator_choice.armed_operator,
     })
     return transition.finish(state, {
         board_closed = state_lib.is_board_closed(state),
@@ -193,26 +237,27 @@ function M.resolve_turn(state, slot, hand_card_id)
     })
 end
 
-function M.choose_operator(state, op_name)
+function M.arm_operator(state, op_name)
     local pending = state.pending_operator_choice
     if not pending then
         return nil, "no_pending_operator_choice"
     end
     local card_id = pending.card_id
     local choices = pending.choices or operator_choices_for_card(state, card_id) or {}
-    if op_name ~= choices[1] and op_name ~= choices[2] then
+    if op_name ~= nil and not operator_choice_is_legal(choices, op_name) then
         return nil, "illegal_operator_choice"
     end
 
-    transition.begin(state, "choose_operator", {
+    transition.begin(state, "arm_operator", {
         card_id = card_id,
         operator = op_name,
     })
 
-    transition.emit(state, "operator_chosen", {
-        card_id = card_id,
-        operator = op_name,
-    })
+    if pending.armed_operator == op_name then
+        op_name = nil
+    end
+    state_lib.set_armed_operator(state, op_name)
+    clear_operator_target_phases(state)
 
     if op_name == "CHOOSE" then
         local legal_slots = {}
@@ -222,93 +267,88 @@ function M.choose_operator(state, op_name)
                 legal_slots[#legal_slots + 1] = slot
             end
         end
-        state.pending_operator_choice = nil
         state.pending_manifest_choice = {
             card_id = card_id,
             operator = op_name,
             legal_slots = legal_slots,
+            armed_slot = nil,
         }
         transition.emit(state, "manifest_choice_pending", {
             card_id = card_id,
+            operator = op_name,
             legal_slots = legal_slots,
         })
-        return transition.finish(state, {
-            pending_manifest_choice = state.pending_manifest_choice,
-            pending_trump = state.pending_trump,
-            board_closed = state_lib.is_board_closed(state),
-        })
-    end
-
-    if op_name == "OBSERVE" then
+    elseif op_name == "OBSERVE" then
         local legal_card_ids = legal_hidden_board_card_ids(state)
-        state.pending_operator_choice = nil
         state.pending_hidden_choice = {
             card_id = card_id,
             operator = op_name,
             legal_card_ids = legal_card_ids,
+            armed_card_id = nil,
         }
         transition.emit(state, "hidden_choice_pending", {
             card_id = card_id,
             operator = op_name,
             legal_card_ids = legal_card_ids,
         })
-        return transition.finish(state, {
-            operator = op_name,
-            pending_hidden_choice = state.pending_hidden_choice,
-            pending_trump = state.pending_trump,
-            board_closed = state_lib.is_board_closed(state),
-        })
-    end
-
-    if op_name == "LOGIC" then
+    elseif op_name == "LOGIC" then
         local legal_card_ids = legal_public_minor_card_ids(state)
-        state.pending_operator_choice = nil
         state.pending_public_choice = {
             card_id = card_id,
             operator = op_name,
             legal_card_ids = legal_card_ids,
+            armed_card_id = nil,
         }
         transition.emit(state, "public_choice_pending", {
             card_id = card_id,
             operator = op_name,
             legal_card_ids = legal_card_ids,
         })
-        return transition.finish(state, {
-            operator = op_name,
-            pending_public_choice = state.pending_public_choice,
-            pending_trump = state.pending_trump,
-            board_closed = state_lib.is_board_closed(state),
-        })
-    end
-
-    if op_name == "MANIFEST" then
+    elseif op_name == "MANIFEST" then
         local legal_card_ids = legal_not_revealed_board_card_ids(state)
-        state.pending_operator_choice = nil
         state.pending_unrevealed_choice = {
             card_id = card_id,
             operator = op_name,
             legal_card_ids = legal_card_ids,
+            armed_card_id = nil,
         }
         transition.emit(state, "unrevealed_choice_pending", {
             card_id = card_id,
             operator = op_name,
             legal_card_ids = legal_card_ids,
         })
-        return transition.finish(state, {
-            operator = op_name,
-            pending_unrevealed_choice = state.pending_unrevealed_choice,
-            pending_trump = state.pending_trump,
-            board_closed = state_lib.is_board_closed(state),
-        })
     end
+
+    transition.emit(state, "operator_armed", {
+        card_id = card_id,
+        armed_operator = pending.armed_operator,
+    })
+
+    return transition.finish(state, {
+        card_id = card_id,
+        pending_operator_choice = state.pending_operator_choice,
+        pending_public_choice = state.pending_public_choice,
+        pending_hidden_choice = state.pending_hidden_choice,
+        pending_hand_choice = state.pending_hand_choice,
+        pending_manifest_choice = state.pending_manifest_choice,
+        pending_unrevealed_choice = state.pending_unrevealed_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+local function start_operator_effect(state, op_name)
+    local pending = state.pending_operator_choice
+    local card_id = pending.card_id
 
     if op_name == "CYCLE" then
         operators.resolve_cycle_draw(state)
-        state.pending_operator_choice = nil
+        clear_operator_target_phases(state)
         state.pending_hand_choice = {
             card_id = card_id,
             operator = op_name,
             legal_card_ids = {},
+            armed_card_id = nil,
         }
         for _, legal_card_id in ipairs(state.zones.hand.cards) do
             state.pending_hand_choice.legal_card_ids[#state.pending_hand_choice.legal_card_ids + 1] = legal_card_id
@@ -320,6 +360,7 @@ function M.choose_operator(state, op_name)
         })
         return transition.finish(state, {
             operator = op_name,
+            pending_operator_choice = state.pending_operator_choice,
             pending_hand_choice = state.pending_hand_choice,
             pending_trump = state.pending_trump,
             board_closed = state_lib.is_board_closed(state),
@@ -346,24 +387,115 @@ function M.choose_operator(state, op_name)
     })
 end
 
-function M.choose_public_target(state, card_id)
+function M.confirm_operator_phase(state)
+    local pending = state.pending_operator_choice
+    if not pending then
+        return nil, "no_pending_operator_choice"
+    end
+
+    local card_id = pending.card_id
+    local choices = pending.choices or operator_choices_for_card(state, card_id) or {}
+    local op_name = pending.armed_operator
+    if op_name ~= nil and not operator_choice_is_legal(choices, op_name) then
+        return nil, "illegal_operator_choice"
+    end
+
+    transition.begin(state, "confirm_operator_phase", {
+        card_id = card_id,
+        operator = op_name,
+    })
+
+    transition.emit(state, "operator_phase_confirmed", {
+        card_id = card_id,
+        operator = op_name,
+    })
+
+    if op_name == nil then
+        clear_operator_target_phases(state)
+        move_to_grave(state, card_id)
+        transition.emit(state, "play_to_grave", {
+            card_id = card_id,
+            operator = nil,
+        })
+
+        state.pending_operator_choice = nil
+        state_lib.clear_gameplay_selection(state)
+        trump.refresh_pending_trump(state)
+
+        return transition.finish(state, {
+            operator = nil,
+            board_closed = state_lib.is_board_closed(state),
+            pending_operator_choice = state.pending_operator_choice,
+            pending_trump = state.pending_trump,
+        })
+    end
+
+    if operator_opens_target_phase(op_name) then
+        return nil, "target_selection_pending"
+    end
+
+    return start_operator_effect(state, op_name)
+end
+
+function M.choose_operator(state, op_name)
+    local armed, err = M.arm_operator(state, op_name)
+    if not armed and err then
+        return nil, err
+    end
+    if state.pending_public_choice
+        or state.pending_hidden_choice
+        or state.pending_manifest_choice
+        or state.pending_unrevealed_choice
+    then
+        return armed
+    end
+    return M.confirm_operator_phase(state)
+end
+
+function M.arm_public_target(state, card_id)
     local pending = state.pending_public_choice
     if not pending then
         return nil, "no_pending_public_choice"
     end
-
-    local legal = false
-    for _, legal_card_id in ipairs(pending.legal_card_ids or {}) do
-        if legal_card_id == card_id then
-            legal = true
-            break
-        end
-    end
-    if not legal then
+    if not card_choice_is_legal(pending.legal_card_ids, card_id) then
         return nil, "illegal_public_choice"
     end
 
-    transition.begin(state, "choose_public_target", {
+    transition.begin(state, "arm_public_target", {
+        card_id = card_id,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    if pending.armed_card_id == card_id then
+        pending.armed_card_id = nil
+    else
+        pending.armed_card_id = card_id
+    end
+    transition.emit(state, "public_target_armed", {
+        card_id = pending.armed_card_id,
+        operator = pending.operator,
+        source_card_id = pending.card_id,
+    })
+
+    return transition.finish(state, {
+        pending_public_choice = state.pending_public_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.confirm_public_target(state)
+    local pending = state.pending_public_choice
+    if not pending then
+        return nil, "no_pending_public_choice"
+    end
+    if not pending.armed_card_id then
+        return nil, "no_armed_public_target"
+    end
+
+    local card_id = pending.armed_card_id
+    transition.begin(state, "confirm_public_target", {
         card_id = card_id,
         source_card_id = pending.card_id,
         operator = pending.operator,
@@ -377,6 +509,7 @@ function M.choose_public_target(state, card_id)
         target_zone = state.cards[card_id].zone,
         target_slot = state.cards[card_id].slot,
         legal_card_ids = {},
+        armed_card_id = nil,
     }
     for _, hand_card_id in ipairs(state.zones.hand.cards) do
         state.pending_hand_choice.legal_card_ids[#state.pending_hand_choice.legal_card_ids + 1] = hand_card_id
@@ -388,6 +521,7 @@ function M.choose_public_target(state, card_id)
         target_card_id = card_id,
     })
     return transition.finish(state, {
+        pending_operator_choice = state.pending_operator_choice,
         pending_public_choice = state.pending_public_choice,
         pending_hand_choice = state.pending_hand_choice,
         pending_trump = state.pending_trump,
@@ -395,24 +529,59 @@ function M.choose_public_target(state, card_id)
     })
 end
 
-function M.choose_unrevealed_target(state, card_id)
+function M.choose_public_target(state, card_id)
+    local armed, err = M.arm_public_target(state, card_id)
+    if not armed and err then
+        return nil, err
+    end
+    return M.confirm_public_target(state)
+end
+
+function M.arm_unrevealed_target(state, card_id)
     local pending = state.pending_unrevealed_choice
     if not pending then
         return nil, "no_pending_unrevealed_choice"
     end
-
-    local legal = false
-    for _, legal_card_id in ipairs(pending.legal_card_ids or {}) do
-        if legal_card_id == card_id then
-            legal = true
-            break
-        end
-    end
-    if not legal then
+    if not card_choice_is_legal(pending.legal_card_ids, card_id) then
         return nil, "illegal_unrevealed_choice"
     end
 
-    transition.begin(state, "choose_unrevealed_target", {
+    transition.begin(state, "arm_unrevealed_target", {
+        card_id = card_id,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    if pending.armed_card_id == card_id then
+        pending.armed_card_id = nil
+    else
+        pending.armed_card_id = card_id
+    end
+    transition.emit(state, "unrevealed_target_armed", {
+        card_id = pending.armed_card_id,
+        operator = pending.operator,
+        source_card_id = pending.card_id,
+    })
+
+    return transition.finish(state, {
+        pending_unrevealed_choice = state.pending_unrevealed_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.confirm_unrevealed_target(state)
+    local pending = state.pending_unrevealed_choice
+    if not pending then
+        return nil, "no_pending_unrevealed_choice"
+    end
+    if not pending.armed_card_id then
+        return nil, "no_armed_unrevealed_target"
+    end
+
+    local card_id = pending.armed_card_id
+
+    transition.begin(state, "confirm_unrevealed_target", {
         card_id = card_id,
         source_card_id = pending.card_id,
         operator = pending.operator,
@@ -464,40 +633,76 @@ function M.choose_unrevealed_target(state, card_id)
     })
 
     state.pending_unrevealed_choice = nil
+    state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
     trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         card_id = card_id,
+        pending_operator_choice = state.pending_operator_choice,
         pending_unrevealed_choice = state.pending_unrevealed_choice,
         pending_trump = state.pending_trump,
         board_closed = state_lib.is_board_closed(state),
     })
 end
 
-function M.choose_manifest_target(state, slot)
+function M.choose_unrevealed_target(state, card_id)
+    local armed, err = M.arm_unrevealed_target(state, card_id)
+    if not armed and err then
+        return nil, err
+    end
+    return M.confirm_unrevealed_target(state)
+end
+
+function M.arm_manifest_target(state, slot)
     local pending = state.pending_manifest_choice
     if not pending then
         return nil, "no_pending_manifest_choice"
     end
-
-    local legal = false
-    for _, legal_slot in ipairs(pending.legal_slots or {}) do
-        if legal_slot == slot then
-            legal = true
-            break
-        end
-    end
-    if not legal then
+    if not slot_choice_is_legal(pending.legal_slots, slot) then
         return nil, "illegal_manifest_choice"
     end
 
+    transition.begin(state, "arm_manifest_target", {
+        slot = slot,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    if pending.armed_slot == slot then
+        pending.armed_slot = nil
+    else
+        pending.armed_slot = slot
+    end
+    transition.emit(state, "manifest_target_armed", {
+        slot = pending.armed_slot,
+        operator = pending.operator,
+        source_card_id = pending.card_id,
+    })
+
+    return transition.finish(state, {
+        pending_manifest_choice = state.pending_manifest_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.confirm_manifest_target(state)
+    local pending = state.pending_manifest_choice
+    if not pending then
+        return nil, "no_pending_manifest_choice"
+    end
+    if not pending.armed_slot then
+        return nil, "no_armed_manifest_target"
+    end
+
+    local slot = pending.armed_slot
     local manifest_id = state.zones.manifest.cards[slot]
     if not manifest_id then
         return nil, "empty_manifest_slot"
     end
 
-    transition.begin(state, "choose_manifest_target", {
+    transition.begin(state, "confirm_manifest_target", {
         slot = slot,
         card_id = manifest_id,
         source_card_id = pending.card_id,
@@ -521,36 +726,73 @@ function M.choose_manifest_target(state, slot)
     })
 
     state.pending_manifest_choice = nil
+    state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
     trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         slot = slot,
         card_id = manifest_id,
+        pending_operator_choice = state.pending_operator_choice,
         pending_manifest_choice = state.pending_manifest_choice,
         pending_trump = state.pending_trump,
         board_closed = state_lib.is_board_closed(state),
     })
 end
 
-function M.choose_hand_target(state, card_id)
+function M.choose_manifest_target(state, slot)
+    local armed, err = M.arm_manifest_target(state, slot)
+    if not armed and err then
+        return nil, err
+    end
+    return M.confirm_manifest_target(state)
+end
+
+function M.arm_hand_target(state, card_id)
     local pending = state.pending_hand_choice
     if not pending then
         return nil, "no_pending_hand_choice"
     end
-
-    local legal = false
-    for _, legal_card_id in ipairs(pending.legal_card_ids or {}) do
-        if legal_card_id == card_id then
-            legal = true
-            break
-        end
-    end
-    if not legal then
+    if not card_choice_is_legal(pending.legal_card_ids, card_id) then
         return nil, "illegal_hand_choice"
     end
 
-    transition.begin(state, "choose_hand_target", {
+    transition.begin(state, "arm_hand_target", {
+        card_id = card_id,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    if pending.armed_card_id == card_id then
+        pending.armed_card_id = nil
+    else
+        pending.armed_card_id = card_id
+    end
+    transition.emit(state, "hand_target_armed", {
+        card_id = pending.armed_card_id,
+        operator = pending.operator,
+        source_card_id = pending.card_id,
+    })
+
+    return transition.finish(state, {
+        pending_hand_choice = state.pending_hand_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.confirm_hand_target(state)
+    local pending = state.pending_hand_choice
+    if not pending then
+        return nil, "no_pending_hand_choice"
+    end
+    if not pending.armed_card_id then
+        return nil, "no_armed_hand_target"
+    end
+
+    local card_id = pending.armed_card_id
+
+    transition.begin(state, "confirm_hand_target", {
         card_id = card_id,
         source_card_id = pending.card_id,
         operator = pending.operator,
@@ -609,11 +851,13 @@ function M.choose_hand_target(state, card_id)
         })
 
         state.pending_hand_choice = nil
+        state.pending_operator_choice = nil
         state_lib.clear_gameplay_selection(state)
         trump.refresh_pending_trump(state)
 
         return transition.finish(state, {
             card_id = card_id,
+            pending_operator_choice = state.pending_operator_choice,
             pending_hand_choice = state.pending_hand_choice,
             pending_trump = state.pending_trump,
             board_closed = state_lib.is_board_closed(state),
@@ -636,35 +880,72 @@ function M.choose_hand_target(state, card_id)
     })
 
     state.pending_hand_choice = nil
+    state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
     trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         card_id = card_id,
+        pending_operator_choice = state.pending_operator_choice,
         pending_hand_choice = state.pending_hand_choice,
         pending_trump = state.pending_trump,
         board_closed = state_lib.is_board_closed(state),
     })
 end
 
-function M.choose_hidden_target(state, card_id)
+function M.choose_hand_target(state, card_id)
+    local armed, err = M.arm_hand_target(state, card_id)
+    if not armed and err then
+        return nil, err
+    end
+    return M.confirm_hand_target(state)
+end
+
+function M.arm_hidden_target(state, card_id)
     local pending = state.pending_hidden_choice
     if not pending then
         return nil, "no_pending_hidden_choice"
     end
-
-    local legal = false
-    for _, legal_card_id in ipairs(pending.legal_card_ids or {}) do
-        if legal_card_id == card_id then
-            legal = true
-            break
-        end
-    end
-    if not legal then
+    if not card_choice_is_legal(pending.legal_card_ids, card_id) then
         return nil, "illegal_hidden_choice"
     end
 
-    transition.begin(state, "choose_hidden_target", {
+    transition.begin(state, "arm_hidden_target", {
+        card_id = card_id,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    if pending.armed_card_id == card_id then
+        pending.armed_card_id = nil
+    else
+        pending.armed_card_id = card_id
+    end
+    transition.emit(state, "hidden_target_armed", {
+        card_id = pending.armed_card_id,
+        operator = pending.operator,
+        source_card_id = pending.card_id,
+    })
+
+    return transition.finish(state, {
+        pending_hidden_choice = state.pending_hidden_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.confirm_hidden_target(state)
+    local pending = state.pending_hidden_choice
+    if not pending then
+        return nil, "no_pending_hidden_choice"
+    end
+    if not pending.armed_card_id then
+        return nil, "no_armed_hidden_target"
+    end
+
+    local card_id = pending.armed_card_id
+
+    transition.begin(state, "confirm_hidden_target", {
         card_id = card_id,
         source_card_id = pending.card_id,
         operator = pending.operator,
@@ -703,15 +984,25 @@ function M.choose_hidden_target(state, card_id)
     })
 
     state.pending_hidden_choice = nil
+    state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
     trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         card_id = card_id,
+        pending_operator_choice = state.pending_operator_choice,
         pending_hidden_choice = state.pending_hidden_choice,
         pending_trump = state.pending_trump,
         board_closed = state_lib.is_board_closed(state),
     })
+end
+
+function M.choose_hidden_target(state, card_id)
+    local armed, err = M.arm_hidden_target(state, card_id)
+    if not armed and err then
+        return nil, err
+    end
+    return M.confirm_hidden_target(state)
 end
 
 return M
