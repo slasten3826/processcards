@@ -1,0 +1,10 @@
+start_game | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | new core game started
+load | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | manifest app loaded
+mousepressed | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | x=835 y=547 button=1
+await_commit_hand_block | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | card=MINOR-80
+mousepressed | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | x=720 y=572 button=1
+await_commit_hand_block | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | card=MINOR-54
+mousepressed | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | x=638 y=574 button=1
+await_commit_hand_block | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | card=MINOR-85
+mousepressed | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | x=498 y=573 button=1
+await_commit_hand_block | phase=await_commit prompt=Choose one manifest slot. advance=no:- hand=- op=- target=-:-:- targets=- target_kind=- target_cards=0 target_slots=0 play=- | card=MINOR-22
