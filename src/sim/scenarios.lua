@@ -13,6 +13,28 @@ local function first_legal_hand(state, slot)
     return legal[1], legal
 end
 
+local function legal_start_hand_cards(state)
+    local out = {}
+    for _, card_id in ipairs(state.zones.hand.cards) do
+        if #rules.legal_manifest_slots_for_hand(state, card_id) > 0 then
+            out[#out + 1] = card_id
+        end
+    end
+    return out
+end
+
+local function same_list(a, b)
+    if #a ~= #b then
+        return false
+    end
+    for i = 1, #a do
+        if a[i] ~= b[i] then
+            return false
+        end
+    end
+    return true
+end
+
 function M.draw_once(state)
     local top_before = state.zones.deck.cards[#state.zones.deck.cards]
     local top_class = top_before and state.cards[top_before].class or nil
@@ -28,6 +50,219 @@ function M.draw_once(state)
         result = result,
         hand_after = #state.zones.hand.cards,
         flow_after = #state.zones.trump_flow.cards,
+    }
+end
+
+function M.interaction_start_surface(state)
+    local ix = core.interaction(state)
+    local expected_hand = legal_start_hand_cards(state)
+
+    if ix.phase ~= "await_start" then
+        return nil, "unexpected_phase"
+    end
+    if #ix.legal.commit_slots == 0 then
+        return nil, "no_commit_slots_at_start"
+    end
+    if not same_list(ix.legal.hand_cards, expected_hand) then
+        return nil, "start_hand_surface_mismatch"
+    end
+    if ix.advance and ix.advance.enabled then
+        return nil, "start_advance_should_be_disabled"
+    end
+    if ix.legal.clears.selection or ix.legal.clears.committed or ix.legal.clears.armed then
+        return nil, "start_clears_should_be_disabled"
+    end
+
+    return {
+        name = "interaction_start_surface",
+        hand_cards = ix.legal.hand_cards,
+        commit_slots = ix.legal.commit_slots,
+    }
+end
+
+function M.interaction_complete_from_commit(state)
+    local slot
+    local hand_card_id
+    local legal
+
+    for i = 1, 6 do
+        hand_card_id, legal = first_legal_hand(state, i)
+        if hand_card_id then
+            slot = i
+            break
+        end
+    end
+    if not slot then
+        return nil, "no_legal_turn"
+    end
+
+    core.commit_manifest(state, slot)
+    local ix = core.interaction(state)
+
+    if ix.phase ~= "await_complete" then
+        return nil, "unexpected_phase"
+    end
+    if ix.armed.hand_card_id ~= nil then
+        return nil, "commit_only_should_not_arm_hand"
+    end
+    if not same_list(ix.legal.hand_cards, legal) then
+        return nil, "commit_hand_surface_mismatch"
+    end
+    if not ix.legal.clears.selection or not ix.legal.clears.committed or ix.legal.clears.armed then
+        return nil, "commit_clear_surface_mismatch"
+    end
+
+    return {
+        name = "interaction_complete_from_commit",
+        slot = slot,
+        hand_cards = ix.legal.hand_cards,
+        commit_slots = ix.legal.commit_slots,
+    }
+end
+
+function M.interaction_complete_from_hand(state)
+    local hand_card_id = legal_start_hand_cards(state)[1]
+    if not hand_card_id then
+        return nil, "no_legal_start_hand"
+    end
+
+    local expected_slots = rules.legal_manifest_slots_for_hand(state, hand_card_id)
+    local expected_hand = legal_start_hand_cards(state)
+
+    core.arm_hand(state, hand_card_id)
+    local ix = core.interaction(state)
+
+    if ix.phase ~= "await_complete" then
+        return nil, "unexpected_phase"
+    end
+    if ix.armed.hand_card_id ~= hand_card_id then
+        return nil, "hand_anchor_not_armed"
+    end
+    if not same_list(ix.legal.commit_slots, expected_slots) then
+        return nil, "hand_commit_surface_mismatch"
+    end
+    if not same_list(ix.legal.hand_cards, expected_hand) then
+        return nil, "hand_switch_surface_mismatch"
+    end
+    if not ix.legal.clears.selection or ix.legal.clears.committed or not ix.legal.clears.armed then
+        return nil, "hand_clear_surface_mismatch"
+    end
+
+    return {
+        name = "interaction_complete_from_hand",
+        hand_card_id = hand_card_id,
+        commit_slots = ix.legal.commit_slots,
+        hand_cards = ix.legal.hand_cards,
+    }
+end
+
+function M.interaction_ready_surface(state)
+    local slot
+    local hand_card_id
+    local legal
+
+    for i = 1, 6 do
+        hand_card_id, legal = first_legal_hand(state, i)
+        if hand_card_id then
+            slot = i
+            break
+        end
+    end
+    if not slot then
+        return nil, "no_legal_turn"
+    end
+
+    local expected_commit = rules.legal_manifest_slots_for_hand(state, hand_card_id)
+    core.commit_manifest(state, slot)
+    core.arm_hand(state, hand_card_id)
+    local ix = core.interaction(state)
+
+    if ix.phase ~= "await_ready" then
+        return nil, "unexpected_phase"
+    end
+    if not ix.advance or not ix.advance.enabled then
+        return nil, "ready_advance_should_be_enabled"
+    end
+    if not same_list(ix.legal.commit_slots, expected_commit) then
+        return nil, "ready_commit_surface_mismatch"
+    end
+    if not same_list(ix.legal.hand_cards, legal) then
+        return nil, "ready_hand_surface_mismatch"
+    end
+    if not ix.legal.clears.selection or not ix.legal.clears.committed or not ix.legal.clears.armed then
+        return nil, "ready_clear_surface_mismatch"
+    end
+
+    return {
+        name = "interaction_ready_surface",
+        slot = slot,
+        hand_card_id = hand_card_id,
+        commit_slots = ix.legal.commit_slots,
+        hand_cards = ix.legal.hand_cards,
+    }
+end
+
+function M.arm_hand_blocked_in_operator_phase(state)
+    local info, err = M.one_turn_setup_only(state)
+    if not info then
+        return nil, err
+    end
+
+    local ix = core.interaction(state)
+    if ix.phase ~= "await_operator" then
+        return nil, "unexpected_phase"
+    end
+
+    local blocked_card_id = state.zones.hand.cards[1]
+    if not blocked_card_id then
+        return nil, "no_hand_card"
+    end
+
+    local before = state.armed_hand
+    local result = core.apply_action(state, {
+        kind = "arm_hand",
+        card_id = blocked_card_id,
+    })
+    local summary = result and result.summary or {}
+    if summary.error ~= "arm_hand_not_available" then
+        return nil, "arm_hand_should_be_blocked"
+    end
+    if state.armed_hand ~= before then
+        return nil, "armed_hand_mutated_in_operator_phase"
+    end
+
+    return {
+        name = "arm_hand_blocked_in_operator_phase",
+        hand_card_id = blocked_card_id,
+        error = summary.error,
+    }
+end
+
+function M.clear_actions_blocked_in_start(state)
+    local ix = core.interaction(state)
+    if ix.phase ~= "await_start" then
+        return nil, "unexpected_phase"
+    end
+
+    local clear_selection = core.apply_action(state, {kind = "clear_selection"})
+    local clear_committed = core.apply_action(state, {kind = "clear_committed"})
+    local clear_armed = core.apply_action(state, {kind = "clear_armed"})
+
+    if clear_selection.summary.error ~= "clear_selection_not_available" then
+        return nil, "clear_selection_should_be_blocked"
+    end
+    if clear_committed.summary.error ~= "clear_committed_not_available" then
+        return nil, "clear_committed_should_be_blocked"
+    end
+    if clear_armed.summary.error ~= "clear_armed_not_available" then
+        return nil, "clear_armed_should_be_blocked"
+    end
+
+    return {
+        name = "clear_actions_blocked_in_start",
+        selection = clear_selection.summary.error,
+        committed = clear_committed.summary.error,
+        armed = clear_armed.summary.error,
     }
 end
 
@@ -202,23 +437,19 @@ function M.one_turn_via_protocol(state)
     for _ = 1, step_limit do
         local ix = core.interaction(state)
 
-        if ix.phase == "await_commit" then
+        if ix.phase == "await_start" then
             local slot = ix.legal.commit_slots[1]
-            if not slot then
-                return nil, "no_legal_turn"
-            end
-            committed_slot = slot
-            local result = core.apply_action(state, {
-                kind = "commit_manifest",
-                slot = slot,
-            })
-            if result.summary and result.summary.error then
-                return nil, result.summary.error
-            end
-            actions[#actions + 1] = "commit:" .. tostring(slot)
-
-        elseif ix.phase == "await_hand" then
-            if not ix.armed.hand_card_id then
+            if slot then
+                committed_slot = slot
+                local result = core.apply_action(state, {
+                    kind = "commit_manifest",
+                    slot = slot,
+                })
+                if result.summary and result.summary.error then
+                    return nil, result.summary.error
+                end
+                actions[#actions + 1] = "commit:" .. tostring(slot)
+            else
                 local card_id = ix.legal.hand_cards[1]
                 if not card_id then
                     return nil, "no_legal_turn"
@@ -232,7 +463,41 @@ function M.one_turn_via_protocol(state)
                     return nil, result.summary.error
                 end
                 actions[#actions + 1] = "arm_hand:" .. tostring(card_id)
+            end
+
+        elseif ix.phase == "await_complete" then
+            if not ix.armed.hand_card_id then
+                local card_id = ix.legal.hand_cards[1]
+                if not card_id then
+                    return nil, "no_legal_hand_card"
+                end
+                played_hand = card_id
+                local result = core.apply_action(state, {
+                    kind = "arm_hand",
+                    card_id = card_id,
+                })
+                if result.summary and result.summary.error then
+                    return nil, result.summary.error
+                end
+                actions[#actions + 1] = "arm_hand:" .. tostring(card_id)
             else
+                local slot = ix.legal.commit_slots[1]
+                if not slot then
+                    return nil, "no_commit_slot_for_armed_hand"
+                end
+                committed_slot = slot
+                local result = core.apply_action(state, {
+                    kind = "commit_manifest",
+                    slot = slot,
+                })
+                if result.summary and result.summary.error then
+                    return nil, result.summary.error
+                end
+                actions[#actions + 1] = "commit:" .. tostring(slot)
+            end
+
+        elseif ix.phase == "await_ready" then
+            do
                 local result = core.apply_action(state, {kind = "advance"})
                 if result.summary and result.summary.error then
                     return nil, result.summary.error

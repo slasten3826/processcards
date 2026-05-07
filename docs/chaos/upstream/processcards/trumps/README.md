@@ -74,8 +74,8 @@ Trump events may disturb the board,
 but should usually return the game to a valid board state:
 
 ```text
-5 manifest slots
-5 latent slots
+6 manifest slots
+6 latent slots
 runtime capacity = 1
 ordered grave
 ```
@@ -88,7 +88,11 @@ not an accidental rules hole.
 
 Resolved trumps do not go to grave by default.
 
-They go to a separate `trump zone`.
+They close through the trump engine:
+
+- ordinary chains park into `trump zone`
+- halted chains flush non-`HALT` trumps back into `deck`
+- `HALT` itself still parks into `trump zone`
 
 This zone is not a buff row.
 It is not a second grave.
@@ -96,16 +100,18 @@ It is not an active board state.
 
 Cards in `trump zone` do nothing except count as resolved trumps.
 
-Default direction:
-
-```text
-resolved trump -> trump zone
-```
-
 Current direction:
 
 ```text
-trump zone capacity = 2
+trumps remain in-flight until chain close
+ordinary close -> trump zone
+halted close -> deck flush + HALT to trump zone
+```
+
+Trump zone capacity:
+
+```text
+2
 ```
 
 When the third resolved trump would enter `trump zone`,
@@ -141,13 +147,28 @@ deck
 
 - [TRUMP_ECOLOGY.md](TRUMP_ECOLOGY.md)
 - [TRUMP_RESOLUTION_ORDER.md](TRUMP_RESOLUTION_ORDER.md)
+- [FOOL.md](FOOL.md)
+- [EJECT.md](EJECT.md)
 - [RECAST.md](RECAST.md)
 - [SHUFFLE.md](SHUFFLE.md)
-- [EJECT.md](EJECT.md)
 - [RESET.md](RESET.md)
 - [UNVEIL.md](UNVEIL.md)
+- [ORACLE.md](ORACLE.md)
 - [HALT.md](HALT.md)
-- [FOOL.md](FOOL.md)
+- [SWAP.md](SWAP.md)
+- [WARRANT.md](WARRANT.md)
+- [REPEAT.md](REPEAT.md)
+- [UNBOUND.md](UNBOUND.md)
+- [TIGEL.md](TIGEL.md)
+- [RUSH.md](RUSH.md)
+- [ENOUGH.md](ENOUGH.md)
+- [GRANT.md](GRANT.md)
+- [GATE.md](GATE.md)
+- [PURGE.md](PURGE.md)
+- [CANON.md](CANON.md)
+- [MAXIMIZE.md](MAXIMIZE.md)
+- [ERROR.md](ERROR.md)
+- [REQUIEM.md](REQUIEM.md)
 
 ---
 

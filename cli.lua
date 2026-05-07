@@ -203,21 +203,36 @@ end
 local function choose_cli_auto_action(ix)
     local targets = ix.legal and ix.legal.targets or {}
 
-    if ix.phase == "await_commit" then
+    if ix.phase == "await_start" then
         local slot = ix.legal.commit_slots[1]
         if slot then
             return {kind = "commit_manifest", slot = slot}
         end
+        local card_id = ix.legal.hand_cards[1]
+        if card_id then
+            return {kind = "arm_hand", card_id = card_id}
+        end
         return nil
     end
 
-    if ix.phase == "await_hand" then
-        if ix.armed.hand_card_id and ix.advance and ix.advance.enabled then
-            return {kind = "advance"}
+    if ix.phase == "await_complete" then
+        if ix.armed.hand_card_id then
+            local slot = ix.legal.commit_slots[1]
+            if slot then
+                return {kind = "commit_manifest", slot = slot}
+            end
+            return nil
         end
         local card_id = ix.legal.hand_cards[1]
         if card_id then
             return {kind = "arm_hand", card_id = card_id}
+        end
+        return nil
+    end
+
+    if ix.phase == "await_ready" then
+        if ix.advance and ix.advance.enabled then
+            return {kind = "advance"}
         end
         return nil
     end

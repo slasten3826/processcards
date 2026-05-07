@@ -10,6 +10,12 @@ This is not final balance text.
 This is not locked card wording.
 This is a mechanical crystall draft.
 
+Legacy breadcrumb:
+
+```text
+X Wheel of Fortune
+```
+
 Primary short name:
 
 ```text

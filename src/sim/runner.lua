@@ -58,26 +58,39 @@ local function first_target_action(ix)
 end
 
 local function choose_protocol_action(ix)
-    if ix.phase == "await_commit" then
+    if ix.phase == "await_start" then
         local slot = ix.legal.commit_slots[1]
         if not slot then
-            return nil, "no_commit_slot"
+            local card_id = ix.legal.hand_cards[1]
+            if not card_id then
+                return nil, "no_start_action"
+            end
+            return {kind = "arm_hand", card_id = card_id}
         end
         return {kind = "commit_manifest", slot = slot}
     end
 
-    if ix.phase == "await_hand" then
+    if ix.phase == "await_complete" then
         if ix.armed.hand_card_id then
-            if ix.advance and ix.advance.enabled then
-                return {kind = "advance"}
+            local slot = ix.legal.commit_slots[1]
+            if not slot then
+                return nil, "no_commit_slot_for_armed_hand"
             end
-            return nil, "hand_armed_but_cannot_advance"
+            return {kind = "commit_manifest", slot = slot}
         end
+
         local card_id = ix.legal.hand_cards[1]
         if not card_id then
             return nil, "no_legal_hand_card"
         end
         return {kind = "arm_hand", card_id = card_id}
+    end
+
+    if ix.phase == "await_ready" then
+        if ix.advance and ix.advance.enabled then
+            return {kind = "advance"}
+        end
+        return nil, "ready_but_cannot_advance"
     end
 
     if ix.phase == "await_operator" then

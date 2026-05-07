@@ -1,3 +1,21 @@
+local script_dir = (arg and arg[0] and arg[0]:match("^(.*)/[^/]+$")) or "."
+
+local project_root = script_dir
+if project_root:match("/src/cli$") then
+    project_root = project_root:gsub("/src/cli$", "")
+elseif project_root:match("/cli$") then
+    project_root = project_root:gsub("/cli$", "")
+elseif project_root == "." then
+    project_root = "."
+end
+
+package.path = table.concat({
+    project_root .. "/src/?.lua",
+    project_root .. "/src/?/init.lua",
+    project_root .. "/src/?/?.lua",
+    package.path,
+}, ";")
+
 local core = require("src.core.api")
 local render = require("src.cli.render")
 local input = require("src.cli.input")

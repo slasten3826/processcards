@@ -87,7 +87,7 @@ gentle rebuild
 When `RESET` becomes known:
 
 1. Discard all cards from hand to grave.
-2. Draw 5 cards from deck.
+2. Draw 6 cards from deck.
 3. If any drawn card is a trump, reveal it and enqueue it by the ordinary trump-resolution law.
 4. Resolve exposed trumps in arrival order according to the normal trump queue.
 5. Continue unfinished draw of `RESET` after each queued trump resolves, unless another resolved effect explicitly prevents continuation.
@@ -97,19 +97,19 @@ Short formula:
 
 ```text
 discard hand
-draw 5
+draw 6
 drawn trumps resolve by normal queue
 RESET follows normal trump ecology
 ```
 
 ---
 
-## 4. Why Draw 5
+## 4. Why Draw 6
 
 The effect is intentionally:
 
 ```text
-draw 5
+draw 6
 ```
 
 Not:
@@ -210,7 +210,7 @@ catastrophic replacement of hand-state
 Draft rules text:
 
 ```text
-Discard your hand. Draw 5.
+Discard your hand. Draw 6.
 If a drawn card is a trump, reveal it and resolve it by the normal trump-resolution law.
 After RESET fully resolves, it follows the ordinary trump ecology.
 ```

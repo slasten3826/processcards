@@ -10,6 +10,12 @@ This is not final balance text.
 This is not locked card wording.
 This is a mechanical clarification draft.
 
+Legacy breadcrumb:
+
+```text
+XII The Hanged Man
+```
+
 Edge:
 
 ```text
@@ -52,10 +58,10 @@ It rewrites the relation between:
 
 ## 2. Terms
 
-`manifest chain` is the full `2×5` table:
+`manifest chain` is the full `2×6` table:
 
-- 5 face-up cards = manifest row
-- 5 face-down cards = latent row
+- 6 face-up cards = manifest row
+- 6 face-down cards = latent row
 
 For this event,
 only the face-up row is first removed directly.
@@ -88,12 +94,12 @@ Possible known-states include:
 
 On reveal / become known:
 
-1. Move all five cards from the current face-up manifest row into `proto-hand`.
-2. Reveal all five cards in the current latent row.
-3. Those five revealed latent cards become the new face-up manifest row.
+1. Move all six cards from the current face-up manifest row into `proto-hand`.
+2. Reveal all six cards in the current latent row.
+3. Those six revealed latent cards become the new face-up manifest row.
 4. Shuffle the player's current hand.
-5. Deal five cards from that shuffled hand face-down into the latent row.
-6. If the shuffled hand contains fewer than five cards,
+5. Deal six cards from that shuffled hand face-down into the latent row.
+6. If the shuffled hand contains fewer than six cards,
    fill the remaining latent slots from deck face-down.
 7. Reveal all remaining cards from the shuffled hand one by one.
 8. Put those revealed cards into grave in reveal order.
@@ -109,7 +115,7 @@ On reveal / become known:
 After resolution:
 
 - manifest row = former latent row
-- latent row = 5 cards from old hand, with deck refill if needed
+- latent row = 6 cards from old hand, with deck refill if needed
 - grave = old hand overflow in reveal order
 - hand = former visible manifest row
 - trump = `trump zone`, unless it triggers trump reset
@@ -130,8 +136,8 @@ third trump -> deck reset
 This event preserves the board invariant:
 
 ```text
-5 manifest slots
-5 latent slots
+6 manifest slots
+6 latent slots
 runtime capacity = 1
 ordered grave
 ```

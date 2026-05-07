@@ -10,6 +10,12 @@ This is not final balance text.
 This is not locked rules text.
 This is a special-case ecology draft.
 
+Legacy breadcrumb:
+
+```text
+XXI The World / Universe
+```
+
 Flavor text:
 
 ```text

@@ -23,6 +23,17 @@ local function legal_hand_cards_from_hints(state)
     return cards
 end
 
+local function legal_start_hand_cards(state)
+    local cards = {}
+    for _, card_id in ipairs(state.zones.hand.cards) do
+        local legal_slots = rules.legal_manifest_slots_for_hand(state, card_id)
+        if #legal_slots > 0 then
+            cards[#cards + 1] = card_id
+        end
+    end
+    return cards
+end
+
 local function zone_flags_from_cards(state, card_ids)
     local zones = {}
     for _, card_id in ipairs(card_ids or {}) do
@@ -87,6 +98,11 @@ local function empty_interaction()
             commit_slots = {},
             hand_cards = {},
             operators = {},
+            clears = {
+                selection = false,
+                committed = false,
+                armed = false,
+            },
             targets = {
                 kind = nil,
                 cards = {},
@@ -255,8 +271,11 @@ function M.read(state)
     if state.committed and state.armed_hand then
         ix.phase = "await_ready"
         ix.prompt = "Press △ to cast."
-        ix.legal.commit_slots = occupied_manifest_slots(state)
+        ix.legal.commit_slots = rules.legal_manifest_slots_for_hand(state, state.armed_hand)
         ix.legal.hand_cards = legal_hand_cards_from_hints(state)
+        ix.legal.clears.selection = true
+        ix.legal.clears.committed = true
+        ix.legal.clears.armed = true
         ix.advance.enabled = true
         ix.advance.reason = "confirm_turn"
         ix.advance.label = "△ Cast"
@@ -268,6 +287,8 @@ function M.read(state)
         ix.prompt = "Choose a hand card or click to deselect."
         ix.legal.commit_slots = occupied_manifest_slots(state)
         ix.legal.hand_cards = legal_hand_cards_from_hints(state)
+        ix.legal.clears.selection = true
+        ix.legal.clears.committed = true
         ix.advance.enabled = false
         return ix
     end
@@ -277,7 +298,9 @@ function M.read(state)
         ix.prompt = "Choose a manifest slot or click to deselect."
         ix.armed.hand_card_id = state.armed_hand
         ix.legal.commit_slots = rules.legal_manifest_slots_for_hand(state, state.armed_hand)
-        ix.legal.hand_cards = {}
+        ix.legal.hand_cards = legal_start_hand_cards(state)
+        ix.legal.clears.selection = true
+        ix.legal.clears.armed = true
         ix.advance.enabled = false
         return ix
     end
@@ -294,6 +317,7 @@ function M.read(state)
     ix.phase = "await_start"
     ix.prompt = "Choose a manifest slot or a hand card."
     ix.legal.commit_slots = occupied_manifest_slots(state)
+    ix.legal.hand_cards = legal_start_hand_cards(state)
     ix.advance.enabled = false
     ix.advance.reason = nil
     ix.advance.label = nil
@@ -355,6 +379,12 @@ function M.format(interaction)
     lines[#lines + 1] = "legal commit_slots=" .. join(legal.commit_slots)
     lines[#lines + 1] = "legal hand_cards=" .. join(legal.hand_cards)
     lines[#lines + 1] = "legal operators=" .. join(legal.operators)
+    lines[#lines + 1] = string.format(
+        "legal clears selection=%s committed=%s armed=%s",
+        legal.clears and legal.clears.selection and "true" or "false",
+        legal.clears and legal.clears.committed and "true" or "false",
+        legal.clears and legal.clears.armed and "true" or "false"
+    )
     lines[#lines + 1] = "legal targets.kind=" .. tostring(targets.kind or "-")
     lines[#lines + 1] = "legal targets.cards=" .. join(targets.cards)
     lines[#lines + 1] = "legal targets.slots=" .. join(targets.slots)

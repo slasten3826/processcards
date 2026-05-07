@@ -9,6 +9,15 @@ local trump = require("src.core.trump")
 
 local M = {}
 
+local function list_contains(list, value)
+    for _, item in ipairs(list or {}) do
+        if item == value then
+            return true
+        end
+    end
+    return false
+end
+
 function M.new()
     return state_lib.new_game()
 end
@@ -100,17 +109,29 @@ function M.apply_action(state, action)
         return M.arm_hand(state, action.card_id)
     end
     if kind == "clear_selection" then
-        transition.begin(state, "clear_selection", {})
+        local ix = interaction.read(state)
+        transition.begin(state, "clear_selection", {phase = ix.phase})
+        if not (ix.legal and ix.legal.clears and ix.legal.clears.selection) then
+            return transition.finish(state, {error = "clear_selection_not_available"})
+        end
         turn.clear_selection(state)
         return transition.finish(state, {})
     end
     if kind == "clear_committed" then
-        transition.begin(state, "clear_committed", {})
+        local ix = interaction.read(state)
+        transition.begin(state, "clear_committed", {phase = ix.phase})
+        if not (ix.legal and ix.legal.clears and ix.legal.clears.committed) then
+            return transition.finish(state, {error = "clear_committed_not_available"})
+        end
         turn.clear_committed(state)
         return transition.finish(state, {})
     end
     if kind == "clear_armed" then
-        transition.begin(state, "clear_armed", {})
+        local ix = interaction.read(state)
+        transition.begin(state, "clear_armed", {phase = ix.phase})
+        if not (ix.legal and ix.legal.clears and ix.legal.clears.armed) then
+            return transition.finish(state, {error = "clear_armed_not_available"})
+        end
         turn.clear_armed(state)
         return transition.finish(state, {})
     end
@@ -169,7 +190,17 @@ function M.commit_manifest(state, slot)
 end
 
 function M.arm_hand(state, card_id)
-    transition.begin(state, "arm_hand", {card_id = card_id})
+    local ix = interaction.read(state)
+    transition.begin(state, "arm_hand", {
+        card_id = card_id,
+        phase = ix.phase,
+    })
+    if not (ix.phase == "await_start" or ix.phase == "await_complete" or ix.phase == "await_ready") then
+        return transition.finish(state, {error = "arm_hand_not_available"})
+    end
+    if not list_contains(ix.legal and ix.legal.hand_cards or {}, card_id) then
+        return transition.finish(state, {error = "illegal_hand_card"})
+    end
     local armed, err = turn.arm_hand(state, card_id)
     if err then
         return transition.finish(state, {error = err})
