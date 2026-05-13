@@ -1,4 +1,4 @@
-[⊞ ◈] [☱ ☶]
+[⊞ ◈] [☳ ☱]
 
 # ERROR
 
@@ -24,8 +24,8 @@ I am Error.
 Core edge:
 
 ```text
-☱ -> ☶
-RUNTIME -> LOGIC
+☳ -> ☱
+CHOOSE -> RUNTIME
 ```
 
 ---
@@ -53,29 +53,29 @@ nothing returned may be refused
 
 ## 2. Reading
 
-`☱ RUNTIME` here is not installation as support.
+`☳ CHOOSE` here is not deliberate player preference.
 
-It is an active failure mode:
+It is forced collapse of separation:
 
 ```text
-the condition is now live
+what had been cut away
+is no longer allowed to stay away
 ```
 
-`☶ LOGIC` here is not guidance.
+`☱ RUNTIME` here is not support.
 
-It is admission law:
+It is the active burden now forced back inside:
 
 ```text
-if it is in grave
-it enters hand
+the state must carry all of it
 ```
 
 So this trump reads as:
 
 ```text
-an installed error-state
-opens the whole residue archive
-back into live possession
+what had already been cut away
+collapses all at once
+back into active possession
 ```
 
 This is not:
@@ -86,7 +86,7 @@ mercy
 careful recursion
 ```
 
-It is compulsory return.
+It is compulsory re-admission.
 
 ---
 
@@ -178,6 +178,13 @@ That makes it a true devil-slot event:
 
 It is not temptation.
 It is lock-in through abundance.
+
+Or more precisely:
+
+```text
+separation fails
+and runtime inherits the whole residue load
+```
 
 ---
 

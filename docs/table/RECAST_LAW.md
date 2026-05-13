@@ -20,6 +20,12 @@ Core edge:
 CHOOSE -> LOGIC
 ```
 
+Flavor text:
+
+```text
+What was shown is kept. What was kept goes under.
+```
+
 ## 1. Core identity
 
 `RECAST` is a manifest-chain inversion trump.
@@ -55,8 +61,8 @@ of the manifest-chain surface.
 So this trump reads as:
 
 ```text
-context inverted
-surface recast
+what was shown is kept
+what was kept goes under
 ```
 
 This is not:

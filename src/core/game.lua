@@ -65,6 +65,12 @@ function M.advance(state)
     end
 
     if ix.phase == "await_target" then
+        if state.pending_flow_choice then
+            return M.confirm_flow_target(state)
+        end
+        if state.pending_encode_choice then
+            return M.confirm_encode_target(state)
+        end
         if state.pending_pair_card_choice then
             return M.confirm_pair_card_target(state)
         end
@@ -138,8 +144,21 @@ function M.apply_action(state, action)
     if kind == "arm_operator" then
         return M.arm_operator(state, action.operator)
     end
+    if kind == "arm_direction" then
+        if state.pending_flow_choice then
+            return M.arm_flow_direction(state, action.direction)
+        end
+        transition.begin(state, "apply_action", {kind = kind})
+        return transition.finish(state, {error = "no_pending_direction_phase"})
+    end
     if kind == "arm_target" then
         local target = action.target or {}
+        if state.pending_flow_choice then
+            return M.arm_flow_target(state, target.card_id)
+        end
+        if state.pending_encode_choice then
+            return M.arm_encode_target(state, target.card_id)
+        end
         if state.pending_pair_card_choice then
             return M.arm_pair_card_target(state, target.card_id)
         end
@@ -274,6 +293,26 @@ end
 
 function M.confirm_pair_card_target(state)
     return turn.confirm_pair_card_target(state)
+end
+
+function M.arm_flow_target(state, card_id)
+    return turn.arm_flow_target(state, card_id)
+end
+
+function M.arm_flow_direction(state, direction)
+    return turn.arm_flow_direction(state, direction)
+end
+
+function M.confirm_flow_target(state)
+    return turn.confirm_flow_target(state)
+end
+
+function M.arm_encode_target(state, card_id)
+    return turn.arm_encode_target(state, card_id)
+end
+
+function M.confirm_encode_target(state)
+    return turn.confirm_encode_target(state)
 end
 
 function M.confirm_public_target(state)

@@ -7,6 +7,6 @@
 - [../OPERATORS_INDEX.md](../OPERATORS_INDEX.md)
 
 Здесь каждый файл фиксирует один operator family,
-его weak/strong law,
+его current family law,
 pair-direction,
 и cardboard constraints.

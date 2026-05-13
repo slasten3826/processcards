@@ -483,21 +483,28 @@ Gluttony / Cerberus / latent future eaten into grave.
 
 The floor makes `DISSOLVE` consume the whole latent manifest chain.
 
-## Normal Game Candidate
+## Normal Game
 
-Normal `☷ DISSOLVE` candidate:
+Normal `☷ DISSOLVE` now reads as:
 
 ```text
-choose one card in latent manifest chain
-send it to grave
+burn the latent support of the committed column
+before ordinary ascent
 ```
 
-Normal turn repair already works as:
+That means:
+
+1. dissolve `latent[i]` in the committed column
+2. if minor -> grave
+3. if trump -> trump flow
+4. refill `latent[i]`
+5. then continue the ordinary column consume
+
+So Circle 3 is no longer “ordinary dissolve but bigger”.
+It is:
 
 ```text
-revealed manifest card → grave
-latent card in same column → revealed manifest
-deck card → hidden latent
+column-burn becomes whole-row devouring
 ```
 
 ## Circle 3 Law — Cerberus Dissolve
@@ -537,7 +544,7 @@ Typical grave math:
 
 ```text
 normal turn: grave +1
-normal dissolve turn: grave +2
+normal dissolve turn: grave +2 or +1 plus trump contact
 Circle 3 dissolve turn: grave +7
 ```
 
@@ -752,4 +759,3 @@ Exit only through manifest.
 ```
 
 machines only. not for humans.
-

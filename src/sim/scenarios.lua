@@ -377,6 +377,23 @@ function M.one_turn(state)
                 core.arm_pair_card_target(state, hand_target)
             end
             choose_result = core.confirm_pair_card_target(state)
+        elseif state.pending_flow_choice then
+            local target_card_id = state.pending_flow_choice.legal_card_ids[1]
+            if not target_card_id then
+                return nil, "no_flow_target"
+            end
+            core.arm_flow_target(state, target_card_id)
+            core.arm_flow_direction(state, "left")
+            choose_result = core.confirm_flow_target(state)
+        elseif state.pending_encode_choice then
+            local first_card_id = state.pending_encode_choice.legal_card_ids[1]
+            local second_card_id = state.pending_encode_choice.legal_card_ids[2]
+            if not first_card_id or not second_card_id then
+                return nil, "no_encode_target_pair"
+            end
+            core.arm_encode_target(state, first_card_id)
+            core.arm_encode_target(state, second_card_id)
+            choose_result = core.confirm_encode_target(state)
         elseif state.pending_hidden_choice then
             local target_card_id = state.pending_hidden_choice.legal_card_ids[1]
             core.arm_hidden_target(state, target_card_id)
@@ -423,6 +440,17 @@ local function first_target_action(interaction)
                 kind = "card",
                 card_id = targets.cards[1],
             },
+        }
+    end
+    return nil
+end
+
+local function first_direction_action(interaction)
+    local directions = interaction.legal and interaction.legal.directions or {}
+    if directions[1] then
+        return {
+            kind = "arm_direction",
+            direction = directions[1],
         }
     end
     return nil
@@ -534,7 +562,7 @@ function M.one_turn_via_protocol(state)
 
         elseif ix.phase == "await_target" then
             if not (ix.advance and ix.advance.enabled) then
-                local action = first_target_action(ix)
+                local action = first_direction_action(ix) or first_target_action(ix)
                 if not action then
                     return nil, "no_target_action"
                 end
@@ -542,7 +570,7 @@ function M.one_turn_via_protocol(state)
                 if result.summary and result.summary.error then
                     return nil, result.summary.error
                 end
-                local target_desc = action.target.card_id or action.target.slot
+                local target_desc = action.direction or action.target.card_id or action.target.slot
                 actions[#actions + 1] = "arm_target:" .. tostring(target_desc)
             else
                 local result = core.apply_action(state, {kind = "advance"})
@@ -673,6 +701,24 @@ local function enter_logic_choice(state)
         return nil, "no_pending_pair_card_choice"
     end
     return choose_result
+end
+
+local function prepare_named_operator_turn(state, wanted)
+    local info, err = M.one_turn_setup_only(state)
+    if not info then
+        return nil, err
+    end
+
+    local choose_result, choose_err = arm_named_operator_choice(state, wanted)
+    if not choose_result then
+        return nil, choose_err
+    end
+
+    return {
+        slot = info.slot,
+        hand_card_id = info.hand_card_id,
+        choose_result = choose_result,
+    }
 end
 
 function M.manifest_target_arm_toggle(state)
@@ -870,6 +916,218 @@ function M.operator_skip_discharge(state)
         hand_card_id = info.hand_card_id,
         play_card_id = play_card_id,
         result = result,
+    }
+end
+
+function M.dissolve_field_card(state)
+    local slot
+    local hand_card_id
+    local manifest_before
+    local latent_before
+
+    for i = 1, 6 do
+        local manifest_id = state.zones.manifest.cards[i]
+        local latent_id = state.zones.latent.cards[i]
+        if manifest_id and latent_id then
+            local legal = rules.legal_hand_ids(state, manifest_id)
+            for _, candidate in ipairs(legal) do
+                local card = state.cards[candidate]
+                if card.op_a == "DISSOLVE" or card.op_b == "DISSOLVE" then
+                    slot = i
+                    hand_card_id = candidate
+                    manifest_before = manifest_id
+                    latent_before = latent_id
+                    break
+                end
+            end
+        end
+        if hand_card_id then
+            break
+        end
+    end
+
+    if not hand_card_id then
+        return nil, "missing_operator_DISSOLVE"
+    end
+
+    core.commit_manifest(state, slot)
+    core.arm_hand(state, hand_card_id)
+    core.resolve_turn(state, slot, hand_card_id)
+    local _, choose_err = arm_named_operator_choice(state, "DISSOLVE")
+    if choose_err then
+        return nil, choose_err
+    end
+    local result = core.confirm_operator_phase(state)
+    local latent_card = state.cards[latent_before]
+
+    if latent_card.class == "minor" then
+        if latent_card.zone ~= "grave" then
+            return nil, "dissolved_latent_minor_not_in_grave"
+        end
+    else
+        local zone = latent_card.zone
+        if zone ~= "trump_flow" and zone ~= "trump" then
+            return nil, "dissolved_latent_trump_not_in_trump_branch"
+        end
+    end
+
+    if state.cards[manifest_before].zone ~= "grave" then
+        return nil, "committed_manifest_not_in_grave"
+    end
+    if not state.zones.manifest.cards[slot] then
+        return nil, "manifest_not_repaired_after_dissolve"
+    end
+    if not state.zones.latent.cards[slot] then
+        return nil, "latent_not_refilled_after_dissolve"
+    end
+
+    return {
+        name = "dissolve_field_card",
+        slot = slot,
+        hand_card_id = hand_card_id,
+        manifest_before = manifest_before,
+        latent_before = latent_before,
+        result = result,
+    }
+end
+
+function M.flow_structure_step(state)
+    local prep, err = prepare_named_operator_turn(state, "FLOW")
+    if not prep then
+        return nil, err
+    end
+    if not state.pending_flow_choice then
+        return nil, "no_pending_flow_choice"
+    end
+
+    local target_card_id = state.pending_flow_choice.legal_card_ids[1]
+    if not target_card_id then
+        return nil, "no_flow_target"
+    end
+    local target_zone = state.cards[target_card_id].zone
+    core.arm_flow_target(state, target_card_id)
+    core.arm_flow_direction(state, "left")
+    local result = core.confirm_flow_target(state)
+
+    if state.pending_flow_choice or state.pending_operator_choice then
+        return nil, "flow_not_resolved"
+    end
+
+    return {
+        name = "flow_structure_step",
+        target_card_id = target_card_id,
+        target_zone = target_zone,
+        result = result,
+    }
+end
+
+function M.encode_concealed_swap(state)
+    local prep, err = prepare_named_operator_turn(state, "ENCODE")
+    if not prep then
+        return nil, err
+    end
+    if not state.pending_encode_choice then
+        return nil, "no_pending_encode_choice"
+    end
+
+    local first_card_id = state.pending_encode_choice.legal_card_ids[1]
+    local second_card_id = state.pending_encode_choice.legal_card_ids[2]
+    if not first_card_id or not second_card_id then
+        return nil, "no_encode_target_pair"
+    end
+
+    local first_before = {zone = state.cards[first_card_id].zone, slot = state.cards[first_card_id].slot}
+    local second_before = {zone = state.cards[second_card_id].zone, slot = state.cards[second_card_id].slot}
+
+    core.arm_encode_target(state, first_card_id)
+    core.arm_encode_target(state, second_card_id)
+    local result = core.confirm_encode_target(state)
+
+    if state.cards[first_card_id].zone ~= second_before.zone then
+        return nil, "encode_first_not_swapped"
+    end
+    if state.cards[second_card_id].zone ~= first_before.zone then
+        return nil, "encode_second_not_swapped"
+    end
+
+    return {
+        name = "encode_concealed_swap",
+        first_card_id = first_card_id,
+        second_card_id = second_card_id,
+        result = result,
+    }
+end
+
+function M.runtime_install_choice(state)
+    local prep, err = prepare_named_operator_turn(state, "RUNTIME")
+    if not prep then
+        return nil, err
+    end
+
+    local play_card_id = state.zones.play.cards[1]
+    local result = core.confirm_operator_phase(state)
+    if result and result.summary and result.summary.error then
+        return nil, result.summary.error
+    end
+    if state.zones.runtime.cards[1] ~= play_card_id then
+        return nil, "runtime_install_failed"
+    end
+    if state.pending_operator_choice then
+        return nil, "runtime_pending_operator_not_cleared"
+    end
+
+    return {
+        name = "runtime_install_choice",
+        installed_card_id = play_card_id,
+        result = result,
+    }
+end
+
+function M.runtime_granted_choice_visible(state)
+    local install, err = M.runtime_install_choice(state)
+    if not install then
+        return nil, err
+    end
+
+    local next_turn, next_err = M.one_turn_setup_only(state)
+    if not next_turn then
+        return nil, next_err
+    end
+    if not state.pending_operator_choice then
+        return nil, "missing_operator_phase_after_runtime"
+    end
+
+    local runtime_card = state.cards[install.installed_card_id]
+    local choices = state.pending_operator_choice.choices or {}
+    local granted = {}
+    if runtime_card.op_a == "RUNTIME" and runtime_card.op_b == "RUNTIME" then
+        granted = {"RUNTIME"}
+    elseif runtime_card.op_a == "RUNTIME" then
+        granted = {runtime_card.op_b}
+    elseif runtime_card.op_b == "RUNTIME" then
+        granted = {runtime_card.op_a}
+    else
+        granted = {runtime_card.op_a, runtime_card.op_b}
+    end
+
+    for _, op_name in ipairs(granted) do
+        local found = false
+        for _, choice in ipairs(choices) do
+            if choice == op_name then
+                found = true
+                break
+            end
+        end
+        if not found then
+            return nil, "runtime_granted_choice_missing"
+        end
+    end
+
+    return {
+        name = "runtime_granted_choice_visible",
+        installed_card_id = install.installed_card_id,
+        granted = granted,
+        choices = choices,
     }
 end
 

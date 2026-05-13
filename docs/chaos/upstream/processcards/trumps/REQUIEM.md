@@ -1,4 +1,4 @@
-[⊞ ◈] [☱ ☲]
+[⊞ ◈] [☵ ☱]
 
 # REQUIEM
 
@@ -24,8 +24,8 @@ You will never reach the end.
 Core edge:
 
 ```text
-☱ -> ☲
-RUNTIME -> CYCLE
+☵ -> ☱
+ENCODE -> RUNTIME
 ```
 
 Inspiration note:
@@ -39,53 +39,58 @@ at the end of JoJo's Bizarre Adventure: Golden Wind.
 
 ## 1. Core Identity
 
-`REQUIEM` is an installed recurrence trump.
+`REQUIEM` is a hidden-to-runtime installation trump.
 
-It does not destroy directly.
-It does not repeat once.
-It does not return a card to hand.
+It does not draw.
+It does not repeat a past trump directly.
+It does not use ordinary runtime admission law.
 
-It takes the most recent trump
-and installs that trump into `runtime`,
-so that the trump begins resolving again
-at the end of each turn.
+It takes any face-down card on the board,
+installs it into `runtime`,
+and only then reveals what kind of law
+the machine has accepted.
 
 Short formula:
 
 ```text
-last trump becomes runtime
-runtime becomes recurring trump
+take one hidden board card
+install it into runtime
+reveal what now governs the world
 ```
 
 ---
 
 ## 2. Reading
 
-`☱ RUNTIME` here is not support.
+`☵ ENCODE` here is not swap alone.
 
-It is the condition that now remains active.
+It is hidden content
+not yet admitted into public law.
 
-`☲ CYCLE` here is not one recurrence.
+`☱ RUNTIME` here is not ordinary support.
 
-It is return that has become law.
+It is the machine slot
+that makes a chosen operator persist
+as active future choice.
 
 So this trump reads as:
 
 ```text
-what had already happened
-becomes the environment
-that makes it happen again
+what was hidden
+is written directly into runtime
+and only then revealed
+as the world's new recurrence
 ```
 
 This is not:
 
 ```text
-ordinary repetition
-simple replay
-revival
+ordinary reveal
+ordinary install
+safe recursion
 ```
 
-It is installed recurrence.
+It is hidden law made active.
 
 ---
 
@@ -93,55 +98,169 @@ It is installed recurrence.
 
 When `REQUIEM` becomes known:
 
-1. If `trump flow` is non-empty, take the most recent trump from `trump flow`.
-2. Otherwise, if `trump zone` is non-empty, take the most recent trump from `trump zone`.
-3. Otherwise, `REQUIEM` has no installation effect.
-4. Put that trump into `runtime` by ordinary runtime replacement law.
-5. The installed runtime trump resolves once at the end of each turn, after the card from `play zone` has left for `grave`.
-6. Any later runtime card may replace that installed trump by ordinary runtime replacement law.
+1. Choose any face-down card on the board.
+2. Move that card into `runtime`.
+3. If a card was already in `runtime`, move it to `grave`.
+4. Reveal the newly installed runtime card.
+5. If the revealed card is a minor card, it remains in `runtime` and modifies future runtime choice according to sections `4` and `5`.
+6. If the revealed card is a trump, it follows the old `REQUIEM` law:
+   - if `trump flow` is non-empty, take the most recent trump from `trump flow`
+   - otherwise, if `trump zone` is non-empty, take the most recent trump from `trump zone`
+   - otherwise, there is no recurring trump payload
+   - put that trump into `runtime` by runtime replacement law
+   - that runtime trump resolves once at the end of each turn, after the played card has left `play zone` for `grave`
 7. After `REQUIEM` fully resolves, it follows ordinary trump ecology.
 
 Short formula:
 
 ```text
-prefer trump flow
-else trump zone
-else nothing
-install into runtime
-resolve it every turn-end
+hidden board card -> runtime
+reveal after installation
+minor -> impossible runtime carrier
+trump -> recurring runtime trump
 ```
 
 ---
 
-## 4. Source Priority
+## 4. Minor Runtime Outcome
 
-`REQUIEM` does not choose freely.
+If the installed hidden card is a minor card,
+`REQUIEM` creates an exceptional runtime state.
 
-Its source order is fixed:
+### Special case: the card is `☱☱`
+
+If the revealed minor is `☱☱`,
+it preserves its ordinary special runtime law.
+
+That means:
+
+- it does **not** immediately grant two runtime operators
+- it does **not** create `3-choice`
+- it does **not** create `4-choice`
+- it only opens `runtime` for any later minor card
+
+So under `REQUIEM`,
+`☱☱` is mostly a null payload.
+
+It still installs a real state,
+but that state is only:
 
 ```text
-trump flow first
-trump zone second
-nothing third
+runtime is now open
 ```
 
-This matters.
+### Ordinary case: the card contains `☱`, but is not `☱☱`
 
-The player does not browse trump history.
-`REQUIEM` takes the nearest available fate.
+If the revealed minor already contains `☱`,
+it behaves by ordinary runtime law:
+
+- the card stays in `runtime`
+- its partner operator becomes the granted runtime choice
+- future played cards may choose:
+  - operator A of the played card
+  - operator B of the played card
+  - granted runtime partner operator
+
+This is the normal `3-choice` state.
+
+### Exceptional case: the card does not contain `☱`
+
+If the revealed minor does **not** contain `☱`,
+`REQUIEM` still allows it to remain in `runtime`.
+
+This breaks ordinary runtime admission law.
+
+In that case, the installed card grants **both** of its printed operators
+as runtime choices.
+
+Future played cards may then choose:
+
+- operator A of the played card
+- operator B of the played card
+- runtime-granted operator X
+- runtime-granted operator Y
+
+If all four operators are distinct,
+this becomes a true `4-choice` state.
 
 Short formula:
 
 ```text
-latest available trump is taken
-not selected
+☱☱ in runtime -> opener only
+ordinary ☱-minor in runtime -> 3-choice
+non-☱ minor in runtime through REQUIEM -> 4-choice
 ```
 
 ---
 
-## 5. Turn-End Timing
+## 5. Why This Is Exceptional
 
-The installed runtime trump does not fire mid-resolution.
+By ordinary law:
+
+```text
+only cards containing ☱ may enter runtime
+```
+
+`REQUIEM` breaks that law deliberately.
+
+It allows hidden board matter
+to become runtime carrier
+even when it normally had no right
+to occupy that slot.
+
+This is load-bearing.
+
+The trump does not just reveal hidden content.
+It lets hidden content become machine law.
+
+---
+
+## 6. Any Face-Down Card
+
+`REQUIEM` may target:
+
+- hidden cards in `latent layer`
+- hidden cards in `target zone`
+- any other face-down board card
+
+It does not care where concealment lived.
+
+It only cares that the card was not yet revealed
+when it was admitted into `runtime`.
+
+Short formula:
+
+```text
+any hidden board card
+may become runtime law
+```
+
+---
+
+## 7. Trump Runtime Outcome
+
+If the hidden chosen card reveals as a trump,
+the installed object in `runtime`
+does not become a static runtime-choice card.
+
+Instead, `REQUIEM` reverts to its terminal recursion branch:
+
+- it sources the most recent trump from `trump flow`, else `trump zone`
+- installs that trump into `runtime`
+- and that runtime trump resolves
+  once at the end of each turn
+
+So the card has two very different deaths:
+
+- hidden minor -> world rewritten by hidden runtime choice
+- hidden trump -> world trapped in recurring end-state
+
+---
+
+## 8. Turn-End Timing
+
+When `REQUIEM` creates a recurring runtime trump,
+that trump does not fire mid-resolution.
 
 It resolves:
 
@@ -151,107 +270,35 @@ after that card has left play zone for grave
 at the very end of the turn
 ```
 
-This keeps the loop readable.
-
-The turn first completes its ordinary action.
-Then the installed recurrence answers.
-
-Short formula:
-
-```text
-turn first
-runtime recurrence after
-```
-
----
-
-## 6. Runtime Replacement
-
-The installed trump in `runtime`
-is not eternal.
-
-Any later runtime card
-may replace it
-by ordinary runtime replacement law.
-
-This is load-bearing.
-
-`REQUIEM` creates a death-loop,
-but not one that is outside the machine.
-
-The loop remains part of runtime ecology.
-
----
-
-## 7. Self-Installation
-
-`REQUIEM` may install itself into `runtime`
-if the game state legally allows that to happen.
-
-This is not forbidden by special exception.
-
-It should be extremely difficult.
-
-If it happens,
-the player has forced `REQUIEM`
-to become its own recurring runtime law.
-
-That is intentional.
-
-Short formula:
-
-```text
-self-installation is allowed
-but not granted for free
-```
-
----
-
-## 8. Why This Works
-
-`REQUIEM` is a death-slot trump
-not because it ends things,
-but because it removes exit.
-
-The most recent trump
-stops being a past event.
-
-It becomes the condition of the world.
-
-That makes `REQUIEM` a true terminal event:
-
-- not simple destruction
-- not simple reset
-- but loss of outside through installed return
-
-Short formula:
-
-```text
-return becomes the ground
-```
-
----
-
-## 9. Relation to Runtime
-
-`REQUIEM` does not invent a new lane.
-
-It uses ordinary `runtime`.
-
-The horror of the card
-is precisely that recurrence
-no longer sits in `trump zone`
-or in past `trump flow`.
-
-It now occupies the same machine slot
-that normally holds active turn-law.
-
 So:
 
-- `runtime` becomes cyclic
-- `cycle` becomes environmental
+- the turn completes
+- then recurrence answers
 
-That is the whole card.
+This keeps the loop readable.
+
+---
+
+## 9. Why This Works
+
+`REQUIEM` is a death-slot trump
+not because it destroys directly,
+but because it lets hidden law
+become the active world.
+
+That hidden law may be:
+
+- a minor structure that mutates future choice
+- or a trump recursion that installs terminal recurrence
+
+Either way, something not yet public
+becomes the machine's future condition.
+
+Short formula:
+
+```text
+the hidden becomes what now returns
+```
 
 ---
 
@@ -260,19 +307,19 @@ That is the whole card.
 `REQUIEM` should feel:
 
 - terminal
-- inescapable
-- installed
+- hidden before it is fatal
 - less explosive than `PURGE`
 - colder than `RESET`
-- like the world has accepted repetition as law
+- like the world accepted a law
+  that should not have reached runtime
 
 It should not feel:
 
-- like simple extra value
-- like ordinary repeat
-- like a cute recursion trick
+- like ordinary runtime support
+- like a cute reveal trick
+- like safe future planning
 
-It is the loop made real.
+It is concealed fate admitted too far.
 
 ---
 
@@ -281,13 +328,12 @@ It is the loop made real.
 Draft rules text:
 
 ```text
-Take the most recent trump from trump flow, if any.
-Otherwise take the most recent trump from trump zone, if any.
-Otherwise REQUIEM has no installation effect.
-Put that trump into runtime by ordinary runtime replacement law.
-That runtime trump resolves once at the end of each turn,
-after the played card has left play zone for grave.
-Any later runtime card may replace it by ordinary runtime replacement law.
+Choose any face-down card on the board and put it into runtime.
+If a card was already in runtime, move it to grave.
+Reveal the newly installed runtime card.
+If it is a minor card containing ☱, it behaves by ordinary runtime law.
+If it is a minor card without ☱, it remains in runtime anyway and grants both of its printed operators as runtime choices.
+If it is a trump, source the most recent trump from trump flow, else trump zone, install that trump into runtime, and resolve it once at the end of each turn after the played card has left play zone for grave.
 After REQUIEM fully resolves, it follows ordinary trump ecology.
 ```
 

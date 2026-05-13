@@ -34,6 +34,9 @@ local function action_desc(action)
     if action.operator then
         return desc .. ":" .. tostring(action.operator)
     end
+    if action.direction then
+        return desc .. ":" .. tostring(action.direction)
+    end
     if action.target then
         return desc .. ":" .. tostring(action.target.card_id or action.target.slot or "-")
     end
@@ -254,6 +257,13 @@ local function choose_cli_auto_action(ix)
     if ix.phase == "await_target" then
         if ix.advance and ix.advance.enabled then
             return {kind = "advance"}
+        end
+        local directions = ix.legal and ix.legal.directions or {}
+        if directions[1] then
+            return {
+                kind = "arm_direction",
+                direction = directions[1],
+            }
         end
         if targets.slots and #targets.slots > 0 then
             return {

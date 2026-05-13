@@ -32,7 +32,7 @@ RECAST
 Flavor text:
 
 ```text
-System rewritten. Context inverted.
+What was shown is kept. What was kept goes under.
 ```
 
 ## 1. Core Reading

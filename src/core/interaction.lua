@@ -98,6 +98,7 @@ local function empty_interaction()
             commit_slots = {},
             hand_cards = {},
             operators = {},
+            directions = {},
             clears = {
                 selection = false,
                 committed = false,
@@ -122,6 +123,71 @@ function M.read(state)
 
     ix.armed.hand_card_id = state.armed_hand
     ix.armed.operator = state.pending_operator_choice and state.pending_operator_choice.armed_operator or nil
+
+    if state.pending_flow_choice then
+        local pending = state.pending_flow_choice
+
+        ix.phase = "await_target"
+        ix.armed.target = target_ref_for_card(state, pending.armed_card_id)
+        append_target_ref(ix.armed.targets, ix.armed.target)
+        ix.legal.targets.kind = "flow_card"
+
+        if not pending.armed_card_id then
+            ix.prompt = "Choose one not-revealed structure card."
+            ix.legal.targets.cards = pending.legal_card_ids or {}
+            ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
+            return ix
+        end
+
+        if not pending.armed_direction then
+            ix.prompt = "Choose flow direction."
+            ix.legal.directions = {"left", "right"}
+            return ix
+        end
+
+        ix.prompt = "Confirm flow step."
+        ix.legal.directions = {"left", "right"}
+        ix.advance.enabled = true
+        ix.advance.reason = "confirm_target"
+        ix.advance.label = "Confirm flow"
+        return ix
+    end
+
+    if state.pending_encode_choice then
+        local pending = state.pending_encode_choice
+        local first = target_ref_for_card(state, pending.armed_first_card_id)
+        local second = target_ref_for_card(state, pending.armed_second_card_id)
+
+        ix.phase = "await_target"
+        ix.legal.targets.kind = "encode_card"
+        append_target_ref(ix.armed.targets, first)
+        append_target_ref(ix.armed.targets, second)
+        ix.armed.target = ix.armed.targets[1]
+
+        if pending.armed_first_card_id and pending.armed_second_card_id then
+            ix.prompt = "Confirm the concealed swap."
+            ix.advance.enabled = true
+            ix.advance.reason = "confirm_target"
+            ix.advance.label = "Confirm swap"
+            return ix
+        end
+
+        if pending.armed_first_card_id then
+            ix.prompt = "Choose the second not-revealed card."
+            for _, card_id in ipairs(pending.legal_card_ids or {}) do
+                if card_id ~= pending.armed_first_card_id then
+                    ix.legal.targets.cards[#ix.legal.targets.cards + 1] = card_id
+                end
+            end
+            ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
+            return ix
+        end
+
+        ix.prompt = "Choose the first not-revealed card."
+        ix.legal.targets.cards = pending.legal_card_ids or {}
+        ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
+        return ix
+    end
 
     if state.pending_pair_card_choice then
         local pending = state.pending_pair_card_choice
@@ -220,10 +286,15 @@ function M.read(state)
 
     if state.pending_public_choice then
         ix.phase = "await_target"
-        ix.prompt = "Choose one revealed minor card."
+        if state.pending_public_choice.operator == "DISSOLVE" then
+            ix.prompt = "Choose one revealed field card."
+            ix.legal.targets.kind = "revealed_field_card"
+        else
+            ix.prompt = "Choose one revealed minor card."
+            ix.legal.targets.kind = "public_minor_card"
+        end
         ix.armed.target = target_ref_for_card(state, state.pending_public_choice.armed_card_id)
         append_target_ref(ix.armed.targets, ix.armed.target)
-        ix.legal.targets.kind = "public_minor_card"
         ix.legal.targets.cards = state.pending_public_choice.legal_card_ids or {}
         ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
         ix.advance.enabled = state.pending_public_choice.armed_card_id ~= nil
@@ -379,6 +450,7 @@ function M.format(interaction)
     lines[#lines + 1] = "legal commit_slots=" .. join(legal.commit_slots)
     lines[#lines + 1] = "legal hand_cards=" .. join(legal.hand_cards)
     lines[#lines + 1] = "legal operators=" .. join(legal.operators)
+    lines[#lines + 1] = "legal directions=" .. join(legal.directions)
     lines[#lines + 1] = string.format(
         "legal clears selection=%s committed=%s armed=%s",
         legal.clears and legal.clears.selection and "true" or "false",

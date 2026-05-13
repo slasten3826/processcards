@@ -19,10 +19,17 @@ local SKIP_ERRORS = {
     no_unrevealed_target = true,
     missing_operator_CHOOSE = true,
     missing_operator_OBSERVE = true,
+    missing_operator_DISSOLVE = true,
+    missing_operator_FLOW = true,
+    missing_operator_ENCODE = true,
+    missing_operator_RUNTIME = true,
     no_manifest_target = true,
     no_hidden_target = true,
     no_public_target = true,
     no_hand_target = true,
+    no_dissolve_target = true,
+    no_flow_target = true,
+    no_encode_target_pair = true,
 }
 
 local function new_game(seed)
@@ -52,6 +59,17 @@ local function first_target_action(ix)
                 kind = "card",
                 card_id = targets.cards[1],
             },
+        }
+    end
+    return nil
+end
+
+local function first_direction_action(ix)
+    local directions = ix.legal and ix.legal.directions or {}
+    if directions[1] then
+        return {
+            kind = "arm_direction",
+            direction = directions[1],
         }
     end
     return nil
@@ -113,6 +131,10 @@ local function choose_protocol_action(ix)
     if ix.phase == "await_target" then
         if ix.advance and ix.advance.enabled then
             return {kind = "advance"}
+        end
+        local direction = first_direction_action(ix)
+        if direction then
+            return direction
         end
         local action = first_target_action(ix)
         if action then

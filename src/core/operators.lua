@@ -35,11 +35,42 @@ function M.finish_observe(state, observed_card_id)
     })
 end
 
+function M.finish_dissolve(state, dissolved_card_id)
+    transition.emit(state, "operator_effect_end", {
+        operator = "DISSOLVE",
+        dissolved_card_id = dissolved_card_id,
+    })
+end
+
+function M.finish_encode(state, first_card_id, second_card_id)
+    transition.emit(state, "operator_effect_end", {
+        operator = "ENCODE",
+        first_card_id = first_card_id,
+        second_card_id = second_card_id,
+    })
+end
+
+function M.finish_flow(state, zone, direction)
+    transition.emit(state, "operator_effect_end", {
+        operator = "FLOW",
+        zone = zone,
+        direction = direction,
+    })
+end
+
 function M.finish_logic(state, target_card_id, inserted_card_id)
     transition.emit(state, "operator_effect_end", {
         operator = "LOGIC",
         target_card_id = target_card_id,
         inserted_card_id = inserted_card_id,
+    })
+end
+
+function M.finish_runtime(state, installed_card_id, granted_operators)
+    transition.emit(state, "operator_effect_end", {
+        operator = "RUNTIME",
+        installed_card_id = installed_card_id,
+        granted_operators = granted_operators,
     })
 end
 

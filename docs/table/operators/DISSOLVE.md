@@ -10,98 +10,198 @@ Symbol:
 
 ```text
 canonical operator law
-aligned with hidden / known / revealed model
+current column-burn branch
 ```
 
 ## 1. Core identity
 
-`☷` now reads as the primary removal operator
-for the main visible game field.
+`☷` больше не читается как generic visible removal.
 
-Short formula:
+Его current identity такая:
 
 ```text
-send one revealed field card to grave
+burn the latent support of the committed column
+before ordinary column ascent
+```
+
+Коротко:
+
+```text
+☷ dissolves the hidden support layer
+of the column being played
 ```
 
 ## 2. What it is not
 
-`☷` is not:
+`☷` now is not:
 
-- draw
-- reveal
-- removal of hidden cards by default
-- removal of merely known cards by default
-- free destruction of anything anywhere
+- broad field removal
+- “choose any revealed card and send it to grave”
+- generic destruction of arbitrary board matter
+- hand interaction
+- grave interaction
 
-## 3. Current playtest law
+Это важно.
+
+Если `☷` снова станет просто removal,
+он потеряет собственную identity inside ProcessCards.
+
+## 3. Core law
 
 If `☷` is the chosen operator effect,
-it may remove:
+it acts only in the **committed column**.
 
-1. one `revealed` card in `manifest`
-2. one `revealed` card in `latent`
-3. revealed `topdeck`, if topdeck is currently in revealed state
+That means:
 
-That card goes to:
+1. look at `latent[i]` under the committed `manifest[i]`
+2. force that latent card into contact
+3. if it is a `minor`, send it to `grave`
+4. if it is a `trump`, send it to `trump flow`
+5. refill `latent[i]` from `deck`
+6. only after that continue the ordinary column sequence
+
+Short formula:
+
+```text
+☷ burns latent[i] first
+then the normal column sequence continues
+```
+
+## 4. Exact sequence
+
+Let the committed column be `i`.
+
+Normal turn sequence in that column is:
+
+1. `manifest[i] -> grave`
+2. `latent[i] -> manifest[i]`
+3. `deck top -> latent[i]`
+
+With `☷`, the sequence changes to:
+
+1. inspect `latent[i]`
+2. reveal that latent card into contact
+3. if `minor` -> `grave`
+4. if `trump` -> `trump flow`
+5. `deck top -> latent[i]`
+6. now perform the ordinary column consume:
+   - `manifest[i] -> grave`
+   - `latent[i] -> manifest[i]`
+   - `deck top -> latent[i]`
+
+So yes:
+
+```text
+the same column is pushed one layer deeper
+in a single turn
+```
+
+## 5. Why this is the right branch
+
+This keeps `☷` specific to the ProcessCards machine.
+
+It does not merely remove a public object.
+
+It does something more native:
+
+```text
+it dissolves the hidden support
+of the world-node you are already committing
+```
+
+That makes `☷`:
+
+- local
+- structural
+- column-bound
+- readable on cardboard
+
+## 6. Trump consequence
+
+If the dissolved `latent[i]` card is a trump,
+it does not go to grave.
+
+It enters:
+
+```text
+trump flow
+```
+
+This means `☷` can force earlier contact
+with hidden trump matter in the committed column.
+
+That is part of its power.
+
+## 7. Minor consequence
+
+If the dissolved `latent[i]` card is a minor,
+it simply goes to:
 
 ```text
 grave
 ```
 
-This makes `☷` a revealed-only removal operator.
+So `☷` can also be read as:
 
-## 4. Main field law
+```text
+skip one hidden support layer
+and let a deeper future rise sooner
+```
 
-`☷` acts only on the main game field by default.
+## 8. No extra target law
 
-That means it may touch:
+`☷` should not open a separate free target-selection surface.
 
-- open `manifest`
-- revealed `latent`
-- revealed `topdeck`
+Its target is already defined by the move:
 
-It does **not** by default target:
+```text
+the committed column itself
+```
 
-- `hand`
-- `grave`
-- `runtime`
-- arbitrary zone content
-- hidden `targets`
+This is one of the main advantages of this branch.
 
-## 5. Pair law directions
+It means:
 
-- `☷☳` — choose what to dissolve
-- `☷☴` — observe before dissolve under pair law
-- `☷☵` — encode around a dissolve or dissolve after hidden setup
-- `☷☶` — dissolve while ignoring one native dissolve restriction
-- `☷☱` — install dissolve-linked runtime privilege
+- no extra board-wide target UI
+- no ambiguity
+- no fake “choose any field card” reading
 
-## 6. Physical execution law
+## 9. Pair-law consequence
 
-Dissolve must be publicly readable.
+This law gives `☷` a clean family identity:
+
+- `☷☳` may later choose how the column-burn branches
+- `☷☴` may later inspect the support before burning it
+- `☷☵` may later rewrite concealed support around the burn
+- `☷☱` may later install column-burn pressure into runtime
+
+But the native core remains:
+
+```text
+column-local latent dissolve
+```
+
+## 10. Physical execution law
+
+`☷` must stay executable with cardboard.
 
 That means:
 
-- removed card physically goes to `grave`
-- zone change is visible
-- legal target class must be table-readable
-- hidden cards are not legal dissolve targets unless another law explicitly upgrades them
+- the committed column is obvious
+- the latent card under it is obvious
+- the burn result is visible
+- the refill is visible
+- the ordinary ascent after that is visible
 
-## 7. Restrictions
+No hidden engine-only interpretation is allowed here.
 
-- `☷` cannot mean "remove anything" without a target law
-- target scope must stay on revealed field-presence by default
-- dissolve should not silently rewrite multiple zones unless pair law says so
-
-## 8. Open questions
-
-- whether revealed `targets` later count as main field for dissolve
-- whether `known but not revealed` should ever become dissolvable under pair law
-- exact pair texts for `☷△`, `☷☱`, `☷☶`
-
-## 9. Short formula
+## 11. Short formula
 
 ```text
-☷ DISSOLVE = send one revealed main-field card to grave
+☷ DISSOLVE = in the committed column,
+burn latent support before ordinary ascent.
+Minor -> grave.
+Trump -> trump flow.
+Refill latent.
+Then continue the ordinary column sequence.
 ```

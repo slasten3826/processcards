@@ -77,16 +77,59 @@ local function move_to_grave(state, card_id)
     state_lib.place_card(state, card_id, "grave", nil)
 end
 
-local function operator_choices_for_card(state, card_id)
-    local card = state.cards[card_id]
-    if not card then
+local function perform_ordinary_world_update(state, slot, manifest_id)
+    move_to_grave(state, manifest_id)
+    transition.emit(state, "manifest_to_grave", {
+        card_id = manifest_id,
+        slot = slot,
+    })
+    repair.repair_manifest_slot(state, slot)
+end
+
+local function resolve_dissolve_column_burn(state, slot)
+    local latent_id = state.zones.latent.cards[slot]
+    if not latent_id then
+        transition.emit(state, "dissolve_skipped", {
+            slot = slot,
+            reason = "empty_latent",
+        })
         return nil
     end
-    return {card.op_a, card.op_b}
+
+    state_lib.remove_from_current_zone(state, latent_id)
+    state_lib.reveal_card(state, latent_id)
+
+    if state.cards[latent_id].class == "trump" then
+        transition.emit(state, "latent_trump_revealed", {
+            card_id = latent_id,
+            slot = slot,
+            reason = "dissolve",
+        })
+        trump.enter_trump_flow(state, latent_id, "dissolve")
+    else
+        state_lib.place_card(state, latent_id, "grave", nil)
+        transition.emit(state, "latent_to_grave", {
+            card_id = latent_id,
+            slot = slot,
+            operator = "DISSOLVE",
+        })
+    end
+
+    draw.concealed_refill(state, "latent", slot)
+    return latent_id
 end
 
 local function operator_choice_is_legal(choices, op_name)
-    return op_name == choices[1] or op_name == choices[2]
+    for _, choice in ipairs(choices or {}) do
+        if op_name == choice then
+            return true
+        end
+    end
+    return false
+end
+
+local function choices_include(choices, op_name)
+    return operator_choice_is_legal(choices, op_name)
 end
 
 local function card_choice_is_legal(legal_card_ids, card_id)
@@ -108,6 +151,8 @@ local function slot_choice_is_legal(legal_slots, slot)
 end
 
 local function clear_operator_target_phases(state)
+    state.pending_flow_choice = nil
+    state.pending_encode_choice = nil
     state.pending_pair_card_choice = nil
     state.pending_public_choice = nil
     state.pending_hidden_choice = nil
@@ -117,12 +162,235 @@ local function clear_operator_target_phases(state)
 end
 
 local function operator_opens_target_phase(op_name)
-    return op_name == "CHOOSE"
+    return op_name == "FLOW"
+        or op_name == "ENCODE"
+        or op_name == "CHOOSE"
         or op_name == "OBSERVE"
         or op_name == "LOGIC"
         or op_name == "MANIFEST"
 end
 
+local function runtime_granted_operators(state)
+    local runtime_card_id = state.zones.runtime.cards[1]
+    if not runtime_card_id then
+        return {}
+    end
+
+    local runtime_card = state.cards[runtime_card_id]
+    if not runtime_card then
+        return {}
+    end
+
+    if runtime_card.op_a == "RUNTIME" and runtime_card.op_b == "RUNTIME" then
+        return {"RUNTIME"}
+    end
+
+    if runtime_card.op_a == "RUNTIME" then
+        return {runtime_card.op_b}
+    end
+
+    if runtime_card.op_b == "RUNTIME" then
+        return {runtime_card.op_a}
+    end
+
+    return {runtime_card.op_a, runtime_card.op_b}
+end
+
+local function legal_encode_card_ids(state)
+    local legal = {}
+
+    local function maybe_add(card_id)
+        if not card_id then
+            return
+        end
+        if not state_lib.is_revealed(state, card_id) then
+            legal[#legal + 1] = card_id
+        end
+    end
+
+    maybe_add(state.zones.deck.cards[#state.zones.deck.cards])
+
+    for _, zone_name in ipairs({"targets", "latent"}) do
+        local zone = state.zones[zone_name]
+        for slot = 1, zone.slot_count do
+            maybe_add(zone.cards[slot])
+        end
+    end
+
+    return legal
+end
+
+local function legal_flow_card_ids(state)
+    local legal = {}
+
+    local function append_zone_if_movable(zone_name)
+        local zone = state.zones[zone_name]
+        local movable = {}
+        for slot = 1, zone.slot_count do
+            local card_id = zone.cards[slot]
+            if card_id and not state_lib.is_revealed(state, card_id) then
+                movable[#movable + 1] = card_id
+            end
+        end
+        if #movable > 1 then
+            for _, card_id in ipairs(movable) do
+                legal[#legal + 1] = card_id
+            end
+        end
+    end
+
+    append_zone_if_movable("targets")
+    append_zone_if_movable("latent")
+
+    local deck = state.zones.deck.cards
+    local concealed_count = 0
+    for _, card_id in ipairs(deck) do
+        if not state_lib.is_revealed(state, card_id) then
+            concealed_count = concealed_count + 1
+        end
+    end
+    if concealed_count > 1 then
+        local topdeck = deck[#deck]
+        if topdeck and not state_lib.is_revealed(state, topdeck) then
+            legal[#legal + 1] = topdeck
+        end
+    end
+
+    return legal
+end
+
+local function runtime_install_allowed(state, card_id)
+    local card = state.cards[card_id]
+    if not card then
+        return false
+    end
+
+    if card.op_a == "RUNTIME" or card.op_b == "RUNTIME" then
+        return true
+    end
+
+    local runtime_card_id = state.zones.runtime.cards[1]
+    if not runtime_card_id then
+        return false
+    end
+
+    local runtime_card = state.cards[runtime_card_id]
+    return runtime_card and runtime_card.op_a == "RUNTIME" and runtime_card.op_b == "RUNTIME"
+end
+
+local function runtime_install_granted_operators(state, card_id)
+    local card = state.cards[card_id]
+    if not card then
+        return {}
+    end
+
+    if card.op_a == "RUNTIME" and card.op_b == "RUNTIME" then
+        return {"RUNTIME"}
+    end
+
+    if card.op_a == "RUNTIME" then
+        return {card.op_b}
+    end
+
+    if card.op_b == "RUNTIME" then
+        return {card.op_a}
+    end
+
+    return {card.op_a, card.op_b}
+end
+
+local function rotate_slots(zone, slots, direction)
+    if #slots < 2 then
+        return
+    end
+
+    local values = {}
+    for i, slot in ipairs(slots) do
+        values[i] = zone.cards[slot]
+    end
+
+    if direction == "left" then
+        for i, slot in ipairs(slots) do
+            local src = i + 1
+            if src > #slots then
+                src = 1
+            end
+            zone.cards[slot] = values[src]
+        end
+    else
+        for i, slot in ipairs(slots) do
+            local src = i - 1
+            if src < 1 then
+                src = #slots
+            end
+            zone.cards[slot] = values[src]
+        end
+    end
+end
+
+local function rotate_deck(state, direction)
+    local deck = state.zones.deck.cards
+    if #deck < 2 then
+        return
+    end
+
+    local fixed_top = false
+    local topdeck = deck[#deck]
+    if topdeck and state_lib.is_revealed(state, topdeck) then
+        fixed_top = true
+    end
+
+    local last_movable = fixed_top and (#deck - 1) or #deck
+    if last_movable <= 1 then
+        return
+    end
+
+    if direction == "left" then
+        local top_index = fixed_top and last_movable or #deck
+        local card_id = table.remove(deck, top_index)
+        table.insert(deck, 1, card_id)
+    else
+        local card_id = table.remove(deck, 1)
+        table.insert(deck, fixed_top and last_movable or #deck + 1, card_id)
+    end
+
+    state_lib.sync_zone_cards(state, "deck")
+end
+
+local function flow_rotate_zone(state, zone_name, direction)
+    if zone_name == "deck" then
+        rotate_deck(state, direction)
+        return
+    end
+
+    local zone = state.zones[zone_name]
+    local movable_slots = {}
+    for slot = 1, zone.slot_count do
+        local card_id = zone.cards[slot]
+        if card_id and not state_lib.is_revealed(state, card_id) then
+            movable_slots[#movable_slots + 1] = slot
+        end
+    end
+    rotate_slots(zone, movable_slots, direction)
+    state_lib.sync_zone_cards(state, zone_name)
+end
+
+local function operator_choices_for_card(state, card_id)
+    local card = state.cards[card_id]
+    if not card then
+        return nil
+    end
+
+    local choices = {card.op_a, card.op_b}
+    local seen = {[card.op_a] = true, [card.op_b] = true}
+    for _, op_name in ipairs(runtime_granted_operators(state)) do
+        if not seen[op_name] then
+            choices[#choices + 1] = op_name
+            seen[op_name] = true
+        end
+    end
+    return choices
+end
 local function legal_hidden_board_card_ids(state)
     local legal = {}
 
@@ -236,19 +504,22 @@ function M.resolve_turn(state, slot, hand_card_id)
     })
 
     local manifest_id = state.committed.card_id
-    move_to_grave(state, manifest_id)
-    transition.emit(state, "manifest_to_grave", {
-        card_id = manifest_id,
-        slot = slot,
-    })
-
-    repair.repair_manifest_slot(state, slot)
+    local choices = operator_choices_for_card(state, hand_card_id)
+    local defer_world_update = choices_include(choices, "DISSOLVE")
+    if not defer_world_update then
+        perform_ordinary_world_update(state, slot, manifest_id)
+    end
     state_lib.clear_gameplay_selection(state)
 
     state.pending_operator_choice = {
         card_id = hand_card_id,
-        choices = operator_choices_for_card(state, hand_card_id),
+        choices = choices,
         armed_operator = nil,
+        turn_context = {
+            slot = slot,
+            manifest_card_id = manifest_id,
+            defer_world_update = defer_world_update,
+        },
     }
     transition.emit(state, "operator_choice_pending", {
         card_id = hand_card_id,
@@ -284,6 +555,11 @@ function M.arm_operator(state, op_name)
     state_lib.set_armed_operator(state, op_name)
     clear_operator_target_phases(state)
 
+    if pending.turn_context and pending.turn_context.defer_world_update and op_name ~= nil and op_name ~= "DISSOLVE" then
+        perform_ordinary_world_update(state, pending.turn_context.slot, pending.turn_context.manifest_card_id)
+        pending.turn_context.defer_world_update = false
+    end
+
     if op_name == "CHOOSE" then
         local legal_slots = {}
         for slot = 1, state.zones.manifest.slot_count do
@@ -302,6 +578,34 @@ function M.arm_operator(state, op_name)
             card_id = card_id,
             operator = op_name,
             legal_slots = legal_slots,
+        })
+    elseif op_name == "FLOW" then
+        local legal_card_ids = legal_flow_card_ids(state)
+        state.pending_flow_choice = {
+            card_id = card_id,
+            operator = op_name,
+            legal_card_ids = legal_card_ids,
+            armed_card_id = nil,
+            armed_direction = nil,
+        }
+        transition.emit(state, "flow_choice_pending", {
+            card_id = card_id,
+            operator = op_name,
+            legal_card_ids = legal_card_ids,
+        })
+    elseif op_name == "ENCODE" then
+        local legal_card_ids = legal_encode_card_ids(state)
+        state.pending_encode_choice = {
+            card_id = card_id,
+            operator = op_name,
+            legal_card_ids = legal_card_ids,
+            armed_first_card_id = nil,
+            armed_second_card_id = nil,
+        }
+        transition.emit(state, "encode_choice_pending", {
+            card_id = card_id,
+            operator = op_name,
+            legal_card_ids = legal_card_ids,
         })
     elseif op_name == "OBSERVE" then
         local legal_card_ids = legal_hidden_board_card_ids(state)
@@ -398,6 +702,42 @@ local function start_operator_effect(state, op_name)
         })
     end
 
+    if op_name == "RUNTIME" then
+        if not runtime_install_allowed(state, card_id) then
+            return nil, "runtime_install_not_available"
+        end
+
+        local replaced_card_id = state.zones.runtime.cards[1]
+        if replaced_card_id then
+            state_lib.remove_from_current_zone(state, replaced_card_id)
+            move_to_grave(state, replaced_card_id)
+            transition.emit(state, "runtime_to_grave", {
+                card_id = replaced_card_id,
+                replaced_by = card_id,
+            })
+        end
+
+        state_lib.remove_from_current_zone(state, card_id)
+        state_lib.reveal_card(state, card_id)
+        state_lib.place_card(state, card_id, "runtime", 1)
+        transition.emit(state, "play_to_runtime", {
+            card_id = card_id,
+            granted_operators = runtime_install_granted_operators(state, card_id),
+        })
+        operators.finish_runtime(state, card_id, runtime_install_granted_operators(state, card_id))
+
+        state.pending_operator_choice = nil
+        state_lib.clear_gameplay_selection(state)
+        trump.refresh_pending_trump(state)
+
+        return transition.finish(state, {
+            operator = op_name,
+            pending_operator_choice = state.pending_operator_choice,
+            pending_trump = state.pending_trump,
+            board_closed = state_lib.is_board_closed(state),
+        })
+    end
+
     operators.resolve(state, op_name)
 
     move_to_grave(state, card_id)
@@ -443,6 +783,10 @@ function M.confirm_operator_phase(state)
 
     if op_name == nil then
         clear_operator_target_phases(state)
+        if pending.turn_context and pending.turn_context.defer_world_update then
+            perform_ordinary_world_update(state, pending.turn_context.slot, pending.turn_context.manifest_card_id)
+            pending.turn_context.defer_world_update = false
+        end
         move_to_grave(state, card_id)
         transition.emit(state, "play_to_grave", {
             card_id = card_id,
@@ -455,6 +799,35 @@ function M.confirm_operator_phase(state)
 
         return transition.finish(state, {
             operator = nil,
+            board_closed = state_lib.is_board_closed(state),
+            pending_operator_choice = state.pending_operator_choice,
+            pending_trump = state.pending_trump,
+        })
+    end
+
+    if op_name == "DISSOLVE" then
+        local turn_context = pending.turn_context
+        if not turn_context then
+            return nil, "missing_turn_context"
+        end
+
+        local dissolved_card_id = resolve_dissolve_column_burn(state, turn_context.slot)
+        perform_ordinary_world_update(state, turn_context.slot, turn_context.manifest_card_id)
+        turn_context.defer_world_update = false
+        operators.finish_dissolve(state, dissolved_card_id)
+
+        move_to_grave(state, card_id)
+        transition.emit(state, "play_to_grave", {
+            card_id = card_id,
+            operator = op_name,
+        })
+
+        state.pending_operator_choice = nil
+        state_lib.clear_gameplay_selection(state)
+        trump.refresh_pending_trump(state)
+
+        return transition.finish(state, {
+            operator = op_name,
             board_closed = state_lib.is_board_closed(state),
             pending_operator_choice = state.pending_operator_choice,
             pending_trump = state.pending_trump,
@@ -474,6 +847,8 @@ function M.choose_operator(state, op_name)
         return nil, err
     end
     if state.pending_public_choice
+        or state.pending_flow_choice
+        or state.pending_encode_choice
         or state.pending_pair_card_choice
         or state.pending_hidden_choice
         or state.pending_manifest_choice
@@ -615,6 +990,228 @@ function M.choose_pair_card_target(state, card_id)
     return M.confirm_pair_card_target(state)
 end
 
+function M.arm_flow_target(state, card_id)
+    local pending = state.pending_flow_choice
+    if not pending then
+        return nil, "no_pending_flow_choice"
+    end
+    if not card_choice_is_legal(pending.legal_card_ids, card_id) then
+        return nil, "illegal_flow_choice"
+    end
+
+    transition.begin(state, "arm_flow_target", {
+        card_id = card_id,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    if pending.armed_card_id == card_id then
+        pending.armed_card_id = nil
+        pending.armed_direction = nil
+    else
+        pending.armed_card_id = card_id
+        pending.armed_direction = nil
+    end
+
+    transition.emit(state, "flow_target_armed", {
+        card_id = pending.armed_card_id,
+        operator = pending.operator,
+        source_card_id = pending.card_id,
+    })
+
+    return transition.finish(state, {
+        pending_flow_choice = state.pending_flow_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.arm_flow_direction(state, direction)
+    local pending = state.pending_flow_choice
+    if not pending then
+        return nil, "no_pending_flow_choice"
+    end
+    if not pending.armed_card_id then
+        return nil, "no_armed_flow_target"
+    end
+    if direction ~= "left" and direction ~= "right" then
+        return nil, "illegal_flow_direction"
+    end
+
+    transition.begin(state, "arm_flow_direction", {
+        direction = direction,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    if pending.armed_direction == direction then
+        pending.armed_direction = nil
+    else
+        pending.armed_direction = direction
+    end
+
+    transition.emit(state, "flow_direction_armed", {
+        direction = pending.armed_direction,
+        operator = pending.operator,
+        source_card_id = pending.card_id,
+    })
+
+    return transition.finish(state, {
+        pending_flow_choice = state.pending_flow_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.confirm_flow_target(state)
+    local pending = state.pending_flow_choice
+    if not pending then
+        return nil, "no_pending_flow_choice"
+    end
+    if not pending.armed_card_id then
+        return nil, "no_armed_flow_target"
+    end
+    if not pending.armed_direction then
+        return nil, "no_armed_flow_direction"
+    end
+
+    local card_id = pending.armed_card_id
+    local zone_name = state.cards[card_id].zone
+
+    transition.begin(state, "confirm_flow_target", {
+        card_id = card_id,
+        zone = zone_name,
+        direction = pending.armed_direction,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    flow_rotate_zone(state, zone_name, pending.armed_direction)
+    transition.emit(state, "flow_step_resolved", {
+        zone = zone_name,
+        direction = pending.armed_direction,
+        operator = pending.operator,
+    })
+    operators.finish_flow(state, zone_name, pending.armed_direction)
+
+    local play_card_id = pending.card_id
+    move_to_grave(state, play_card_id)
+    transition.emit(state, "play_to_grave", {
+        card_id = play_card_id,
+        operator = pending.operator,
+    })
+
+    state.pending_flow_choice = nil
+    state.pending_operator_choice = nil
+    state_lib.clear_gameplay_selection(state)
+    trump.refresh_pending_trump(state)
+
+    return transition.finish(state, {
+        pending_operator_choice = state.pending_operator_choice,
+        pending_flow_choice = state.pending_flow_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.arm_encode_target(state, card_id)
+    local pending = state.pending_encode_choice
+    if not pending then
+        return nil, "no_pending_encode_choice"
+    end
+    if not card_choice_is_legal(pending.legal_card_ids, card_id) then
+        return nil, "illegal_encode_choice"
+    end
+
+    transition.begin(state, "arm_encode_target", {
+        card_id = card_id,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    if pending.armed_first_card_id == card_id then
+        pending.armed_first_card_id = nil
+        pending.armed_second_card_id = nil
+    elseif pending.armed_second_card_id == card_id then
+        pending.armed_second_card_id = nil
+    elseif not pending.armed_first_card_id then
+        pending.armed_first_card_id = card_id
+    else
+        pending.armed_second_card_id = card_id
+    end
+
+    transition.emit(state, "encode_target_armed", {
+        first_card_id = pending.armed_first_card_id,
+        second_card_id = pending.armed_second_card_id,
+        operator = pending.operator,
+        source_card_id = pending.card_id,
+    })
+
+    return transition.finish(state, {
+        pending_encode_choice = state.pending_encode_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
+function M.confirm_encode_target(state)
+    local pending = state.pending_encode_choice
+    if not pending then
+        return nil, "no_pending_encode_choice"
+    end
+    if not pending.armed_first_card_id or not pending.armed_second_card_id then
+        return nil, "incomplete_encode_choice"
+    end
+
+    local first_card_id = pending.armed_first_card_id
+    local second_card_id = pending.armed_second_card_id
+    local first = state.cards[first_card_id]
+    local second = state.cards[second_card_id]
+    if not first or not second or not first.zone or not second.zone then
+        return nil, "encode_target_missing"
+    end
+
+    local first_zone, first_slot = first.zone, first.slot
+    local second_zone, second_slot = second.zone, second.slot
+
+    transition.begin(state, "confirm_encode_target", {
+        first_card_id = first_card_id,
+        second_card_id = second_card_id,
+        source_card_id = pending.card_id,
+        operator = pending.operator,
+    })
+
+    state_lib.remove_from_current_zone(state, first_card_id)
+    state_lib.remove_from_current_zone(state, second_card_id)
+    state_lib.place_card(state, first_card_id, second_zone, second_zone == "deck" and nil or second_slot)
+    state_lib.place_card(state, second_card_id, first_zone, first_zone == "deck" and nil or first_slot)
+    transition.emit(state, "concealed_swap_resolved", {
+        first_card_id = first_card_id,
+        second_card_id = second_card_id,
+        operator = pending.operator,
+    })
+    operators.finish_encode(state, first_card_id, second_card_id)
+
+    local play_card_id = pending.card_id
+    move_to_grave(state, play_card_id)
+    transition.emit(state, "play_to_grave", {
+        card_id = play_card_id,
+        operator = pending.operator,
+    })
+
+    state.pending_encode_choice = nil
+    state.pending_operator_choice = nil
+    state_lib.clear_gameplay_selection(state)
+    trump.refresh_pending_trump(state)
+
+    return transition.finish(state, {
+        pending_operator_choice = state.pending_operator_choice,
+        pending_encode_choice = state.pending_encode_choice,
+        pending_trump = state.pending_trump,
+        board_closed = state_lib.is_board_closed(state),
+    })
+end
+
 function M.arm_public_target(state, card_id)
     local pending = state.pending_public_choice
     if not pending then
@@ -663,6 +1260,43 @@ function M.confirm_public_target(state)
         source_card_id = pending.card_id,
         operator = pending.operator,
     })
+
+    if pending.operator == "DISSOLVE" then
+        local target_zone = state.cards[card_id].zone
+        local target_slot = state.cards[card_id].slot
+
+        state_lib.remove_from_current_zone(state, card_id)
+        state_lib.reveal_card(state, card_id)
+        state_lib.place_card(state, card_id, "grave", nil)
+        transition.emit(state, "field_to_grave", {
+            card_id = card_id,
+            zone = target_zone,
+            slot = target_slot,
+            operator = pending.operator,
+        })
+
+        repair_after_field_removal(state, target_zone, target_slot)
+        operators.finish_dissolve(state, card_id)
+
+        local play_card_id = pending.card_id
+        move_to_grave(state, play_card_id)
+        transition.emit(state, "play_to_grave", {
+            card_id = play_card_id,
+            operator = pending.operator,
+        })
+
+        state.pending_public_choice = nil
+        state.pending_operator_choice = nil
+        state_lib.clear_gameplay_selection(state)
+        trump.refresh_pending_trump(state)
+
+        return transition.finish(state, {
+            pending_operator_choice = state.pending_operator_choice,
+            pending_public_choice = state.pending_public_choice,
+            pending_trump = state.pending_trump,
+            board_closed = state_lib.is_board_closed(state),
+        })
+    end
 
     state.pending_public_choice = nil
     state.pending_hand_choice = {
