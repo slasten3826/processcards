@@ -46,23 +46,42 @@ canonical table routing note
 Это и есть текущий live law,
 на который может опираться runtime.
 
-### B. Imported trump design branch
+### B. Full table trump branch
 
-Полные draft-доки по козырям теперь лежат в:
+Полный trump-канон теперь лежит прямо в:
 
-- [../chaos/upstream/processcards/trumps/README.md](../chaos/upstream/processcards/trumps/README.md)
-- [../chaos/upstream/processcards/trumps/TRUMP_ECOLOGY.md](../chaos/upstream/processcards/trumps/TRUMP_ECOLOGY.md)
-- [../chaos/upstream/processcards/trumps/TRUMP_RESOLUTION_ORDER.md](../chaos/upstream/processcards/trumps/TRUMP_RESOLUTION_ORDER.md)
-- [../chaos/upstream/processcards/trumps/FOOL.md](../chaos/upstream/processcards/trumps/FOOL.md)
-- [../chaos/upstream/processcards/trumps/EJECT.md](../chaos/upstream/processcards/trumps/EJECT.md)
-- [../chaos/upstream/processcards/trumps/SHUFFLE.md](../chaos/upstream/processcards/trumps/SHUFFLE.md)
-- [../chaos/upstream/processcards/trumps/RECAST.md](../chaos/upstream/processcards/trumps/RECAST.md)
-- [../chaos/upstream/processcards/trumps/RESET.md](../chaos/upstream/processcards/trumps/RESET.md)
-- [../chaos/upstream/processcards/trumps/UNVEIL.md](../chaos/upstream/processcards/trumps/UNVEIL.md)
-- [../chaos/upstream/processcards/trumps/HALT.md](../chaos/upstream/processcards/trumps/HALT.md)
+- [trumps/README.md](./trumps/README.md)
+- [trumps/TRUMP_ECOLOGY.md](./trumps/TRUMP_ECOLOGY.md)
+- [trumps/TRUMP_RESOLUTION_ORDER.md](./trumps/TRUMP_RESOLUTION_ORDER.md)
+- [trumps/FOOL.md](./trumps/FOOL.md)
+- [trumps/EJECT.md](./trumps/EJECT.md)
+- [trumps/SHUFFLE.md](./trumps/SHUFFLE.md)
+- [trumps/RECAST.md](./trumps/RECAST.md)
+- [trumps/RESET.md](./trumps/RESET.md)
+- [trumps/UNVEIL.md](./trumps/UNVEIL.md)
+- [trumps/HALT.md](./trumps/HALT.md)
+- [trumps/ORACLE.md](./trumps/ORACLE.md)
+- [trumps/SWAP.md](./trumps/SWAP.md)
+- [trumps/WARRANT.md](./trumps/WARRANT.md)
+- [trumps/REPEAT.md](./trumps/REPEAT.md)
+- [trumps/UNBOUND.md](./trumps/UNBOUND.md)
+- [trumps/TIGEL.md](./trumps/TIGEL.md)
+- [trumps/RUSH.md](./trumps/RUSH.md)
+- [trumps/ENOUGH.md](./trumps/ENOUGH.md)
+- [trumps/GRANT.md](./trumps/GRANT.md)
+- [trumps/GATE.md](./trumps/GATE.md)
+- [trumps/PURGE.md](./trumps/PURGE.md)
+- [trumps/CANON.md](./trumps/CANON.md)
+- [trumps/MAXIMIZE.md](./trumps/MAXIMIZE.md)
+- [trumps/ERROR.md](./trumps/ERROR.md)
+- [trumps/REQUIEM.md](./trumps/REQUIEM.md)
 
-Эти документы уже ценны,
-но пока не считаются автоматически live prototype canon.
+Эти документы уже находятся в `table`,
+но это не значит, что весь trump-layer уже автоматически обязан runtime.
+Надо всё ещё различать:
+
+- short live prototype laws in `docs/table/*.md`
+- full trump branch in `docs/table/trumps/`
 
 Already adopted individual trump law:
 
@@ -84,32 +103,32 @@ Already adopted individual trump law:
 Правильный порядок чтения сейчас такой:
 
 1. сначала читать live prototype laws в `docs/table/`
-2. потом читать imported trump branch в `docs/chaos/.../trumps/`
-3. поднимать отдельные pieces из imported branch в `docs/table/`
+2. потом читать full trump branch в `docs/table/trumps/`
+3. поднимать отдельные pieces из full trump branch в `docs/table/`
    только после явного решения
 
 Коротко:
 
 ```text
-chaos trumps = imported branch
-table trumps = active prototype law
+table/*.md short laws = active prototype law
+table/trumps/* = full trump canon branch
 ```
 
 ## 3. Why this split exists
 
 Этот split нужен,
-потому что trump-доки уже достаточно сильные как design branch,
-но текущий prototype scope пока intentionally проще.
+потому что trump-доки уже собраны как table-branch,
+но текущий prototype scope всё ещё intentionally проще.
 
 То есть:
 
-- trump knowledge уже надо хранить в репо
+- full trump knowledge уже живёт в table
 - но нельзя делать вид,
   будто весь trump event engine уже обязателен в текущем runtime
 
 ## 4. Upgrade rule
 
-Если какой-то trump law из imported branch
+Если какой-то trump law из `table/trumps/`
 становится частью живого прототипа,
 его надо:
 
@@ -127,12 +146,12 @@ implement it directly
 Правильно:
 
 ```text
-chaos draft -> explicit table adoption -> code
+table/trumps draft -> explicit short-law adoption -> code
 ```
 
 ## 5. Short formula
 
 ```text
-full trump branch now lives in chaos
-only adopted pieces become active table law
+full trump branch now lives in table/trumps
+only adopted short laws become active runtime-facing table law
 ```

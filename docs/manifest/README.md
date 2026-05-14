@@ -54,6 +54,7 @@
 - [TRUMP_RESOLUTION_ORDER_LAW.md](../table/TRUMP_RESOLUTION_ORDER_LAW.md)
 - [TRUMP_ZONE_LAW.md](../table/TRUMP_ZONE_LAW.md)
 - [TRUMP_IDENTITY_LAW.md](../table/TRUMP_IDENTITY_LAW.md)
+- [trumps/README.md](../table/trumps/README.md)
 - [FOOL_LAW.md](../table/FOOL_LAW.md)
 - [SHUFFLE_LAW.md](../table/SHUFFLE_LAW.md)
 - [UNVEIL_LAW.md](../table/UNVEIL_LAW.md)
