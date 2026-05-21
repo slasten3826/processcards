@@ -38,8 +38,9 @@ then end that one draw procedure
 
 1. карта становится `revealed`
 2. запускается обычный `trump flow` path
-3. карта **не** входит в `hand`
-4. именно эта конкретная draw procedure считается потраченной
+3. trump immediately resolves through the current trump path
+4. карта **не** входит в `hand`
+5. именно эта конкретная draw procedure считается потраченной
 
 Коротко:
 
@@ -47,19 +48,8 @@ then end that one draw procedure
 trump burns that draw procedure
 ```
 
-При этом revealed trump
-не обязан сразу резолвиться.
-
-Он может только войти в `trump flow`
-и ждать:
-
-- полного board closure
-- player confirm
-
-См.:
-
-- [BOARD_CLOSURE_LAW.md](./BOARD_CLOSURE_LAW.md)
-- [TRUMP_RUNTIME_STUB_LAW.md](./TRUMP_RUNTIME_STUB_LAW.md)
+Если multi-draw effect продолжается дальше,
+следующий draw step всё равно выполняется после этого trump resolution.
 
 ## 4. Multi-draw consequence
 
@@ -69,18 +59,19 @@ trump burns that draw procedure
 Пример:
 
 ```text
-draw 2
+draw 3
 ```
 
 значит:
 
 1. perform draw procedure #1
 2. perform draw procedure #2
+3. perform draw procedure #3
 
 Если в первой вскрылся trump,
 сгорает только первая.
 
-Вторая всё равно выполняется.
+Вторая и третья всё равно выполняются.
 
 ## 5. Why this law exists
 
@@ -109,6 +100,7 @@ draw 2
 ```text
 each draw is one separate procedure
 minor enters hand
-trump enters trump flow and burns that one draw procedure
+trump resolves through the current trump path
+and burns that one draw procedure
 remaining draw procedures still continue
 ```

@@ -20,6 +20,12 @@ local core = require("src.core.api")
 local render = require("src.cli.render")
 local input = require("src.cli.input")
 
+local DEV_TRUMP_PRESETS = {
+    none = {},
+    foolrush = {"FOOL", "RUSH"},
+    full = nil,
+}
+
 local function clear_screen()
     io.write(string.char(0x1b) .. "[2J")
     io.write(string.char(0x1b) .. "[H")
@@ -71,9 +77,22 @@ local function main()
     local state = core.new()
     local status_message = ""
     local recent_events = {}
+    local start_opts = {
+        trump_mode = "full",
+        enabled_trumps = DEV_TRUMP_PRESETS.full,
+    }
+
+    local function build_start_opts()
+        return {
+            rng = function(n) return math.random(n) end,
+            trump_mode = start_opts.trump_mode,
+            enabled_trumps = start_opts.enabled_trumps,
+        }
+    end
+
     local function start_new_game()
         state = core.new()
-        local result = core.start_game(state, { rng = function(n) return math.random(n) end })
+        local result = core.start_game(state, build_start_opts())
         status_message = summarize_result(result)
         recent_events = {}
         for _, event in ipairs(core.drain_events(state)) do
@@ -100,6 +119,20 @@ local function main()
         local raw = io.read()
         if not raw then
             break
+        end
+
+        local preset = raw:match("^%s*dev%s+([%w_%-]+)%s*$")
+        if preset then
+            preset = preset:lower()
+            if preset == "full" or DEV_TRUMP_PRESETS[preset] ~= nil then
+                start_opts.trump_mode = preset
+                start_opts.enabled_trumps = DEV_TRUMP_PRESETS[preset]
+                start_new_game()
+                status_message = "OK: dev preset " .. preset
+            else
+                status_message = "ERROR: unknown dev preset"
+            end
+            goto continue
         end
 
         local action = input.parse(state, ix, raw)

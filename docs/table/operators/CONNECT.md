@@ -23,7 +23,7 @@ aligned with play-zone execution shell
 Short formula:
 
 ```text
-☰ = perform 2 draw procedures
+☰ = perform 3 draw procedures
 ```
 
 ## 2. Execution position
@@ -49,7 +49,7 @@ If `☰` is the chosen operator effect,
 player performs:
 
 ```text
-2 draw procedures
+3 draw procedures
 ```
 
 Read those procedures through:
@@ -62,6 +62,7 @@ That means:
 
 1. draw procedure #1 resolves fully
 2. draw procedure #2 resolves fully
+3. draw procedure #3 resolves fully
 
 `☰` does not collapse them into one big hand gain.
 
@@ -84,24 +85,16 @@ Because draw already reveals first,
 
 That means:
 
-- `☰` does not guarantee 2 cards in hand
-- it guarantees 2 draw procedures
+- `☰` does not guarantee 3 cards in hand
+- it guarantees 3 draw procedures
 - any of those may be consumed by trump-event
 
 If a draw under `☰` reveals a trump:
 
 - that trump enters `trump flow`
+- that trump resolves through the current trump path
 - that one draw procedure burns
-- the remaining draw procedure, if any, still continues
-
-But trump-flow continuation does **not** outrank the current played card.
-
-So:
-
-- trumps may enter flow during `☰`
-- `☰` still finishes first
-- the played card still leaves `play` first
-- only then may `△` continue the trump flow
+- the remaining draw procedures, if any, still continue
 
 This follows:
 
@@ -115,16 +108,16 @@ This follows:
 That means:
 
 - draw cards really come from `deck`
-- revealed trump really enters `trump flow`
+- revealed trump really routes through the current trump path
 - hand size changes are physically observable
 - the played card remains in `play` until `☰` fully finishes
 
 ## 7. Restrictions
 
 - `☰` should not secretly bypass draw law
-- `☰` does not mean “take 2 cards ignoring trump”
+- `☰` does not mean “take 3 cards ignoring trump”
 - `☰` is hand refill, not generic topology override
-- `☰` does not auto-resolve trump flow mid-effect
+- `☰` does not bypass draw procedure routing
 
 ## 8. Legacy relation
 
@@ -134,15 +127,15 @@ unless later the game explicitly returns to that idea.
 
 ## 9. Open questions
 
-- whether `☰☰` should stay exactly `draw 2`
+- whether `☰☰` should stay exactly `draw 3`
   or later become stronger
-- whether some pair-laws should modify one of the two draw procedures
+- whether some pair-laws should modify one of the three draw procedures
 - whether later hand-cap pressure needs extra constraint on repeated `☰`
 
 ## 10. Short formula
 
 ```text
 ☰ CONNECT = while the played card remains in play,
-perform 2 draw procedures;
+perform 3 draw procedures;
 then let the played card leave play
 ```

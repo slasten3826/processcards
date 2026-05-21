@@ -185,7 +185,34 @@ not a private ecology rewrite.
 
 ---
 
-## 7. Why This Works
+## 7. HALT Interaction
+
+`RUSH` has one special boundary interaction.
+
+If `HALT` appears during the six-card burst:
+
+- `RUSH` still finishes its own burst
+- later trumps exposed after `HALT` do not begin resolution
+- those later trumps become halted trumps by the ordinary `HALT` law
+- after `RUSH` ends, `HALT` closes the halted chain as normal
+
+Important:
+
+this continuity belongs to `RUSH` itself.
+
+It should not be generalized into a universal law that every resolving trump
+may always continue in the same way after `HALT`.
+
+Short formula:
+
+```text
+HALT does not cut a living RUSH burst in half
+but it does deny later trump entry inside that burst
+```
+
+---
+
+## 8. Why This Works
 
 Not every trump should be a topology machine.
 
@@ -204,7 +231,7 @@ Not from internal procedural complexity.
 
 ---
 
-## 8. Design Character
+## 9. Design Character
 
 `RUSH` should feel:
 
@@ -226,7 +253,7 @@ It should not feel:
 
 ---
 
-## 9. Minimal Canonical Text
+## 10. Minimal Canonical Text
 
 Draft rules text:
 

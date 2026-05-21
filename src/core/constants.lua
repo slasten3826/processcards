@@ -40,12 +40,19 @@ M.TRUMP_CANON = {
 
 M.TRUMP_NAMES = {
     [1] = "FOOL",
+    [8] = "RUSH",
     [2] = "EJECT",
     [14] = "SHUFFLE",
     [16] = "RECAST",
     [17] = "RESET",
+    [20] = "REPEAT",
     [21] = "UNVEIL",
     [22] = "HALT",
 }
+
+M.TRUMP_NAME_TO_INDEX = {}
+for index, name in pairs(M.TRUMP_NAMES) do
+    M.TRUMP_NAME_TO_INDEX[name] = index
+end
 
 return M

@@ -387,7 +387,7 @@ manifest must embody it
 
 #### `☰ CONNECT`
 
-Обычный приток материи в руку через draw procedures.
+Обычный приток материи в руку через 3 отдельных draw procedures.
 
 #### `☷ DISSOLVE`
 

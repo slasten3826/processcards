@@ -403,6 +403,9 @@ local function system_line(state, interaction)
         string.format("TZ:%d/2", zone_filled(state.zones.trump)),
         string.format("PHASE:%s", interaction.phase or "?"),
     }
+    if state.setup_options and state.setup_options.trump_mode then
+        parts[#parts + 1] = string.format("TR:%s", state.setup_options.trump_mode)
+    end
     if interaction.advance and interaction.advance.enabled then
         parts[#parts + 1] = g("green") .. g("bold") .. (interaction.advance.label or "ADVANCE") .. g("reset")
     end
@@ -426,6 +429,7 @@ end
 local function command_hints(interaction)
     local lines = { zone_name_line("COMMANDS") }
     lines[#lines + 1] = "[enter] advance/confirm   [x] clear   [s] restart   [q] quit"
+    lines[#lines + 1] = "[dev none|foolrush|full] restart with trump preset"
 
     if interaction.phase == "await_start" or interaction.phase == "await_complete" or interaction.phase == "await_ready" then
         lines[#lines + 1] = "[1-6] commit manifest   [a-l] arm hand"

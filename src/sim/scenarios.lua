@@ -35,6 +35,41 @@ local function same_list(a, b)
     return true
 end
 
+local function move_card_to_deck_top(state, card_id)
+    local deck = state.zones.deck.cards
+    for i, id in ipairs(deck) do
+        if id == card_id then
+            table.remove(deck, i)
+            break
+        end
+    end
+    table.insert(deck, card_id)
+    state_lib.sync_zone_cards(state, "deck")
+end
+
+local function move_card_to_deck_bottom(state, card_id)
+    local deck = state.zones.deck.cards
+    for i, id in ipairs(deck) do
+        if id == card_id then
+            table.remove(deck, i)
+            break
+        end
+    end
+    table.insert(deck, 1, card_id)
+    state_lib.sync_zone_cards(state, "deck")
+end
+
+local function created_trump_ids(state)
+    local out = {}
+    for card_id, card in pairs(state.cards) do
+        if card.class == "trump" then
+            out[#out + 1] = card_id
+        end
+    end
+    table.sort(out)
+    return out
+end
+
 function M.draw_once(state)
     local top_before = state.zones.deck.cards[#state.zones.deck.cards]
     local top_class = top_before and state.cards[top_before].class or nil
@@ -50,6 +85,352 @@ function M.draw_once(state)
         result = result,
         hand_after = #state.zones.hand.cards,
         flow_after = #state.zones.trump_flow.cards,
+    }
+end
+
+function M.draw_reveal_routes_trump(state)
+    local deck = state.zones.deck.cards
+    local minor_a
+    local minor_b
+    local trump_id
+
+    for _, card_id in ipairs(deck) do
+        local card = state.cards[card_id]
+        if card.class == "trump" and not trump_id then
+            trump_id = card_id
+        elseif card.class == "minor" then
+            if not minor_a then
+                minor_a = card_id
+            elseif not minor_b then
+                minor_b = card_id
+            end
+        end
+        if minor_a and minor_b and trump_id then
+            break
+        end
+    end
+
+    if not (minor_a and minor_b and trump_id) then
+        return nil, "missing_draw_sequence_cards"
+    end
+
+    move_card_to_deck_top(state, minor_b)
+    move_card_to_deck_top(state, trump_id)
+    move_card_to_deck_top(state, minor_a)
+
+    local hand_before = #state.zones.hand.cards
+    local deck_before = #state.zones.deck.cards
+
+    local first = core.draw_to_hand(state)
+    local second = core.draw_to_hand(state)
+    local third = core.draw_to_hand(state)
+
+    if first.summary.error or second.summary.error or third.summary.error then
+        return nil, "unexpected_draw_error"
+    end
+    if #state.zones.hand.cards ~= hand_before + 2 then
+        return nil, "draw_hand_count_mismatch"
+    end
+    if #state.zones.deck.cards ~= deck_before - 3 then
+        return nil, "draw_deck_count_mismatch"
+    end
+    if state_lib.zone_count(state, "trump") ~= 1 then
+        return nil, "draw_trump_zone_count_mismatch"
+    end
+    if #state.zones.trump_flow.cards ~= 0 then
+        return nil, "draw_trump_flow_should_be_empty"
+    end
+    if state.pending_trump ~= nil then
+        return nil, "draw_pending_trump_should_be_empty"
+    end
+
+    return {
+        name = "draw_reveal_routes_trump",
+        hand_after = #state.zones.hand.cards,
+        deck_after = #state.zones.deck.cards,
+        trump_zone = state_lib.zone_count(state, "trump"),
+    }
+end
+
+function M.fool_trump_drill(state)
+    local fool_id = "TRUMP-1"
+    local contact_id = "TRUMP-2"
+    local minor_id = state.zones.deck.cards[1]
+
+    if not (state.cards[fool_id] and state.cards[contact_id] and minor_id) then
+        return nil, "missing_trump_cards"
+    end
+
+    move_card_to_deck_top(state, contact_id)
+    move_card_to_deck_top(state, minor_id)
+    move_card_to_deck_top(state, fool_id)
+
+    local deck = state.zones.deck.cards
+    local fool_top = deck[#deck]
+    if fool_top ~= fool_id then
+        return nil, "fool_not_on_top"
+    end
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "fool_draw_error"
+    end
+
+    if state_lib.zone_count(state, "grave") < 1 then
+        return nil, "fool_should_drill_minor_to_grave"
+    end
+    if state_lib.zone_count(state, "trump") < 2 then
+        return nil, "fool_should_resolve_contact_trump_and_self"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "fool_should_leave_no_pending_trump"
+    end
+
+    return {
+        name = "fool_trump_drill",
+        grave = state_lib.zone_count(state, "grave"),
+        trump = state_lib.zone_count(state, "trump"),
+    }
+end
+
+function M.rush_trump_burst(state)
+    local rush_id = "TRUMP-8"
+    if not state.cards[rush_id] then
+        return nil, "missing_rush"
+    end
+
+    local minors = {}
+    local extra_trump
+    for _, card_id in ipairs(state.zones.deck.cards) do
+        local card = state.cards[card_id]
+        if card.class == "minor" then
+            minors[#minors + 1] = card_id
+        elseif card_id ~= rush_id and not extra_trump then
+            extra_trump = card_id
+        end
+        if #minors >= 5 and extra_trump then
+            break
+        end
+    end
+    if #minors < 5 or not extra_trump then
+        return nil, "missing_rush_sequence_cards"
+    end
+
+    for i = 1, 5 do
+        move_card_to_deck_top(state, minors[i])
+    end
+    move_card_to_deck_top(state, extra_trump)
+    move_card_to_deck_top(state, rush_id)
+
+    local hand_before = #state.zones.hand.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "rush_draw_error"
+    end
+
+    if #state.zones.hand.cards ~= hand_before + 5 then
+        return nil, "rush_hand_gain_mismatch"
+    end
+    if state_lib.zone_count(state, "trump") < 2 then
+        return nil, "rush_should_resolve_self_and_queued_trump"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "rush_should_leave_no_pending_trump"
+    end
+
+    return {
+        name = "rush_trump_burst",
+        hand_after = #state.zones.hand.cards,
+        trump = state_lib.zone_count(state, "trump"),
+    }
+end
+
+function M.reset_hand_rebuild(state)
+    local reset_id = "TRUMP-17"
+    if not state.cards[reset_id] then
+        return nil, "missing_reset"
+    end
+
+    local minors = {}
+    for _, card_id in ipairs(state.zones.deck.cards) do
+        if state.cards[card_id].class == "minor" then
+            minors[#minors + 1] = card_id
+        end
+        if #minors >= 6 then
+            break
+        end
+    end
+    if #minors < 6 then
+        return nil, "missing_reset_draw_minors"
+    end
+
+    for i = 1, 6 do
+        move_card_to_deck_top(state, minors[i])
+    end
+    move_card_to_deck_top(state, reset_id)
+
+    local hand_before = #state.zones.hand.cards
+    local grave_before = #state.zones.grave.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "reset_draw_error"
+    end
+    if #state.zones.hand.cards ~= 6 then
+        return nil, "reset_hand_size_mismatch"
+    end
+    if #state.zones.grave.cards < grave_before + hand_before then
+        return nil, "reset_should_dump_old_hand_to_grave"
+    end
+    if state.zones.trump.cards[1] ~= reset_id and state.zones.trump.cards[2] ~= reset_id then
+        return nil, "reset_should_enter_trump_zone"
+    end
+
+    return {
+        name = "reset_hand_rebuild",
+        hand_after = #state.zones.hand.cards,
+        grave_after = #state.zones.grave.cards,
+    }
+end
+
+function M.shuffle_grave_to_deck(state)
+    local shuffle_id = "TRUMP-14"
+    if not state.cards[shuffle_id] then
+        return nil, "missing_shuffle"
+    end
+
+    local hand_card = state.zones.hand.cards[1]
+    if not hand_card then
+        return nil, "missing_hand_card_for_shuffle_prep"
+    end
+    state_lib.remove_from_current_zone(state, hand_card)
+    state_lib.reveal_card(state, hand_card)
+    state_lib.place_card(state, hand_card, "grave", nil)
+
+    move_card_to_deck_top(state, shuffle_id)
+
+    local deck_before = #state.zones.deck.cards
+    local grave_before = #state.zones.grave.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "shuffle_draw_error"
+    end
+    if #state.zones.grave.cards ~= 0 then
+        return nil, "shuffle_should_empty_grave"
+    end
+    if #state.zones.deck.cards ~= deck_before + grave_before - 1 then
+        return nil, "shuffle_deck_count_mismatch"
+    end
+    if state.zones.trump.cards[1] ~= shuffle_id and state.zones.trump.cards[2] ~= shuffle_id then
+        return nil, "shuffle_should_enter_trump_zone"
+    end
+
+    return {
+        name = "shuffle_grave_to_deck",
+        deck_after = #state.zones.deck.cards,
+    }
+end
+
+function M.repeat_rush_echo(state)
+    local rush_id = "TRUMP-8"
+    local repeat_id = "TRUMP-20"
+    if not (state.cards[rush_id] and state.cards[repeat_id]) then
+        return nil, "missing_repeat_or_rush"
+    end
+
+    local minors = {}
+    for _, card_id in ipairs(state.zones.deck.cards) do
+        if state.cards[card_id].class == "minor" then
+            minors[#minors + 1] = card_id
+        end
+        if #minors >= 11 then
+            break
+        end
+    end
+    if #minors < 11 then
+        return nil, "missing_repeat_rush_minors"
+    end
+
+    for i = 11, 7, -1 do
+        move_card_to_deck_top(state, minors[i])
+    end
+    for i = 6, 2, -1 do
+        move_card_to_deck_top(state, minors[i])
+    end
+    move_card_to_deck_top(state, repeat_id)
+    move_card_to_deck_top(state, rush_id)
+
+    local hand_before = #state.zones.hand.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "repeat_rush_draw_error"
+    end
+    if #state.zones.hand.cards ~= hand_before + 11 then
+        return nil, "repeat_rush_hand_gain_mismatch"
+    end
+    if state.zones.trump.cards[1] ~= repeat_id and state.zones.trump.cards[2] ~= repeat_id then
+        return nil, "repeat_should_enter_trump_zone"
+    end
+    if state.zones.trump.cards[1] ~= rush_id and state.zones.trump.cards[2] ~= rush_id then
+        return nil, "rush_should_enter_trump_zone"
+    end
+
+    return {
+        name = "repeat_rush_echo",
+        hand_after = #state.zones.hand.cards,
+    }
+end
+
+function M.halt_blocks_later_trump(state)
+    local rush_id = "TRUMP-8"
+    local halt_id = "TRUMP-22"
+    local reset_id = "TRUMP-17"
+    if not (state.cards[rush_id] and state.cards[halt_id] and state.cards[reset_id]) then
+        return nil, "missing_halt_chain_cards"
+    end
+
+    local minors = {}
+    for _, card_id in ipairs(state.zones.deck.cards) do
+        if state.cards[card_id].class == "minor" then
+            minors[#minors + 1] = card_id
+        end
+        if #minors >= 4 then
+            break
+        end
+    end
+    if #minors < 4 then
+        return nil, "missing_halt_chain_minors"
+    end
+
+    for i = 4, 1, -1 do
+        move_card_to_deck_top(state, minors[i])
+    end
+    move_card_to_deck_top(state, reset_id)
+    move_card_to_deck_top(state, halt_id)
+    move_card_to_deck_top(state, rush_id)
+
+    local hand_before = #state.zones.hand.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "halt_chain_draw_error"
+    end
+    if #state.zones.hand.cards ~= hand_before + 4 then
+        return nil, "halt_should_only_keep_minor_draws"
+    end
+    if state.zones.trump.cards[1] ~= halt_id and state.zones.trump.cards[2] ~= halt_id then
+        return nil, "halt_should_survive_chain"
+    end
+    if state.zones.trump.cards[1] == rush_id or state.zones.trump.cards[2] == rush_id then
+        return nil, "rush_should_be_flushed_by_halt"
+    end
+    if state.zones.trump.cards[1] == reset_id or state.zones.trump.cards[2] == reset_id then
+        return nil, "reset_should_be_halted_and_flushed"
+    end
+
+    return {
+        name = "halt_blocks_later_trump",
+        hand_after = #state.zones.hand.cards,
+        halt_zone_1 = state.zones.trump.cards[1],
+        halt_zone_2 = state.zones.trump.cards[2],
     }
 end
 
@@ -1411,6 +1792,52 @@ function M.logic_topdeck_swap(state)
         prep = prep,
         choose_result = choose_result,
         hand_result = hand_result,
+    }
+end
+
+function M.start_game_without_trumps()
+    local state = core.new()
+    local result = core.start_game(state, {
+        rng = function(n) return math.random(n) end,
+        trump_mode = "none",
+        enabled_trumps = {},
+    })
+    local trumps = created_trump_ids(state)
+    if #trumps ~= 0 then
+        return nil, "unexpected_trumps_created"
+    end
+    if #state.zones.deck.cards ~= 79 then
+        return nil, "unexpected_no_trump_deck_count"
+    end
+    return {
+        name = "start_game_without_trumps",
+        result = result,
+        deck = #state.zones.deck.cards,
+    }
+end
+
+function M.start_game_foolrush_only()
+    local state = core.new()
+    local result = core.start_game(state, {
+        rng = function(n) return math.random(n) end,
+        trump_mode = "foolrush",
+        enabled_trumps = {"FOOL", "RUSH"},
+    })
+    local trumps = created_trump_ids(state)
+    if #trumps ~= 2 then
+        return nil, "unexpected_foolrush_trump_count"
+    end
+    if not (state.cards["TRUMP-1"] and state.cards["TRUMP-8"]) then
+        return nil, "missing_fool_or_rush"
+    end
+    if #state.zones.deck.cards ~= 81 then
+        return nil, "unexpected_foolrush_deck_count"
+    end
+    return {
+        name = "start_game_foolrush_only",
+        result = result,
+        deck = #state.zones.deck.cards,
+        trumps = trumps,
     }
 end
 

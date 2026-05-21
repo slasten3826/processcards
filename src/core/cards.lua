@@ -59,9 +59,11 @@ function M.append_minor_deck(store, target)
     end
 end
 
-function M.append_trump_deck(store, target)
+function M.append_trump_deck(store, target, enabled)
     for i = 1, 22 do
-        target[#target + 1] = M.create_trump(store, i)
+        if enabled == nil or enabled[i] then
+            target[#target + 1] = M.create_trump(store, i)
+        end
     end
 end
 

@@ -29,6 +29,27 @@ function M.concealed_refill(state, zone_name, slot)
     return card_id
 end
 
+local function resolve_revealed_draw(state, card_id, reason)
+    state_lib.reveal_card(state, card_id)
+
+    if state.cards[card_id].class == "trump" then
+        trump.enter_trump_flow(state, card_id, reason)
+        trump.refresh_pending_trump(state)
+        if state.pending_trump then
+            local _, err = trump.resolve_pending_trump(state)
+            if err then
+                return nil, err
+            end
+            trump.refresh_pending_trump(state)
+        end
+        return nil, nil
+    end
+
+    state_lib.place_card(state, card_id, "hand", nil)
+    transition.emit(state, "draw_to_hand", {card_id = card_id})
+    return card_id, nil
+end
+
 function M.open_manifest_closure(state, slot)
     while true do
         local card_id = pop_topdeck(state)
@@ -54,14 +75,7 @@ function M.draw_to_hand(state)
     if not card_id then
         return nil, "deck_empty"
     end
-    state_lib.reveal_card(state, card_id)
-    if state.cards[card_id].class == "trump" then
-        trump.enter_trump_flow(state, card_id, "draw")
-        return nil, "trump_burn"
-    end
-    state_lib.place_card(state, card_id, "hand", nil)
-    transition.emit(state, "draw_to_hand", {card_id = card_id})
-    return card_id, nil
+    return resolve_revealed_draw(state, card_id, "draw")
 end
 
 return M

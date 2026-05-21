@@ -9,6 +9,7 @@ local function resolve_connect(state)
     })
     draw.draw_to_hand(state)
     draw.draw_to_hand(state)
+    draw.draw_to_hand(state)
     transition.emit(state, "operator_effect_end", {
         operator = "CONNECT",
     })

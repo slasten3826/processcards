@@ -1,4 +1,5 @@
 local cards = require("src.core.cards")
+local constants = require("src.core.constants")
 local state_lib = require("src.core.state")
 
 local M = {}
@@ -12,6 +13,29 @@ end
 
 local function default_rng(max_n)
     return math.random(max_n)
+end
+
+local function normalize_enabled_trumps(enabled_trumps)
+    if enabled_trumps == nil then
+        return nil
+    end
+
+    local out = {}
+    for _, item in ipairs(enabled_trumps) do
+        local idx = nil
+        if type(item) == "number" then
+            idx = item
+        elseif type(item) == "string" then
+            local upper = item:upper()
+            idx = constants.TRUMP_NAME_TO_INDEX[upper]
+                or tonumber(upper:match("^TRUMP%-(%d+)$"))
+                or tonumber(upper)
+        end
+        if idx and idx >= 1 and idx <= #constants.TRUMP_CANON then
+            out[idx] = true
+        end
+    end
+    return out
 end
 
 local function deal_from_deck(state, zone_name, slot, info_state)
@@ -29,7 +53,12 @@ end
 function M.start_game(state, opts)
     opts = opts or {}
     local rng = opts.rng or default_rng
+    local enabled_trumps = normalize_enabled_trumps(opts.enabled_trumps)
     state.rng = rng
+    state.setup_options = {
+        enabled_trumps = enabled_trumps,
+        trump_mode = opts.trump_mode or (enabled_trumps and "custom" or "full"),
+    }
 
     state.cards = cards.create_card_store()
     state.log = {}
@@ -66,7 +95,7 @@ function M.start_game(state, opts)
         state_lib.place_card(state, card_id, "hand", nil)
     end
 
-    cards.append_trump_deck(state.cards, state.zones.deck.cards)
+    cards.append_trump_deck(state.cards, state.zones.deck.cards, enabled_trumps)
     for _, card_id in ipairs(minor_deck) do
         state.zones.deck.cards[#state.zones.deck.cards + 1] = card_id
     end
@@ -82,8 +111,16 @@ function M.start_game(state, opts)
 
     state_lib.push_log(state, "Start Game complete.")
     state_lib.push_log(state, "Phase A: 100 minors -> 6 manifest, 6 hand.")
-    state_lib.push_log(state, "Phase B: +22 trumps shuffled into deck -> 3 targets, 6 latent.")
-    state_lib.push_log(state, "Deck now holds 101 cards.")
+    local trump_count = 0
+    if enabled_trumps == nil then
+        trump_count = 22
+    else
+        for _ in pairs(enabled_trumps) do
+            trump_count = trump_count + 1
+        end
+    end
+    state_lib.push_log(state, string.format("Phase B: +%d trumps shuffled into deck -> 3 targets, 6 latent.", trump_count))
+    state_lib.push_log(state, string.format("Deck now holds %d cards.", #state.zones.deck.cards))
 end
 
 return M

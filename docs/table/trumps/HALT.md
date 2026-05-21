@@ -123,18 +123,22 @@ not to overload `trump zone` with the very cascade it is suppressing.
 
 Important extension:
 
-all other non-`HALT` trumps that already participated in that halted chain
-also follow the same deck-flush ending.
+trumps revealed after `HALT` in that chain are the ones that become halted
+and are flushed.
 
-So a halted chain does not partly park into `trump zone`
-while the rest is flushed.
+The already-living resolver is not automatically erased by `HALT`.
 
-It closes as one interrupted anomaly contour.
+This matters for burst trumps such as `RUSH`.
+If `RUSH` is already in motion,
+`HALT` does not cut the burst in half.
+`RUSH` may finish its own running procedure,
+while later trumps exposed after `HALT` are halted and flushed.
 
-Canonical compression:
+So the accurate compression is:
 
 ```text
-HALTed chain parks nothing except HALT itself
+HALT preserves the current resolver
+but denies later trump entry in that chain
 ```
 
 ---
@@ -187,6 +191,12 @@ It means:
 - let the current resolving item finish
 - block any later trump initiation in that same chain
 
+Special note:
+
+- for `RUSH`, the running six-card burst is treated as one living procedure
+- `HALT` may stop later trump entry inside that burst
+- `HALT` does not split the burst body itself
+
 ---
 
 ## 7. Solo Behavior
@@ -234,8 +244,9 @@ The current resolving item completes.
 Later revealed trumps in that chain become halted trumps.
 They do not resolve.
 When the halted chain closes,
-all non-`HALT` trumps from that chain are shuffled into deck.
+those halted trumps are shuffled into deck.
 `HALT` itself enters ordinary trump ecology.
+The current already-living resolver may remain by ordinary ecology.
 
 ### HALT revealed after another trump already started resolving
 
@@ -246,7 +257,7 @@ That earlier resolving item finishes normally.
 
 None of them resolve.
 All of them become halted trumps.
-All non-`HALT` trumps from that chain are shuffled into deck after the chain closes.
+All of them are shuffled into deck after the chain closes.
 
 ### HALT and ordinary non-trump steps
 
