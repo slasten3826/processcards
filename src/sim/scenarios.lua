@@ -1,4 +1,5 @@
 local core = require("src.core.api")
+local draw = require("src.core.draw")
 local rules = require("src.core.rules")
 local state_lib = require("src.core.state")
 
@@ -35,28 +36,92 @@ local function same_list(a, b)
     return true
 end
 
-local function move_card_to_deck_top(state, card_id)
-    local deck = state.zones.deck.cards
-    for i, id in ipairs(deck) do
-        if id == card_id then
-            table.remove(deck, i)
-            break
-        end
+local function relocate_existing_card(state, card_id)
+    local card = state.cards[card_id]
+    if not card or not card.zone then
+        return nil, "missing_card_zone"
     end
-    table.insert(deck, card_id)
+
+    local from_zone = card.zone
+    local from_slot = card.slot
+    state_lib.remove_from_current_zone(state, card_id)
+
+    if (from_zone == "latent" or from_zone == "targets") and from_slot then
+        draw.concealed_refill(state, from_zone, from_slot)
+    end
+
+    return {
+        from_zone = from_zone,
+        from_slot = from_slot,
+    }, nil
+end
+
+local function move_card_to_deck_top(state, card_id)
+    local moved, err = relocate_existing_card(state, card_id)
+    if err then
+        return nil, err
+    end
+    state_lib.hide_card(state, card_id)
+    table.insert(state.zones.deck.cards, card_id)
     state_lib.sync_zone_cards(state, "deck")
+    return moved
 end
 
 local function move_card_to_deck_bottom(state, card_id)
-    local deck = state.zones.deck.cards
-    for i, id in ipairs(deck) do
-        if id == card_id then
-            table.remove(deck, i)
-            break
-        end
+    local moved, err = relocate_existing_card(state, card_id)
+    if err then
+        return nil, err
     end
+    state_lib.hide_card(state, card_id)
+    local deck = state.zones.deck.cards
     table.insert(deck, 1, card_id)
     state_lib.sync_zone_cards(state, "deck")
+    return moved
+end
+
+local function insert_card_at_hand_front(state, card_id)
+    local moved, err = relocate_existing_card(state, card_id)
+    if err then
+        return nil, err
+    end
+    state_lib.reveal_card(state, card_id)
+    table.insert(state.zones.hand.cards, 1, card_id)
+    state_lib.sync_zone_cards(state, "hand")
+    return moved
+end
+
+local function move_card_to_slot(state, card_id, zone_name, slot, info_state)
+    local moved, err = relocate_existing_card(state, card_id)
+    if err then
+        return nil, err
+    end
+    if info_state == "hidden" then
+        state_lib.hide_card(state, card_id)
+    elseif info_state == "known" then
+        state_lib.hide_card(state, card_id)
+        state_lib.know_card(state, card_id)
+    else
+        state_lib.reveal_card(state, card_id)
+    end
+    state_lib.place_card(state, card_id, zone_name, slot)
+    return moved
+end
+
+local function move_card_to_zone_tail(state, card_id, zone_name, info_state)
+    local moved, err = relocate_existing_card(state, card_id)
+    if err then
+        return nil, err
+    end
+    if info_state == "hidden" then
+        state_lib.hide_card(state, card_id)
+    elseif info_state == "known" then
+        state_lib.hide_card(state, card_id)
+        state_lib.know_card(state, card_id)
+    else
+        state_lib.reveal_card(state, card_id)
+    end
+    state_lib.place_card(state, card_id, zone_name, nil)
+    return moved
 end
 
 local function created_trump_ids(state)
@@ -68,6 +133,77 @@ local function created_trump_ids(state)
     end
     table.sort(out)
     return out
+end
+
+local function first_card_matching(state, predicate, excluded)
+    excluded = excluded or {}
+    for _, zone_name in ipairs({"hand", "deck", "grave", "manifest", "latent", "targets"}) do
+        local zone = state.zones[zone_name]
+        if zone.kind == "slots" then
+            for slot = 1, zone.slot_count do
+                local card_id = zone.cards[slot]
+                if card_id and not excluded[card_id] and predicate(card_id) then
+                    excluded[card_id] = true
+                    return card_id
+                end
+            end
+        else
+            for _, card_id in ipairs(zone.cards) do
+                if card_id and not excluded[card_id] and predicate(card_id) then
+                    excluded[card_id] = true
+                    return card_id
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function first_minor(state, excluded)
+    return first_card_matching(state, function(card_id)
+        return state.cards[card_id].class == "minor"
+    end, excluded)
+end
+
+local function stage_card_to_slot(state, card_id, zone_name, slot, info_state)
+    local zone = state.zones[zone_name]
+    local occupant = zone.cards[slot]
+    if occupant and occupant ~= card_id then
+        state_lib.remove_from_current_zone(state, occupant)
+        state_lib.hide_card(state, occupant)
+        table.insert(state.zones.deck.cards, 1, occupant)
+        state_lib.sync_zone_cards(state, "deck")
+    end
+
+    if state.cards[card_id].zone then
+        state_lib.remove_from_current_zone(state, card_id)
+    end
+
+    if info_state == "hidden" then
+        state_lib.hide_card(state, card_id)
+    elseif info_state == "known" then
+        state_lib.hide_card(state, card_id)
+        state_lib.know_card(state, card_id)
+    else
+        state_lib.reveal_card(state, card_id)
+    end
+    state_lib.place_card(state, card_id, zone_name, slot)
+end
+
+local function stage_card_to_deck_top(state, card_id, info_state)
+    if state.cards[card_id].zone then
+        state_lib.remove_from_current_zone(state, card_id)
+    end
+    if info_state == "hidden" then
+        state_lib.hide_card(state, card_id)
+    elseif info_state == "known" then
+        state_lib.hide_card(state, card_id)
+        state_lib.know_card(state, card_id)
+    else
+        state_lib.reveal_card(state, card_id)
+    end
+    table.insert(state.zones.deck.cards, card_id)
+    state_lib.sync_zone_cards(state, "deck")
 end
 
 function M.draw_once(state)
@@ -419,8 +555,8 @@ function M.halt_blocks_later_trump(state)
     if state.zones.trump.cards[1] ~= halt_id and state.zones.trump.cards[2] ~= halt_id then
         return nil, "halt_should_survive_chain"
     end
-    if state.zones.trump.cards[1] == rush_id or state.zones.trump.cards[2] == rush_id then
-        return nil, "rush_should_be_flushed_by_halt"
+    if state.zones.trump.cards[1] ~= rush_id and state.zones.trump.cards[2] ~= rush_id then
+        return nil, "rush_should_survive_its_own_burst"
     end
     if state.zones.trump.cards[1] == reset_id or state.zones.trump.cards[2] == reset_id then
         return nil, "reset_should_be_halted_and_flushed"
@@ -431,6 +567,1687 @@ function M.halt_blocks_later_trump(state)
         hand_after = #state.zones.hand.cards,
         halt_zone_1 = state.zones.trump.cards[1],
         halt_zone_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.recast_manifest_inversion(state)
+    local recast_id = "TRUMP-16"
+    if not state.cards[recast_id] then
+        return nil, "missing_recast"
+    end
+
+    local old_manifest = {}
+    local old_latent = {}
+    local old_hand = {}
+    for slot = 1, 6 do
+        old_manifest[slot] = state.zones.manifest.cards[slot]
+        old_latent[slot] = state.zones.latent.cards[slot]
+    end
+    for _, card_id in ipairs(state.zones.hand.cards) do
+        old_hand[#old_hand + 1] = card_id
+    end
+
+    move_card_to_deck_top(state, recast_id)
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "recast_draw_error"
+    end
+
+    for slot = 1, 6 do
+        if state.zones.manifest.cards[slot] ~= old_latent[slot] then
+            return nil, "recast_manifest_not_promoted"
+        end
+        if not state_lib.is_revealed(state, state.zones.manifest.cards[slot]) then
+            return nil, "recast_manifest_should_be_revealed"
+        end
+    end
+
+    local hand_set = {}
+    for _, card_id in ipairs(state.zones.hand.cards) do
+        hand_set[card_id] = true
+    end
+    for _, card_id in ipairs(old_manifest) do
+        if not hand_set[card_id] then
+            return nil, "recast_old_manifest_not_in_hand"
+        end
+    end
+
+    for slot = 1, 6 do
+        local latent_id = state.zones.latent.cards[slot]
+        if not latent_id then
+            return nil, "recast_latent_not_refilled"
+        end
+        if not state_lib.is_hidden(state, latent_id) then
+            return nil, "recast_latent_should_be_hidden"
+        end
+    end
+
+    if state.zones.trump.cards[1] ~= recast_id and state.zones.trump.cards[2] ~= recast_id then
+        return nil, "recast_should_enter_trump_zone"
+    end
+
+    return {
+        name = "recast_manifest_inversion",
+        hand_after = #state.zones.hand.cards,
+        grave_after = #state.zones.grave.cards,
+    }
+end
+
+function M.repeat_fool_contacts_shuffle(state)
+    local fool_id = "TRUMP-1"
+    local repeat_id = "TRUMP-20"
+    local shuffle_id = "TRUMP-14"
+    if not (state.cards[fool_id] and state.cards[repeat_id] and state.cards[shuffle_id]) then
+        return nil, "missing_repeat_fool_shuffle_cards"
+    end
+
+    move_card_to_deck_top(state, shuffle_id)
+    move_card_to_deck_top(state, repeat_id)
+    move_card_to_deck_top(state, fool_id)
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "repeat_fool_draw_error"
+    end
+
+    if state_lib.zone_count(state, "trump") ~= 0 then
+        return nil, "repeat_fool_should_flush_all_three"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "repeat_fool_should_leave_no_pending_trump"
+    end
+
+    return {
+        name = "repeat_fool_contacts_shuffle",
+        deck_after = #state.zones.deck.cards,
+        grave_after = #state.zones.grave.cards,
+    }
+end
+
+function M.recast_overflow_trump_routes(state)
+    local recast_id = "TRUMP-16"
+    local shuffle_id = "TRUMP-14"
+    if not (state.cards[recast_id] and state.cards[shuffle_id]) then
+        return nil, "missing_recast_or_shuffle"
+    end
+
+    state.rng = function(n) return n end
+    insert_card_at_hand_front(state, shuffle_id)
+    move_card_to_deck_top(state, recast_id)
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "recast_overflow_draw_error"
+    end
+
+    local has_recast = state.zones.trump.cards[1] == recast_id or state.zones.trump.cards[2] == recast_id
+    local has_shuffle = state.zones.trump.cards[1] == shuffle_id or state.zones.trump.cards[2] == shuffle_id
+    if not has_recast then
+        return nil, "recast_should_enter_trump_zone"
+    end
+    if not has_shuffle then
+        return nil, "overflow_trump_should_resolve_and_enter_trump_zone"
+    end
+    if #state.zones.grave.cards ~= 0 then
+        return nil, "shuffle_overflow_should_clear_grave"
+    end
+
+    return {
+        name = "recast_overflow_trump_routes",
+        hand_after = #state.zones.hand.cards,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.recast_survives_halt(state)
+    local recast_id = "TRUMP-16"
+    local halt_id = "TRUMP-22"
+    if not (state.cards[recast_id] and state.cards[halt_id]) then
+        return nil, "missing_recast_or_halt"
+    end
+
+    local old_manifest = {}
+    local old_latent = {}
+    for slot = 1, 6 do
+        old_manifest[slot] = state.zones.manifest.cards[slot]
+        old_latent[slot] = state.zones.latent.cards[slot]
+    end
+
+    state.rng = function(n) return n end
+    insert_card_at_hand_front(state, halt_id)
+    move_card_to_deck_top(state, recast_id)
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "recast_halt_draw_error"
+    end
+
+    local hand_set = {}
+    for _, card_id in ipairs(state.zones.hand.cards) do
+        hand_set[card_id] = true
+    end
+    for _, card_id in ipairs(old_manifest) do
+        if not hand_set[card_id] then
+            return nil, "recast_halt_old_manifest_not_restored"
+        end
+    end
+
+    for slot = 1, 6 do
+        if state.zones.manifest.cards[slot] ~= old_latent[slot] then
+            return nil, "recast_halt_manifest_not_promoted"
+        end
+    end
+
+    local has_recast = state.zones.trump.cards[1] == recast_id or state.zones.trump.cards[2] == recast_id
+    local has_halt = state.zones.trump.cards[1] == halt_id or state.zones.trump.cards[2] == halt_id
+    if not has_recast then
+        return nil, "recast_should_survive_halt"
+    end
+    if not has_halt then
+        return nil, "halt_should_enter_trump_zone"
+    end
+    if not state_lib.is_board_closed(state) then
+        return nil, "recast_halt_should_leave_board_closed"
+    end
+
+    return {
+        name = "recast_survives_halt",
+        hand_after = #state.zones.hand.cards,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.repeat_recast_echo(state)
+    local recast_id = "TRUMP-16"
+    local repeat_id = "TRUMP-20"
+    if not (state.cards[recast_id] and state.cards[repeat_id]) then
+        return nil, "missing_recast_or_repeat"
+    end
+
+    local old_manifest = {}
+    local old_latent = {}
+    for slot = 1, 6 do
+        old_manifest[slot] = state.zones.manifest.cards[slot]
+        old_latent[slot] = state.zones.latent.cards[slot]
+    end
+
+    state.rng = function(n) return n end
+    insert_card_at_hand_front(state, repeat_id)
+    move_card_to_deck_top(state, recast_id)
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "repeat_recast_draw_error"
+    end
+
+    local hand_set = {}
+    for _, card_id in ipairs(state.zones.hand.cards) do
+        hand_set[card_id] = true
+    end
+    for _, card_id in ipairs(old_latent) do
+        if not hand_set[card_id] then
+            return nil, "repeat_recast_old_latent_missing_from_hand"
+        end
+    end
+
+    local manifest_set = {}
+    for slot = 1, 6 do
+        manifest_set[state.zones.manifest.cards[slot]] = true
+    end
+    for _, card_id in ipairs(old_latent) do
+        if manifest_set[card_id] then
+            return nil, "repeat_recast_manifest_should_not_be_old_latent"
+        end
+    end
+
+    local latent_set = {}
+    for slot = 1, 6 do
+        latent_set[state.zones.latent.cards[slot]] = true
+    end
+    for _, card_id in ipairs(old_manifest) do
+        if not latent_set[card_id] then
+            return nil, "repeat_recast_old_manifest_should_become_new_latent"
+        end
+    end
+
+    local has_recast = state.zones.trump.cards[1] == recast_id or state.zones.trump.cards[2] == recast_id
+    local has_repeat = state.zones.trump.cards[1] == repeat_id or state.zones.trump.cards[2] == repeat_id
+    if not has_recast then
+        return nil, "recast_should_enter_trump_zone"
+    end
+    if not has_repeat then
+        return nil, "repeat_should_echo_recast_and_enter_trump_zone"
+    end
+    if #state.zones.hand.cards ~= 6 then
+        return nil, "repeat_recast_should_leave_one_full_hand"
+    end
+
+    return {
+        name = "repeat_recast_echo",
+        hand_after = #state.zones.hand.cards,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.oracle_top_six_pick_minor(state)
+    local oracle_id = "TRUMP-3"
+    if not state.cards[oracle_id] then
+        return nil, "missing_oracle"
+    end
+
+    local deck = state.zones.deck.cards
+    local viewed = {}
+    for i = #deck, math.max(1, #deck - 5), -1 do
+        viewed[#viewed + 1] = deck[i]
+    end
+    if #viewed < 3 then
+        return nil, "deck_too_small_for_oracle"
+    end
+
+    local chosen_minor = nil
+    local chosen_index = nil
+    for index, card_id in ipairs(viewed) do
+        if state.cards[card_id].class ~= "trump" then
+            chosen_minor = card_id
+            chosen_index = index
+            break
+        end
+    end
+    if not chosen_minor then
+        return nil, "oracle_view_has_no_minor"
+    end
+
+    move_card_to_deck_top(state, oracle_id)
+
+    local hand_before = #state.zones.hand.cards
+    local deck_before = #state.zones.deck.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "oracle_draw_error"
+    end
+
+    local hand_top = state.zones.hand.cards[#state.zones.hand.cards]
+    if hand_top ~= chosen_minor then
+        return nil, "oracle_should_take_first_minor_from_view"
+    end
+    if #state.zones.hand.cards ~= hand_before + 1 then
+        return nil, "oracle_should_add_one_card_to_hand"
+    end
+    if #state.zones.deck.cards ~= deck_before - 2 then
+        return nil, "oracle_deck_count_mismatch"
+    end
+    if state.zones.trump.cards[1] ~= oracle_id and state.zones.trump.cards[2] ~= oracle_id then
+        return nil, "oracle_should_enter_trump_zone"
+    end
+    if state_lib.zone_count(state, "trump") ~= 1 then
+        return nil, "oracle_should_not_trigger_viewed_trumps"
+    end
+
+    return {
+        name = "oracle_top_six_pick_minor",
+        picked_index = chosen_index,
+        picked_card = chosen_minor,
+    }
+end
+
+function M.oracle_recast_fat_deck(state)
+    local oracle_id = "TRUMP-3"
+    local recast_id = "TRUMP-16"
+    if not (state.cards[oracle_id] and state.cards[recast_id]) then
+        return nil, "missing_oracle_or_recast"
+    end
+
+    local deck_before = #state.zones.deck.cards
+    if deck_before < 40 then
+        return nil, "deck_not_fat_enough"
+    end
+
+    local staged_to_deck = {}
+    for _, card_id in ipairs({recast_id, oracle_id}) do
+        if state.cards[card_id].zone ~= "deck" then
+            local moved, err = relocate_existing_card(state, card_id)
+            if err then
+                return nil, err
+            end
+            if not moved then
+                return nil, "failed_to_stage_oracle_recast"
+            end
+            state_lib.hide_card(state, card_id)
+            staged_to_deck[#staged_to_deck + 1] = card_id
+        end
+    end
+    for _, card_id in ipairs(staged_to_deck) do
+        table.insert(state.zones.deck.cards, card_id)
+    end
+    if #staged_to_deck > 0 then
+        state_lib.sync_zone_cards(state, "deck")
+    end
+
+    local deck_trumps = {}
+    for _, card_id in ipairs(state.zones.deck.cards) do
+        if state.cards[card_id].class == "trump" and card_id ~= oracle_id then
+            deck_trumps[#deck_trumps + 1] = card_id
+        end
+    end
+    if #deck_trumps < 6 then
+        return nil, "not_enough_deck_trumps_for_oracle_recast_view"
+    end
+
+    local viewed = {recast_id}
+    for _, card_id in ipairs(deck_trumps) do
+        if card_id ~= recast_id then
+            viewed[#viewed + 1] = card_id
+        end
+        if #viewed == 6 then
+            break
+        end
+    end
+    if #viewed < 6 then
+        return nil, "not_enough_deck_trumps_for_oracle_recast_view"
+    end
+
+    for i = #viewed, 1, -1 do
+        move_card_to_deck_top(state, viewed[i])
+    end
+    move_card_to_deck_top(state, oracle_id)
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "oracle_recast_fat_draw_error"
+    end
+
+    if not state_lib.is_board_closed(state) then
+        return nil, "oracle_recast_fat_should_leave_board_closed"
+    end
+    if #state.zones.deck.cards >= deck_before then
+        return nil, "oracle_recast_fat_should_consume_some_deck"
+    end
+    if #state.zones.deck.cards <= 20 then
+        return nil, "oracle_recast_fat_should_not_nearly_empty_deck"
+    end
+
+    local has_oracle = state.zones.trump.cards[1] == oracle_id or state.zones.trump.cards[2] == oracle_id
+    local has_recast = state.zones.trump.cards[1] == recast_id or state.zones.trump.cards[2] == recast_id
+    if not has_oracle then
+        return nil, "oracle_should_enter_trump_zone"
+    end
+    if not has_recast then
+        return nil, "recast_should_enter_trump_zone"
+    end
+
+    return {
+        name = "oracle_recast_fat_deck",
+        deck_before = deck_before,
+        deck_after = #state.zones.deck.cards,
+        hand_after = #state.zones.hand.cards,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.eject_target_trump_breaks_seal(state)
+    local eject_id = "TRUMP-2"
+    local shuffle_id = "TRUMP-14"
+    if not (state.cards[eject_id] and state.cards[shuffle_id]) then
+        return nil, "missing_eject_or_shuffle"
+    end
+
+    local grave_minor = state.zones.hand.cards[1]
+    if not grave_minor then
+        return nil, "missing_grave_minor"
+    end
+    move_card_to_zone_tail(state, grave_minor, "grave", "revealed")
+    move_card_to_slot(state, shuffle_id, "targets", 1, "hidden")
+    move_card_to_deck_top(state, eject_id)
+
+    local deck_before = #state.zones.deck.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "eject_target_trump_draw_error"
+    end
+
+    local has_eject = state.zones.trump.cards[1] == eject_id or state.zones.trump.cards[2] == eject_id
+    local has_shuffle = state.zones.trump.cards[1] == shuffle_id or state.zones.trump.cards[2] == shuffle_id
+    if not has_eject or not has_shuffle then
+        return nil, "eject_target_trump_should_resolve_shuffle_and_self"
+    end
+    if not state.zones.targets.cards[1] then
+        return nil, "eject_target_trump_should_refill_target_slot"
+    end
+    if state.cards[shuffle_id].zone ~= "trump" then
+        return nil, "eject_target_trump_shuffle_should_end_in_trump_zone"
+    end
+    if state_lib.zone_count(state, "grave") ~= 0 then
+        return nil, "eject_target_trump_shuffle_should_empty_grave"
+    end
+    if state.cards[grave_minor].zone ~= "deck" then
+        return nil, "eject_target_trump_shuffle_should_return_grave_card_to_deck"
+    end
+
+    return {
+        name = "eject_target_trump_breaks_seal",
+        deck_before = deck_before,
+        deck_after = #state.zones.deck.cards,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.eject_trump_zone_releases_stored_trump(state)
+    local eject_id = "TRUMP-2"
+    local shuffle_id = "TRUMP-14"
+    if not (state.cards[eject_id] and state.cards[shuffle_id]) then
+        return nil, "missing_eject_or_shuffle"
+    end
+
+    local grave_minor = state.zones.hand.cards[1]
+    if not grave_minor then
+        return nil, "missing_grave_minor"
+    end
+    move_card_to_zone_tail(state, grave_minor, "grave", "revealed")
+    move_card_to_slot(state, shuffle_id, "trump", 1, "revealed")
+    move_card_to_deck_top(state, eject_id)
+
+    local deck_before = #state.zones.deck.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "eject_trump_zone_draw_error"
+    end
+
+    local has_eject = state.zones.trump.cards[1] == eject_id or state.zones.trump.cards[2] == eject_id
+    local has_shuffle = state.zones.trump.cards[1] == shuffle_id or state.zones.trump.cards[2] == shuffle_id
+    if not has_eject or not has_shuffle then
+        return nil, "eject_trump_zone_should_resolve_stored_trump_and_self"
+    end
+    if state_lib.zone_count(state, "grave") ~= 0 then
+        return nil, "eject_trump_zone_shuffle_should_empty_grave"
+    end
+    if state.cards[grave_minor].zone ~= "deck" then
+        return nil, "eject_trump_zone_shuffle_should_return_grave_card_to_deck"
+    end
+
+    return {
+        name = "eject_trump_zone_releases_stored_trump",
+        deck_before = deck_before,
+        deck_after = #state.zones.deck.cards,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.eject_manifest_trump_repairs_before_resolution(state)
+    local eject_id = "TRUMP-2"
+    local shuffle_id = "TRUMP-14"
+    if not (state.cards[eject_id] and state.cards[shuffle_id]) then
+        return nil, "missing_eject_or_shuffle"
+    end
+
+    local grave_minor = state.zones.hand.cards[1]
+    if not grave_minor then
+        return nil, "missing_grave_minor"
+    end
+    move_card_to_zone_tail(state, grave_minor, "grave", "revealed")
+
+    local repair_minor = state.zones.latent.cards[1]
+    if not repair_minor or state.cards[repair_minor].class == "trump" then
+        return nil, "missing_repair_minor"
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local card_id = state.zones.targets.cards[slot]
+        if card_id and state.cards[card_id].class == "trump" then
+            move_card_to_deck_bottom(state, card_id)
+        end
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local card_id = state.zones.latent.cards[slot]
+        if card_id and slot ~= 1 and state.cards[card_id].class == "trump" then
+            move_card_to_deck_bottom(state, card_id)
+        end
+    end
+
+    move_card_to_slot(state, shuffle_id, "manifest", 1, "revealed")
+    move_card_to_deck_top(state, eject_id)
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "eject_manifest_trump_draw_error"
+    end
+
+    local has_eject = state.zones.trump.cards[1] == eject_id or state.zones.trump.cards[2] == eject_id
+    local has_shuffle = state.zones.trump.cards[1] == shuffle_id or state.zones.trump.cards[2] == shuffle_id
+    if not has_eject or not has_shuffle then
+        return nil, "eject_manifest_trump_should_resolve_shuffle_and_self"
+    end
+    if state.zones.manifest.cards[1] ~= repair_minor then
+        return nil, "eject_manifest_trump_should_repair_manifest_before_resolution"
+    end
+    if state.cards[repair_minor].zone ~= "manifest" then
+        return nil, "repair_minor_should_end_in_manifest"
+    end
+    if state_lib.zone_count(state, "grave") ~= 0 then
+        return nil, "eject_manifest_shuffle_should_empty_grave"
+    end
+
+    return {
+        name = "eject_manifest_trump_repairs_before_resolution",
+        manifest_1 = state.zones.manifest.cards[1],
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.oracle_pick_trump_without_triggering_other_viewed_trumps(state)
+    local oracle_id = "TRUMP-3"
+    local chosen_trump_id = "TRUMP-14"
+    if not (state.cards[oracle_id] and state.cards[chosen_trump_id]) then
+        return nil, "missing_oracle_or_chosen_trump"
+    end
+
+    local viewed = { chosen_trump_id }
+    for _, card_id in ipairs(created_trump_ids(state)) do
+        if card_id ~= oracle_id and card_id ~= chosen_trump_id then
+            viewed[#viewed + 1] = card_id
+        end
+        if #viewed == 6 then
+            break
+        end
+    end
+    if #viewed < 6 then
+        return nil, "not_enough_viewed_trumps"
+    end
+
+    local staged_to_deck = {}
+    for _, card_id in ipairs(viewed) do
+        if state.cards[card_id].zone ~= "deck" then
+            local moved, err = relocate_existing_card(state, card_id)
+            if err then
+                return nil, err
+            end
+            if not moved then
+                return nil, "failed_to_stage_oracle_pick_trump"
+            end
+            state_lib.hide_card(state, card_id)
+            staged_to_deck[#staged_to_deck + 1] = card_id
+        end
+    end
+    if state.cards[oracle_id].zone ~= "deck" then
+        local moved, err = relocate_existing_card(state, oracle_id)
+        if err then
+            return nil, err
+        end
+        if not moved then
+            return nil, "failed_to_stage_oracle_pick_trump"
+        end
+        state_lib.hide_card(state, oracle_id)
+        staged_to_deck[#staged_to_deck + 1] = oracle_id
+    end
+    for _, card_id in ipairs(staged_to_deck) do
+        table.insert(state.zones.deck.cards, card_id)
+    end
+    if #staged_to_deck > 0 then
+        state_lib.sync_zone_cards(state, "deck")
+    end
+
+    for i = #viewed, 1, -1 do
+        move_card_to_deck_top(state, viewed[i])
+    end
+    move_card_to_deck_top(state, oracle_id)
+
+    local deck_before = #state.zones.deck.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "oracle_pick_trump_draw_error"
+    end
+
+    local has_oracle = state.zones.trump.cards[1] == oracle_id or state.zones.trump.cards[2] == oracle_id
+    local has_chosen = state.zones.trump.cards[1] == chosen_trump_id or state.zones.trump.cards[2] == chosen_trump_id
+    if not has_oracle then
+        return nil, "oracle_should_enter_trump_zone"
+    end
+    if not has_chosen then
+        return nil, "oracle_chosen_trump_should_enter_trump_zone"
+    end
+    if state_lib.zone_count(state, "trump") ~= 2 then
+        return nil, "oracle_should_only_trigger_chosen_trump"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "oracle_should_leave_no_pending_trump"
+    end
+    if #state.zones.deck.cards ~= deck_before - 2 then
+        return nil, "oracle_pick_trump_deck_count_mismatch"
+    end
+
+    for i = 2, #viewed do
+        local card_id = viewed[i]
+        if state.cards[card_id].zone ~= "deck" then
+            return nil, "oracle_viewed_trump_should_remain_in_deck"
+        end
+    end
+
+    return {
+        name = "oracle_pick_trump_without_triggering_other_viewed_trumps",
+        chosen_trump = chosen_trump_id,
+        deck_after = #state.zones.deck.cards,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.repeat_oracle_echo(state)
+    local oracle_id = "TRUMP-3"
+    local repeat_id = "TRUMP-20"
+    if not (state.cards[oracle_id] and state.cards[repeat_id]) then
+        return nil, "missing_oracle_or_repeat"
+    end
+
+    local echo_viewed_trumps = {}
+    local echo_minor = nil
+    for _, card_id in ipairs(created_trump_ids(state)) do
+        if card_id ~= oracle_id and card_id ~= repeat_id then
+            echo_viewed_trumps[#echo_viewed_trumps + 1] = card_id
+        end
+        if #echo_viewed_trumps == 5 then
+            break
+        end
+    end
+    for i = #state.zones.deck.cards, 1, -1 do
+        local card_id = state.zones.deck.cards[i]
+        if state.cards[card_id].class ~= "trump" then
+            echo_minor = card_id
+            break
+        end
+    end
+    if #echo_viewed_trumps < 5 or not echo_minor then
+        return nil, "missing_repeat_oracle_view_cards"
+    end
+
+    local initial_view = { repeat_id }
+    for i = 1, 5 do
+        initial_view[#initial_view + 1] = echo_viewed_trumps[i]
+    end
+
+    local staged_to_deck = {}
+    for _, card_id in ipairs(initial_view) do
+        if state.cards[card_id].zone ~= "deck" then
+            local moved, err = relocate_existing_card(state, card_id)
+            if err then
+                return nil, err
+            end
+            if not moved then
+                return nil, "failed_to_stage_repeat_oracle"
+            end
+            state_lib.hide_card(state, card_id)
+            staged_to_deck[#staged_to_deck + 1] = card_id
+        end
+    end
+    for _, card_id in ipairs({ echo_minor, oracle_id }) do
+        if state.cards[card_id].zone ~= "deck" then
+            local moved, err = relocate_existing_card(state, card_id)
+            if err then
+                return nil, err
+            end
+            if not moved then
+                return nil, "failed_to_stage_repeat_oracle"
+            end
+            state_lib.hide_card(state, card_id)
+            staged_to_deck[#staged_to_deck + 1] = card_id
+        end
+    end
+    for _, card_id in ipairs(staged_to_deck) do
+        table.insert(state.zones.deck.cards, card_id)
+    end
+    if #staged_to_deck > 0 then
+        state_lib.sync_zone_cards(state, "deck")
+    end
+
+    move_card_to_deck_top(state, echo_minor)
+    for i = #initial_view, 1, -1 do
+        move_card_to_deck_top(state, initial_view[i])
+    end
+    move_card_to_deck_top(state, oracle_id)
+
+    local hand_before = #state.zones.hand.cards
+    local deck_before = #state.zones.deck.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "repeat_oracle_draw_error"
+    end
+
+    local hand_top = state.zones.hand.cards[#state.zones.hand.cards]
+    if hand_top ~= echo_minor then
+        return nil, "repeat_oracle_should_pick_echo_minor"
+    end
+    if #state.zones.hand.cards ~= hand_before + 1 then
+        return nil, "repeat_oracle_should_add_one_card_to_hand"
+    end
+    if #state.zones.deck.cards ~= deck_before - 3 then
+        return nil, "repeat_oracle_deck_count_mismatch"
+    end
+
+    local has_oracle = state.zones.trump.cards[1] == oracle_id or state.zones.trump.cards[2] == oracle_id
+    local has_repeat = state.zones.trump.cards[1] == repeat_id or state.zones.trump.cards[2] == repeat_id
+    if not has_oracle or not has_repeat then
+        return nil, "repeat_oracle_should_leave_oracle_and_repeat_in_trump_zone"
+    end
+    if state_lib.zone_count(state, "trump") ~= 2 then
+        return nil, "repeat_oracle_should_not_trigger_other_viewed_trumps"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "repeat_oracle_should_leave_no_pending_trump"
+    end
+
+    for _, card_id in ipairs(echo_viewed_trumps) do
+        if state.cards[card_id].zone ~= "deck" then
+            return nil, "repeat_oracle_viewed_trumps_should_remain_in_deck"
+        end
+    end
+
+    return {
+        name = "repeat_oracle_echo",
+        picked_minor = echo_minor,
+        hand_after = #state.zones.hand.cards,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.unveil_reveals_known_targets_and_topdeck(state)
+    local unveil_id = "TRUMP-21"
+    local target_trump_id = "TRUMP-14"
+    if not (state.cards[unveil_id] and state.cards[target_trump_id]) then
+        return nil, "missing_unveil_or_target_trump"
+    end
+
+    local excluded = {
+        [unveil_id] = true,
+        [target_trump_id] = true,
+    }
+    local target_known_minor = first_minor(state, excluded)
+    local target_hidden_minor = first_minor(state, excluded)
+    local refill_a = first_minor(state, excluded)
+    local refill_b = first_minor(state, excluded)
+    local top_minor = first_minor(state, excluded)
+    if not (target_known_minor and target_hidden_minor and refill_a and refill_b and top_minor) then
+        return nil, "missing_unveil_target_minors"
+    end
+
+    stage_card_to_slot(state, target_known_minor, "targets", 1, "known")
+    stage_card_to_slot(state, target_trump_id, "targets", 2, "hidden")
+    stage_card_to_slot(state, target_hidden_minor, "targets", 3, "hidden")
+
+    for slot = 1, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_latent_minors"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, slot % 2 == 0 and "known" or "hidden")
+    end
+
+    stage_card_to_deck_top(state, top_minor, "hidden")
+    stage_card_to_deck_top(state, refill_b, "hidden")
+    stage_card_to_deck_top(state, refill_a, "hidden")
+    stage_card_to_deck_top(state, unveil_id, "hidden")
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "unveil_draw_error"
+    end
+
+    if state.cards[target_known_minor].zone ~= "grave" then
+        return nil, "unveil_known_target_minor_should_go_grave"
+    end
+    if state.cards[target_hidden_minor].zone ~= "grave" then
+        return nil, "unveil_hidden_target_minor_should_go_grave"
+    end
+    if state.zones.targets.cards[2] ~= target_trump_id then
+        return nil, "unveil_target_trump_should_remain_installed"
+    end
+    if not state_lib.is_revealed(state, target_trump_id) then
+        return nil, "unveil_target_trump_should_be_revealed"
+    end
+    if state.zones.targets.cards[1] ~= refill_a or state.zones.targets.cards[3] ~= refill_b then
+        return nil, "unveil_target_refill_order_mismatch"
+    end
+    if state_lib.is_revealed(state, refill_a) or state_lib.is_revealed(state, refill_b) then
+        return nil, "unveil_refills_should_remain_hidden"
+    end
+    if state.zones.deck.cards[#state.zones.deck.cards] ~= top_minor then
+        return nil, "unveil_topdeck_should_remain_on_top"
+    end
+    if not state_lib.is_revealed(state, top_minor) then
+        return nil, "unveil_topdeck_should_be_revealed"
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local card_id = state.zones.latent.cards[slot]
+        if card_id and not state_lib.is_revealed(state, card_id) then
+            return nil, "unveil_latent_minor_should_be_revealed"
+        end
+    end
+
+    return {
+        name = "unveil_reveals_known_targets_and_topdeck",
+        known_target = target_known_minor,
+        target_trump = target_trump_id,
+        topdeck = top_minor,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.unveil_latent_trump_resolves_after_unveil_zone(state)
+    local unveil_id = "TRUMP-21"
+    local shuffle_id = "TRUMP-14"
+    if not (state.cards[unveil_id] and state.cards[shuffle_id]) then
+        return nil, "missing_unveil_or_shuffle"
+    end
+
+    local excluded = {
+        [unveil_id] = true,
+        [shuffle_id] = true,
+    }
+    local grave_minor = first_minor(state, excluded)
+    local top_minor = first_minor(state, excluded)
+    if not (grave_minor and top_minor) then
+        return nil, "missing_unveil_latent_minors"
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_target_padding"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, "revealed")
+    end
+
+    stage_card_to_slot(state, shuffle_id, "latent", 1, "hidden")
+    for slot = 2, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, "hidden")
+    end
+
+    move_card_to_zone_tail(state, grave_minor, "grave", "revealed")
+    stage_card_to_deck_top(state, top_minor, "hidden")
+    stage_card_to_deck_top(state, unveil_id, "hidden")
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "unveil_latent_draw_error"
+    end
+
+    if state.zones.trump.cards[1] ~= unveil_id then
+        return nil, "unveil_should_enter_trump_zone_before_latent_trump"
+    end
+    if state.zones.trump.cards[2] ~= shuffle_id then
+        return nil, "unveil_latent_trump_should_resolve_after_unveil"
+    end
+    if state.cards[shuffle_id].zone ~= "trump" then
+        return nil, "unveil_latent_shuffle_should_end_in_trump_zone"
+    end
+    if state.zones.latent.cards[1] == shuffle_id then
+        return nil, "unveil_latent_slot_should_be_repaired"
+    end
+    if state_lib.zone_count(state, "grave") ~= 0 then
+        return nil, "unveil_latent_shuffle_should_empty_grave"
+    end
+    if state.pending_trump ~= nil or #state.zones.trump_flow.cards ~= 0 then
+        return nil, "unveil_latent_flow_should_be_drained"
+    end
+
+    return {
+        name = "unveil_latent_trump_resolves_after_unveil_zone",
+        unveil = unveil_id,
+        latent_trump = shuffle_id,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+        deck_after = #state.zones.deck.cards,
+    }
+end
+
+function M.unveil_soft_visibility_stand(state)
+    local unveil_id = "TRUMP-21"
+    if not state.cards[unveil_id] then
+        return nil, "missing_unveil"
+    end
+
+    local excluded = {
+        [unveil_id] = true,
+    }
+    local top_minor = first_minor(state, excluded)
+    local refill_1 = first_minor(state, excluded)
+    local refill_2 = first_minor(state, excluded)
+    local refill_3 = first_minor(state, excluded)
+    if not (top_minor and refill_1 and refill_2 and refill_3) then
+        return nil, "missing_unveil_soft_top_or_refill_minor"
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_soft_target_minor"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, slot == 2 and "known" or "hidden")
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_soft_latent_minor"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, slot % 2 == 0 and "known" or "hidden")
+    end
+
+    stage_card_to_deck_top(state, top_minor, "hidden")
+    stage_card_to_deck_top(state, refill_3, "hidden")
+    stage_card_to_deck_top(state, refill_2, "hidden")
+    stage_card_to_deck_top(state, refill_1, "hidden")
+    stage_card_to_deck_top(state, unveil_id, "hidden")
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "unveil_soft_draw_error"
+    end
+
+    if state.zones.trump.cards[1] ~= unveil_id or state.zones.trump.cards[2] ~= nil then
+        return nil, "unveil_soft_should_only_place_unveil"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "unveil_soft_should_not_leave_flow"
+    end
+    if state.zones.deck.cards[#state.zones.deck.cards] ~= top_minor or not state_lib.is_revealed(state, top_minor) then
+        return nil, "unveil_soft_topdeck_should_be_revealed"
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local card_id = state.zones.latent.cards[slot]
+        if not card_id or not state_lib.is_revealed(state, card_id) then
+            return nil, "unveil_soft_latent_should_be_revealed"
+        end
+    end
+
+    return {
+        name = "unveil_soft_visibility_stand",
+        topdeck = top_minor,
+        grave_after = #state.zones.grave.cards,
+        trump_1 = state.zones.trump.cards[1],
+    }
+end
+
+function M.unveil_topdeck_trump_pressure_stand(state)
+    local unveil_id = "TRUMP-21"
+    local shuffle_id = "TRUMP-14"
+    if not (state.cards[unveil_id] and state.cards[shuffle_id]) then
+        return nil, "missing_unveil_or_shuffle"
+    end
+
+    local excluded = {
+        [unveil_id] = true,
+        [shuffle_id] = true,
+    }
+    local grave_minor = first_minor(state, excluded)
+    if not grave_minor then
+        return nil, "missing_unveil_topdeck_grave_minor"
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_topdeck_target_padding"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, "revealed")
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_topdeck_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, "revealed")
+    end
+
+    move_card_to_zone_tail(state, grave_minor, "grave", "revealed")
+    stage_card_to_deck_top(state, shuffle_id, "hidden")
+    stage_card_to_deck_top(state, unveil_id, "hidden")
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "unveil_topdeck_draw_error"
+    end
+
+    if state.zones.trump.cards[1] ~= unveil_id or state.zones.trump.cards[2] ~= shuffle_id then
+        return nil, "unveil_topdeck_trump_order_mismatch"
+    end
+    if state_lib.zone_count(state, "grave") ~= 0 then
+        return nil, "unveil_topdeck_shuffle_should_empty_grave"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "unveil_topdeck_flow_should_be_drained"
+    end
+
+    return {
+        name = "unveil_topdeck_trump_pressure_stand",
+        unveil = unveil_id,
+        topdeck_trump = shuffle_id,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.unveil_overflow_storm_stand(state)
+    local unveil_id = "TRUMP-21"
+    local shuffle_id = "TRUMP-14"
+    local oracle_id = "TRUMP-3"
+    if not (state.cards[unveil_id] and state.cards[shuffle_id] and state.cards[oracle_id]) then
+        return nil, "missing_unveil_shuffle_or_oracle"
+    end
+
+    local excluded = {
+        [unveil_id] = true,
+        [shuffle_id] = true,
+        [oracle_id] = true,
+    }
+    local refill_minor = first_minor(state, excluded)
+    if not refill_minor then
+        return nil, "missing_unveil_storm_refill_minor"
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_storm_target_padding"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, "revealed")
+    end
+    stage_card_to_slot(state, shuffle_id, "latent", 1, "hidden")
+    for slot = 2, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_storm_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, "revealed")
+    end
+
+    local oracle_view = {}
+    for _ = 1, 6 do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_storm_oracle_view"
+        end
+        oracle_view[#oracle_view + 1] = minor_id
+        stage_card_to_deck_top(state, minor_id, "hidden")
+    end
+    stage_card_to_deck_top(state, oracle_id, "hidden")
+    stage_card_to_deck_top(state, refill_minor, "hidden")
+    stage_card_to_deck_top(state, unveil_id, "hidden")
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "unveil_storm_draw_error"
+    end
+
+    if state.zones.trump.cards[1] ~= nil or state.zones.trump.cards[2] ~= nil then
+        return nil, "unveil_storm_should_overflow_trump_zone"
+    end
+    if state.cards[unveil_id].zone ~= "deck" or state.cards[shuffle_id].zone ~= "deck" or state.cards[oracle_id].zone ~= "deck" then
+        return nil, "unveil_storm_overflowed_trumps_should_return_deck"
+    end
+    if state.cards[shuffle_id].info_state ~= "hidden" or state.cards[oracle_id].info_state ~= "hidden" then
+        return nil, "unveil_storm_flushed_trumps_should_be_hidden"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "unveil_storm_flow_should_be_drained"
+    end
+
+    return {
+        name = "unveil_overflow_storm_stand",
+        oracle_view = oracle_view,
+        hand_after = #state.zones.hand.cards,
+        grave_after = #state.zones.grave.cards,
+        deck_after = #state.zones.deck.cards,
+    }
+end
+
+function M.purge_topdeck_first_and_targets_untouched(state)
+    local purge_id = "TRUMP-19"
+    local target_trump_id = "TRUMP-14"
+    if not (state.cards[purge_id] and state.cards[target_trump_id]) then
+        return nil, "missing_purge_or_target_trump"
+    end
+
+    local excluded = {
+        [purge_id] = true,
+        [target_trump_id] = true,
+    }
+    local top_minor = first_minor(state, excluded)
+    local target_minor = first_minor(state, excluded)
+    if not (top_minor and target_minor) then
+        return nil, "missing_purge_topdeck_target_minors"
+    end
+
+    stage_card_to_slot(state, target_minor, "targets", 1, "revealed")
+    stage_card_to_slot(state, target_trump_id, "targets", 2, "revealed")
+
+    for slot = 1, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_purge_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, "hidden")
+    end
+
+    for _ = 1, 6 do
+        local refill_id = first_minor(state, excluded)
+        if not refill_id then
+            return nil, "missing_purge_refill_padding"
+        end
+        stage_card_to_deck_top(state, refill_id, "hidden")
+    end
+    stage_card_to_deck_top(state, top_minor, "revealed")
+    stage_card_to_deck_top(state, purge_id, "hidden")
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "purge_draw_error"
+    end
+
+    if state.cards[top_minor].zone ~= "grave" then
+        return nil, "purge_should_process_revealed_topdeck_first"
+    end
+    if state.zones.targets.cards[1] ~= target_minor or state.cards[target_minor].zone ~= "targets" then
+        return nil, "purge_should_not_touch_target_minor"
+    end
+    if state.zones.targets.cards[2] ~= target_trump_id or state.cards[target_trump_id].zone ~= "targets" then
+        return nil, "purge_should_not_touch_target_trump"
+    end
+    if state.zones.trump.cards[1] ~= purge_id then
+        return nil, "purge_should_enter_trump_zone"
+    end
+    if state.zones.trump.cards[2] ~= nil then
+        return nil, "purge_should_not_activate_target_trump"
+    end
+
+    return {
+        name = "purge_topdeck_first_and_targets_untouched",
+        topdeck = top_minor,
+        target_minor = target_minor,
+        target_trump = target_trump_id,
+        trump_1 = state.zones.trump.cards[1],
+    }
+end
+
+function M.purge_column_revealed_latent_repairs_before_manifest(state)
+    local purge_id = "TRUMP-19"
+    if not state.cards[purge_id] then
+        return nil, "missing_purge"
+    end
+
+    local excluded = {
+        [purge_id] = true,
+    }
+    local latent_revealed = first_minor(state, excluded)
+    local latent_refill = first_minor(state, excluded)
+    local repair_refill = first_minor(state, excluded)
+    if not (latent_revealed and latent_refill and repair_refill) then
+        return nil, "missing_purge_column_minors"
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_purge_target_padding"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, "hidden")
+    end
+    stage_card_to_slot(state, latent_revealed, "latent", 1, "revealed")
+    for slot = 2, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_purge_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, "hidden")
+    end
+
+    local original_manifest = state.zones.manifest.cards[1]
+    if not original_manifest then
+        return nil, "missing_purge_manifest_card"
+    end
+
+    for _ = 1, 12 do
+        local refill_id = first_minor(state, excluded)
+        if not refill_id then
+            return nil, "missing_purge_extra_refills"
+        end
+        stage_card_to_deck_top(state, refill_id, "hidden")
+    end
+    stage_card_to_deck_top(state, repair_refill, "hidden")
+    stage_card_to_deck_top(state, latent_refill, "hidden")
+    stage_card_to_deck_top(state, purge_id, "hidden")
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "purge_column_draw_error"
+    end
+
+    if state.cards[latent_revealed].zone ~= "grave" then
+        return nil, "purge_revealed_latent_should_go_grave"
+    end
+    if state.cards[original_manifest].zone ~= "grave" then
+        return nil, "purge_manifest_should_go_grave_after_latent"
+    end
+    if state.zones.manifest.cards[1] ~= latent_refill then
+        return nil, "purge_manifest_repair_should_promote_latent_refill"
+    end
+    if state.zones.latent.cards[1] ~= repair_refill then
+        return nil, "purge_manifest_repair_should_refill_latent"
+    end
+    if not state_lib.is_revealed(state, latent_refill) then
+        return nil, "purge_promoted_latent_refill_should_be_revealed"
+    end
+    if state_lib.is_revealed(state, repair_refill) then
+        return nil, "purge_new_latent_refill_should_stay_hidden"
+    end
+
+    return {
+        name = "purge_column_revealed_latent_repairs_before_manifest",
+        purged_latent = latent_revealed,
+        purged_manifest = original_manifest,
+        promoted = latent_refill,
+        new_latent = repair_refill,
+    }
+end
+
+function M.purge_topdeck_trump_resolves_after_purge_zone(state)
+    local purge_id = "TRUMP-19"
+    local shuffle_id = "TRUMP-14"
+    if not (state.cards[purge_id] and state.cards[shuffle_id]) then
+        return nil, "missing_purge_or_shuffle"
+    end
+
+    local excluded = {
+        [purge_id] = true,
+        [shuffle_id] = true,
+    }
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_purge_target_padding"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, "hidden")
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_purge_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, "hidden")
+    end
+
+    for _ = 1, 6 do
+        local refill_id = first_minor(state, excluded)
+        if not refill_id then
+            return nil, "missing_purge_refill_padding"
+        end
+        stage_card_to_deck_top(state, refill_id, "hidden")
+    end
+    stage_card_to_deck_top(state, shuffle_id, "revealed")
+    stage_card_to_deck_top(state, purge_id, "hidden")
+
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "purge_topdeck_trump_draw_error"
+    end
+
+    if state.zones.trump.cards[1] ~= purge_id then
+        return nil, "purge_should_enter_trump_zone_before_topdeck_trump"
+    end
+    if state.zones.trump.cards[2] ~= shuffle_id then
+        return nil, "purge_topdeck_trump_should_resolve_after_purge"
+    end
+    if state.cards[shuffle_id].zone ~= "trump" then
+        return nil, "purge_shuffle_should_end_in_trump_zone"
+    end
+    if #state.zones.trump_flow.cards ~= 0 or state.pending_trump ~= nil then
+        return nil, "purge_topdeck_flow_should_be_drained"
+    end
+
+    return {
+        name = "purge_topdeck_trump_resolves_after_purge_zone",
+        purge = purge_id,
+        topdeck_trump = shuffle_id,
+        trump_1 = state.zones.trump.cards[1],
+        trump_2 = state.zones.trump.cards[2],
+    }
+end
+
+function M.error_grave_returns_to_hand_in_order(state)
+    local error_id = "TRUMP-15"
+    if not state.cards[error_id] then
+        return nil, "missing_error"
+    end
+
+    local excluded = {
+        [error_id] = true,
+    }
+    local grave_cards = {}
+    for _ = 1, 5 do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_error_grave_minor"
+        end
+        grave_cards[#grave_cards + 1] = minor_id
+        move_card_to_zone_tail(state, minor_id, "grave", "revealed")
+    end
+
+    move_card_to_deck_top(state, error_id)
+
+    local hand_before = #state.zones.hand.cards
+    local drawn = core.draw_to_hand(state)
+    if drawn.summary.error then
+        return nil, "error_draw_error"
+    end
+
+    if #state.zones.grave.cards ~= 0 then
+        return nil, "error_should_empty_grave"
+    end
+    if #state.zones.hand.cards ~= hand_before + #grave_cards then
+        return nil, "error_should_return_whole_grave_to_hand"
+    end
+    for i, card_id in ipairs(grave_cards) do
+        local hand_index = hand_before + i
+        if state.zones.hand.cards[hand_index] ~= card_id then
+            return nil, "error_should_preserve_grave_order"
+        end
+        if state.cards[card_id].zone ~= "hand" or not state_lib.is_revealed(state, card_id) then
+            return nil, "error_returned_card_should_be_revealed_in_hand"
+        end
+    end
+    if state.zones.trump.cards[1] ~= error_id then
+        return nil, "error_should_enter_trump_zone"
+    end
+    if state.cards[error_id].zone == "hand" then
+        return nil, "error_itself_should_not_enter_hand"
+    end
+
+    return {
+        name = "error_grave_returns_to_hand_in_order",
+        returned = grave_cards,
+        hand_before = hand_before,
+        hand_after = #state.zones.hand.cards,
+        trump_1 = state.zones.trump.cards[1],
+    }
+end
+
+function M.purge_then_error_table_stand(state)
+    local purge_id = "TRUMP-19"
+    local error_id = "TRUMP-15"
+    if not (state.cards[purge_id] and state.cards[error_id]) then
+        return nil, "missing_purge_or_error"
+    end
+
+    local excluded = {
+        [purge_id] = true,
+        [error_id] = true,
+    }
+    local visible_top = first_minor(state, excluded)
+    if not visible_top then
+        return nil, "missing_purge_error_top_minor"
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_purge_error_target_padding"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, "revealed")
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_purge_error_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, slot <= 3 and "revealed" or "hidden")
+    end
+
+    stage_card_to_deck_top(state, error_id, "hidden")
+    for _ = 1, 18 do
+        local refill_id = first_minor(state, excluded)
+        if not refill_id then
+            return nil, "missing_purge_error_refills"
+        end
+        stage_card_to_deck_top(state, refill_id, "hidden")
+    end
+    stage_card_to_deck_top(state, visible_top, "revealed")
+    stage_card_to_deck_top(state, purge_id, "hidden")
+
+    local hand_before = #state.zones.hand.cards
+    local deck_before = #state.zones.deck.cards
+    local first = core.draw_to_hand(state)
+    if first.summary.error then
+        return nil, "purge_then_error_purge_draw_error"
+    end
+
+    local grave_after_purge = #state.zones.grave.cards
+    local deck_after_purge = #state.zones.deck.cards
+    local hand_after_purge = #state.zones.hand.cards
+    local draws_to_error = 0
+    while state.cards[error_id].zone ~= "trump" and draws_to_error < 30 do
+        draws_to_error = draws_to_error + 1
+        local next_draw = core.draw_to_hand(state)
+        if next_draw.summary.error then
+            return nil, "purge_then_error_error_draw_error"
+        end
+    end
+
+    if grave_after_purge <= 0 then
+        return nil, "purge_then_error_purge_should_create_grave"
+    end
+    if state.cards[error_id].zone ~= "trump" then
+        return nil, "purge_then_error_should_reach_error"
+    end
+    if #state.zones.grave.cards ~= 0 then
+        return nil, "purge_then_error_error_should_empty_grave"
+    end
+    if #state.zones.hand.cards < hand_after_purge + grave_after_purge then
+        return nil, "purge_then_error_error_should_import_purge_residue"
+    end
+    if not (state.zones.trump.cards[1] == purge_id or state.zones.trump.cards[2] == purge_id) then
+        return nil, "purge_then_error_purge_should_resolve"
+    end
+    if not (state.zones.trump.cards[1] == error_id or state.zones.trump.cards[2] == error_id) then
+        return nil, "purge_then_error_error_should_resolve"
+    end
+
+    return {
+        name = "purge_then_error_table_stand",
+        hand_before = hand_before,
+        hand_after_purge = hand_after_purge,
+        hand_after_error = #state.zones.hand.cards,
+        draws_to_error = draws_to_error,
+        grave_after_purge = grave_after_purge,
+        deck_before = deck_before,
+        deck_after_purge = deck_after_purge,
+        deck_after_error = #state.zones.deck.cards,
+    }
+end
+
+function M.error_then_purge_table_stand(state)
+    local error_id = "TRUMP-15"
+    local purge_id = "TRUMP-19"
+    if not (state.cards[error_id] and state.cards[purge_id]) then
+        return nil, "missing_error_or_purge"
+    end
+
+    local excluded = {
+        [error_id] = true,
+        [purge_id] = true,
+    }
+    local preload = {}
+    for _ = 1, 8 do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_error_purge_grave_minor"
+        end
+        preload[#preload + 1] = minor_id
+        move_card_to_zone_tail(state, minor_id, "grave", "revealed")
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_error_purge_target_padding"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, "revealed")
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_error_purge_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, slot <= 2 and "revealed" or "hidden")
+    end
+
+    for _ = 1, 18 do
+        local refill_id = first_minor(state, excluded)
+        if not refill_id then
+            return nil, "missing_error_purge_refills"
+        end
+        stage_card_to_deck_top(state, refill_id, "hidden")
+    end
+    stage_card_to_deck_top(state, purge_id, "hidden")
+    move_card_to_deck_top(state, error_id)
+
+    local hand_before = #state.zones.hand.cards
+    local first = core.draw_to_hand(state)
+    if first.summary.error then
+        return nil, "error_then_purge_error_draw_error"
+    end
+    local hand_after_error = #state.zones.hand.cards
+    local grave_after_error = #state.zones.grave.cards
+
+    local second = core.draw_to_hand(state)
+    if second.summary.error then
+        return nil, "error_then_purge_purge_draw_error"
+    end
+
+    if hand_after_error ~= hand_before + #preload then
+        return nil, "error_then_purge_error_should_import_preload"
+    end
+    if grave_after_error ~= 0 then
+        return nil, "error_then_purge_error_should_empty_grave"
+    end
+    if #state.zones.grave.cards <= 0 then
+        return nil, "error_then_purge_purge_should_recreate_grave"
+    end
+    if #state.zones.hand.cards ~= hand_after_error then
+        return nil, "error_then_purge_purge_should_not_change_hand"
+    end
+
+    return {
+        name = "error_then_purge_table_stand",
+        preload = #preload,
+        hand_before = hand_before,
+        hand_after_error = hand_after_error,
+        hand_after_purge = #state.zones.hand.cards,
+        grave_after_purge = #state.zones.grave.cards,
+    }
+end
+
+function M.unveil_purge_error_table_stand(state)
+    local unveil_id = "TRUMP-21"
+    local purge_id = "TRUMP-19"
+    local error_id = "TRUMP-15"
+    if not (state.cards[unveil_id] and state.cards[purge_id] and state.cards[error_id]) then
+        return nil, "missing_unveil_purge_or_error"
+    end
+
+    local excluded = {
+        [unveil_id] = true,
+        [purge_id] = true,
+        [error_id] = true,
+    }
+    local visible_after_unveil = first_minor(state, excluded)
+    if not visible_after_unveil then
+        return nil, "missing_unveil_purge_error_visible_top"
+    end
+
+    for slot = 1, state.zones.targets.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_purge_error_target_padding"
+        end
+        stage_card_to_slot(state, minor_id, "targets", slot, "revealed")
+    end
+    for slot = 1, state.zones.latent.slot_count do
+        local minor_id = first_minor(state, excluded)
+        if not minor_id then
+            return nil, "missing_unveil_purge_error_latent_padding"
+        end
+        stage_card_to_slot(state, minor_id, "latent", slot, "hidden")
+    end
+
+    stage_card_to_deck_top(state, error_id, "hidden")
+    for _ = 1, 24 do
+        local refill_id = first_minor(state, excluded)
+        if not refill_id then
+            return nil, "missing_unveil_purge_error_refills"
+        end
+        stage_card_to_deck_top(state, refill_id, "hidden")
+    end
+    stage_card_to_deck_top(state, visible_after_unveil, "revealed")
+    stage_card_to_deck_top(state, purge_id, "hidden")
+    stage_card_to_deck_top(state, unveil_id, "hidden")
+
+    local hand_before = #state.zones.hand.cards
+    local first = core.draw_to_hand(state)
+    if first.summary.error then
+        return nil, "unveil_purge_error_unveil_draw_error"
+    end
+    if state.cards[purge_id].zone ~= "trump" and state.cards[purge_id].zone ~= "deck" then
+        return nil, "unveil_purge_error_purge_should_have_resolved_or_overflowed"
+    end
+    local grave_after_purge = #state.zones.grave.cards
+
+    if state.cards[error_id].zone ~= "trump" then
+        move_card_to_deck_top(state, error_id)
+        if state.zones.deck.cards[#state.zones.deck.cards] ~= error_id then
+            return nil, "unveil_purge_error_error_should_be_staged_topdeck"
+        end
+    end
+
+    local draws_to_error = 0
+    while state.cards[error_id].zone ~= "trump" and draws_to_error < 40 do
+        draws_to_error = draws_to_error + 1
+        local next_draw = core.draw_to_hand(state)
+        if next_draw.summary.error then
+            return nil, "unveil_purge_error_error_draw_error"
+        end
+    end
+
+    if grave_after_purge <= 0 then
+        return nil, "unveil_purge_error_purge_should_create_grave"
+    end
+    local reached_error = state.cards[error_id].zone == "trump"
+    if reached_error then
+        if #state.zones.grave.cards ~= 0 then
+            return nil, "unveil_purge_error_error_should_empty_grave"
+        end
+        if #state.zones.hand.cards <= hand_before then
+            return nil, "unveil_purge_error_error_should_expand_hand"
+        end
+    end
+
+    return {
+        name = "unveil_purge_error_table_stand",
+        grave_after_purge = grave_after_purge,
+        draws_to_error = draws_to_error,
+        reached_error = reached_error,
+        hand_before = hand_before,
+        hand_after_error = #state.zones.hand.cards,
+        deck_after = #state.zones.deck.cards,
     }
 end
 
@@ -1838,6 +3655,48 @@ function M.start_game_foolrush_only()
         result = result,
         deck = #state.zones.deck.cards,
         trumps = trumps,
+    }
+end
+
+function M.trump_flow_runaway_guard(state)
+    local card_id = "TRUMP-1"
+    if not state.cards[card_id] then
+        return nil, "missing_guard_trump"
+    end
+
+    local moved, err = relocate_existing_card(state, card_id)
+    if err then
+        return nil, err
+    end
+
+    state.trump_guard = {
+        max_trump_chain_steps = 0,
+        max_repair_attempts = 128,
+    }
+    state_lib.reveal_card(state, card_id)
+    state_lib.place_card(state, card_id, "trump_flow", nil)
+    state.pending_trump = card_id
+
+    local result = core.resolve_pending_trump(state)
+    local summary = result and result.summary or {}
+    if summary.error ~= "trump_flow_runaway" then
+        return nil, "expected_trump_flow_runaway"
+    end
+    if not summary.trump_runaway then
+        return nil, "missing_trump_runaway_diagnostic"
+    end
+    if state.zones.trump_flow.cards[1] ~= card_id then
+        return nil, "runaway_guard_should_keep_flow_head"
+    end
+    if state.pending_trump ~= card_id then
+        return nil, "runaway_guard_should_keep_pending_trump"
+    end
+
+    return {
+        name = "trump_flow_runaway_guard",
+        moved = moved,
+        error = summary.error,
+        diagnostic = summary.trump_runaway,
     }
 end
 

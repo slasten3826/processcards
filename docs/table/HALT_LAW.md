@@ -63,8 +63,9 @@ If `HALT` becomes known during an ongoing trump flow:
 2. no further trump resolution may begin during that same flow
 3. any trump revealed later in that same flow becomes a `halted trump`
 4. halted trumps do not resolve
-5. when the halted flow closes, all non-`HALT` trumps from that halted flow are shuffled into deck
+5. when the halted flow closes, halted unresolved trumps are shuffled into deck
 6. `HALT` itself then follows ordinary trump ecology
+7. the already-living current resolver follows its own trump law
 
 If `HALT` becomes known
 and no further trump entry would occur,
@@ -76,8 +77,9 @@ Short formula:
 HALT resolves
 current item finishes
 later trumps become halted trumps
-halted flow non-HALT trumps -> deck
+halted unresolved trumps -> deck
 HALT itself -> ordinary trump ecology
+current resolver -> its own ordinary/special ecology
 ```
 
 ## 4. Halted trumps
@@ -102,14 +104,26 @@ Important:
 
 Important extension:
 
-all other non-`HALT` trumps
-that already participated in that halted flow
-also follow the same deck-flush ending.
+The already-living resolver is not automatically erased by `HALT`.
+
+If a trump was already resolving when `HALT` appeared,
+that trump may finish its own living procedure.
+
+This matters for burst trumps such as `RUSH`.
+
+For `RUSH`:
+
+- `HALT` does not cut the six-card burst in half
+- later trumps exposed after `HALT` become halted trumps
+- `RUSH` itself follows the ecology allowed by its own law
 
 Canonical compression:
 
 ```text
-HALTed flow parks nothing except HALT itself
+HALT preserves current resolver
+HALT denies later trump entry
+halted unresolved trumps return to deck
+HALT itself follows ordinary ecology
 ```
 
 ## 5. What HALT does not do
@@ -180,6 +194,7 @@ the current resolving item may finish.
 No further trump resolutions may begin in that flow.
 Any trumps revealed later in that flow become halted trumps.
 When the halted flow closes,
-all non-HALT trumps from that flow are shuffled into deck.
+halted unresolved trumps are shuffled into deck.
 HALT itself follows ordinary trump ecology.
+The current resolver follows its own trump law.
 ```

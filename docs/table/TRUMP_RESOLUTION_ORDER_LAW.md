@@ -94,6 +94,11 @@ But:
 first caused, first resolved
 ```
 
+Queue ownership belongs to the active trump-flow runner.
+
+Individual trump effects may produce trumps,
+but they do not independently decide when the whole chain closes.
+
 ## 5. In-flight trumps
 
 Пока trump flow ещё резолвится,
@@ -118,12 +123,22 @@ resolve now
 park later
 ```
 
+Operational reading:
+
+```text
+queue -> current -> in_flight -> chain close -> trump zone
+```
+
+No individual trump payload may call the trump-zone parking procedure directly
+while its parent chain is still active.
+
 ## 6. Ordinary chain close
 
 When an ordinary trump flow closes:
 
-1. resolved in-flight trumps are transferred into `trump zone` in resolution order
+1. all resolved `in_flight` trumps are transferred into `trump zone` in resolution order
 2. if this produces a third parked trump, resolve the ordinary chamber release
+3. chamber release happens only during this close procedure, not mid-chain
 
 Коротко:
 
@@ -148,13 +163,18 @@ In a halted chain:
 
 - the current resolving item may finish
 - no further trump resolution may begin
-- all non-`HALT` trumps from that halted chain are shuffled into deck
+- trumps revealed after the HALT boundary become halted trumps
+- halted trumps are shuffled into deck
 - `HALT` itself enters ordinary trump ecology after the halted chain closes
+- the already-living current resolver follows its own trump law
 
 Canonical compression:
 
 ```text
-HALTed chain parks nothing except HALT itself
+HALT preserves current resolver
+HALT denies later trump entry
+halted unresolved trumps return to deck
+HALT itself follows ordinary ecology
 ```
 
 ## 8. Why this matters
@@ -201,6 +221,7 @@ If a trump effect activates another trump, enqueue it.
 Resolve trumps in the order they were caused.
 Resolved trumps remain in-flight until chain close.
 Ordinary closed chains enter trump zone.
-Halted chains flush non-HALT trumps into deck, while HALT itself follows ordinary ecology.
-HALTed chain parks nothing except HALT itself.
+Halted chains preserve the current resolver, deny later trump entry, and flush halted unresolved trumps into deck.
+HALT itself follows ordinary ecology.
+Trump-zone overflow is a chain-close event, never a mid-chain event.
 ```

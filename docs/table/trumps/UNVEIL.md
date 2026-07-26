@@ -31,8 +31,11 @@ MANIFEST -> CYCLE
 
 `UNVEIL` is a total visibility trump.
 
-It does not primarily move cards.
-It changes the visibility state of the machine.
+It reveals the hidden machine in a fixed order.
+That reveal uses ordinary ecology.
+
+So `UNVEIL` does not only change information.
+It can expose trumps and route them into trump flow.
 
 Short formula:
 
@@ -73,25 +76,40 @@ temporary scouting
 
 ## 3. Resolution Scope
 
-When `UNVEIL` becomes known,
-reveal all cards that are face-down at the moment this trump resolves.
+When `UNVEIL` resolves,
+reveal unrevealed cards in this order:
 
-This includes:
+1. target zone slot 1
+2. target zone slot 2
+3. target zone slot 3
+4. latent manifest layer slot 1
+5. latent manifest layer slot 2
+6. latent manifest layer slot 3
+7. latent manifest layer slot 4
+8. latent manifest layer slot 5
+9. latent manifest layer slot 6
+10. top card of deck
 
-- face-down cards in the latent row of manifest chain
-- face-down cards in target zone
-- the top card of deck, if it is face-down
-- any other face-down card created by future lawful effects
+This includes both:
+
+- hidden cards
+- known but not fully revealed cards
 
 This does not include:
 
 - hand cards, because hand is not a face-down zone under current rules
 - hidden runtime, because hidden runtime does not exist under current rules
 
+After this reveal pass completes,
+`UNVEIL` enters trump zone.
+
+Then any trumps placed into trump flow by this reveal pass
+begin resolving through ordinary trump flow.
+
 Short formula:
 
 ```text
-all current face-down cards become revealed
+targets 1-2-3 -> latent 1-6 -> topdeck -> UNVEIL to trump zone -> trump flow
 ```
 
 ---
@@ -104,6 +122,9 @@ If a card is revealed in target zone:
 - if it is not a trump, discard it to grave immediately
 
 This discard happens during the same resolution.
+The emptied target slot is repaired by ordinary concealed refill.
+
+Cards created by that refill are not revealed again by the same target step.
 
 Short formula:
 
@@ -131,18 +152,20 @@ revealed means revealed
 
 ## 6. Topdeck Rule
 
-If the top card of deck is face-down,
+If the top card of deck is unrevealed,
 reveal it.
 
 This trump does not draw that card
-and does not move it by default.
+and does not move it by default if it is a non-trump.
 
-It only makes the top of deck visible.
+If the top card is a trump,
+it enters trump flow through ordinary trump ecology.
 
 Short formula:
 
 ```text
-topdeck may become manifest without being drawn
+topdeck minor -> revealed topdeck
+topdeck trump -> trump flow
 ```
 
 ---
@@ -178,13 +201,15 @@ It uses:
 - ordinary trump-zone law
 - ordinary third-trump release if triggered
 
-If newly revealed cards later trigger further lawful events,
-those events follow the ordinary machine rules.
+If newly revealed latent or topdeck cards are trumps,
+those trumps enter trump flow.
+
+`UNVEIL` itself enters trump zone before those queued trumps resolve.
 
 Short formula:
 
 ```text
-UNVEIL changes visibility, not ecology
+UNVEIL reveals in order; ecology handles what was revealed
 ```
 
 ---
@@ -209,9 +234,14 @@ It removes secrecy as protection.
 Draft rules text:
 
 ```text
-Reveal all face-down cards.
+Reveal all unrevealed target-zone cards from slot 1 to 3.
 If a non-trump card is revealed in target zone, discard it immediately.
 Revealed trump cards in target zone remain.
+Then reveal latent layer slots 1 to 6.
+Latent trumps enter trump flow and their slots are repaired.
+Then reveal topdeck.
+Topdeck trump enters trump flow.
+UNVEIL enters trump zone before queued trumps resolve.
 ```
 
 ---

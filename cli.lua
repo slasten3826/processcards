@@ -13,10 +13,11 @@ Usage:
   lua cli.lua latent_trump_closure
   lua cli.lua scenario <name> [seed]
   lua cli.lua autoplay [seed] [steps]
+  lua cli.lua survival [seed] [steps]
   lua cli.lua headless [seed] [steps]
   lua cli.lua play [seed]
   lua cli.lua smoke [seed] [turns]
-  lua cli.lua bench <name|smoke|autoplay|headless> [count] [seed]
+  lua cli.lua bench <name|smoke|autoplay|survival|headless> [count] [seed]
 ]])
 end
 
@@ -125,6 +126,27 @@ if command == "headless" then
     local seed = tonumber(arg[2]) or 1
     local steps = tonumber(arg[3]) or 256
     local result = sim.run_headless_game(seed, steps)
+    if result.ok then
+        io.write("OK\n")
+        io.write("steps=" .. #result.transcript .. "\n")
+        io.write("stop_reason=" .. tostring(result.stop_reason or "-") .. "\n")
+        for _, entry in ipairs(result.transcript) do
+            io.write(string.format("%02d phase=%s action=%s\n", entry.step, tostring(entry.phase), action_desc(entry.action)))
+        end
+        io.write(result.snapshot .. "\n")
+        if result.interaction then
+            io.write(interaction_lib.format(result.interaction) .. "\n")
+        end
+        os.exit(0)
+    end
+    print_failure(result)
+    os.exit(2)
+end
+
+if command == "survival" then
+    local seed = tonumber(arg[2]) or 1
+    local steps = tonumber(arg[3]) or 256
+    local result = sim.run_survival_bot(seed, steps)
     if result.ok then
         io.write("OK\n")
         io.write("steps=" .. #result.transcript .. "\n")

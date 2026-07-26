@@ -40,11 +40,14 @@ M.TRUMP_CANON = {
 
 M.TRUMP_NAMES = {
     [1] = "FOOL",
+    [3] = "ORACLE",
     [8] = "RUSH",
     [2] = "EJECT",
     [14] = "SHUFFLE",
+    [15] = "ERROR",
     [16] = "RECAST",
     [17] = "RESET",
+    [19] = "PURGE",
     [20] = "REPEAT",
     [21] = "UNVEIL",
     [22] = "HALT",

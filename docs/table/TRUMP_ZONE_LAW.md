@@ -63,6 +63,7 @@ and only on ordinary chain close
 - `trump zone` не хранит pending trump
 - `trump zone` хранит только уже resolved trump residue
 - `trump zone` does not receive in-flight trumps mid-chain
+- individual trump payloads do not park themselves into `trump zone`
 
 Active unresolved trump now belongs in:
 
@@ -110,6 +111,22 @@ overflow flushes the whole trump residue back into deck
 third parked trump releases the chamber
 ```
 
+This is a chain-close event.
+
+It must not happen while a parent trump is still resolving.
+
+If multiple trumps close together,
+they are offered to the chamber in their in-flight resolution order.
+
+Each offered trump either:
+
+- enters an open chamber slot
+- or causes chamber release with itself plus current chamber residents
+
+After a chamber release,
+the chamber is empty and later closing trumps, if any, continue being offered
+in order.
+
 ## 7. Information consequence
 
 Пока козырь лежит в `trump zone`:
@@ -144,4 +161,5 @@ and what happens on overflow
 trump zone = 2 open trumps parked after ordinary chain close
 if a third parked trump would enter,
 new trump + all zone trumps shuffle back into deck
+overflow happens only during chain close
 ```

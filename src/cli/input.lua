@@ -190,6 +190,10 @@ function M.parse(state, interaction, raw)
         return nil
     end
 
+    if raw == "." or raw == "auto" then
+        return { kind = "advance" }
+    end
+
     if raw == "q" or raw == "quit" then
         os.exit(0)
     end

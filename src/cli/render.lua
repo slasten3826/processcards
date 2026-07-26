@@ -420,6 +420,9 @@ local function event_lines(ui)
     for _, item in ipairs((ui and ui.events) or {}) do
         lines[#lines + 1] = g("dim") .. item .. g("reset")
     end
+    for _, item in ipairs((ui and ui.debug_lines) or {}) do
+        lines[#lines + 1] = item
+    end
     if #lines > 0 then
         lines[#lines + 1] = ""
     end
@@ -428,8 +431,14 @@ end
 
 local function command_hints(interaction)
     local lines = { zone_name_line("COMMANDS") }
-    lines[#lines + 1] = "[enter] advance/confirm   [x] clear   [s] restart   [q] quit"
-    lines[#lines + 1] = "[dev none|foolrush|full] restart with trump preset"
+    lines[#lines + 1] = "[enter/.] advance   [x] clear   [s] restart   [q] quit"
+    lines[#lines + 1] = "[dev/preset none|foolrush|full] restart with trump preset"
+    lines[#lines + 1] = "[seed N] restart with deterministic seed"
+    lines[#lines + 1] = "[help] phase help   [ix] interaction   [snap] snapshot   [events] log   [last] transition"
+    lines[#lines + 1] = "[where QUERY] find cards   [zone NAME] text dump zone"
+    lines[#lines + 1] = "[config] show config   [context compact|default|max]   [set events|zone|transition N]"
+    lines[#lines + 1] = "[legal] raw legal surface   [history N] command history"
+    lines[#lines + 1] = "[multi] chain actions in one line, e.g.  c 5 . o1 t1 ."
 
     if interaction.phase == "await_start" or interaction.phase == "await_complete" or interaction.phase == "await_ready" then
         lines[#lines + 1] = "[1-6] commit manifest   [a-l] arm hand"

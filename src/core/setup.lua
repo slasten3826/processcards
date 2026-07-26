@@ -58,7 +58,14 @@ function M.start_game(state, opts)
     state.setup_options = {
         enabled_trumps = enabled_trumps,
         trump_mode = opts.trump_mode or (enabled_trumps and "custom" or "full"),
+        guard = opts.guard,
     }
+    state.trump_guard = opts.guard
+    state.trump_runaway = nil
+    state.trump_flow_draining = nil
+    state.trump_chain_steps = nil
+    state.trump_repair_attempts = nil
+    state.max_transition_events_per_action = opts.max_transition_events_per_action
 
     state.cards = cards.create_card_store()
     state.log = {}

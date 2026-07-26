@@ -18,7 +18,7 @@ XX Judgement
 Flavor text:
 
 ```text
-What is known is purged.
+What is revealed is purged.
 ```
 
 Core edge:
@@ -32,30 +32,33 @@ MANIFEST -> LOGIC
 
 ## 1. Core Identity
 
-`PURGE` is a mass-closure trump.
+`PURGE` is a column-closure trump.
 
 It does not select.
 It does not filter by operator.
 It does not negotiate.
 
-It routes the visible field
-through one binary law:
+It first checks topdeck,
+then walks the manifest chain by column
+and routes each column through one binary law:
 
 ```text
 revealed
 or not revealed
 ```
 
-Visible non-trumps go to `grave`.
-Visible trumps in `target zone` do not go to `grave`.
-They wake up.
+The latent layer is checked first.
+Then the manifest card is checked.
+Repair happens inside the column before the next column is processed.
 
 Short formula:
 
 ```text
-revealed non-trumps leave
-revealed target-trumps activate
-hidden remains hidden
+topdeck first
+column 1 -> column 2 -> column 3 -> column 4 -> column 5 -> column 6
+latent first
+manifest second
+repair inside each column
 ```
 
 ---
@@ -64,24 +67,24 @@ hidden remains hidden
 
 `△ MANIFEST` here is not local reveal.
 
-It is the whole visible field
-taken as one judged class.
+It is the manifest chain
+processed as ordered columns.
 
 `☶ LOGIC` here is not doctrine.
 
-It is a binary classifier:
+It is a column classifier:
 
 ```text
-visible
-or not visible
+revealed latent
+or protected latent
 ```
 
 So this trump reads as:
 
 ```text
-the visible field
-is judged by one binary law
-and routed accordingly
+each column is judged
+by the state of its hidden underside
+then repaired before judgement moves on
 ```
 
 This is not:
@@ -92,31 +95,72 @@ selection
 mercy
 ```
 
-It is structural mass closure.
+It is structural column closure.
 
 ---
 
 ## 3. Core Law
 
-When `PURGE` becomes known:
+When `PURGE` resolves,
+check topdeck first.
 
-1. Each revealed card in `manifest chain` moves to `grave`.
-2. Each revealed card in `latent layer` moves to `grave`.
-3. The revealed top card of `deck`, if any, moves to `grave`.
-4. Each revealed non-trump card in `target zone` moves to `grave`.
-5. Each revealed trump in `target zone` activates through `trump flow` in left-to-right slot order.
-6. Hidden cards in `latent layer` remain hidden and untouched.
-7. Hidden cards in `target zone` remain hidden and untouched.
-8. `PURGE` does not reveal any face-down card.
-9. After `PURGE` fully resolves, it follows ordinary trump ecology.
+If topdeck is revealed:
+
+- topdeck non-trump moves to `grave`
+- topdeck trump routes through `trump flow`
+
+If topdeck is not revealed,
+leave it untouched.
+
+Then process manifest-chain columns from `1` to `6`.
+
+For each column:
+
+1. Look at the latent card in that column.
+2. If the latent card is not revealed, do not reveal it and do not move it.
+3. Then purge the manifest card in that column:
+   - if it is a non-trump, move it to `grave`
+   - if it is a trump, route it through `trump flow`
+4. Repair the manifest slot through ordinary repair.
+5. Continue to the next column.
+
+If the latent card is revealed:
+
+1. Purge the latent card first:
+   - if it is a non-trump, move it to `grave`
+   - if it is a trump, route it through `trump flow`
+2. Repair the latent slot by concealed refill.
+3. Then purge the manifest card in that column:
+   - if it is a non-trump, move it to `grave`
+   - if it is a trump, route it through `trump flow`
+4. Repair the manifest slot through ordinary repair.
+5. Continue to the next column.
+
+After all six manifest-chain columns are processed:
+
+1. `PURGE` itself enters trump zone.
+2. Then queued trumps resolve through ordinary trump flow.
+
+`PURGE` does not work with target zone.
+
+Target-zone cards are outside its scope:
+
+- hidden targets are untouched
+- known targets are untouched
+- revealed targets are untouched
+- target trumps are not removed
+- target trumps are not activated
 
 Short formula:
 
 ```text
-revealed non-trump -> grave
-revealed topdeck -> grave
-revealed target-trump -> trump flow
-hidden -> untouched
+revealed topdeck -> grave/trump_flow
+unrevealed topdeck -> untouched
+for n = 1..6:
+  latent[n] if revealed -> grave/trump_flow, then latent repair
+  manifest[n] -> grave/trump_flow, then manifest repair
+target zone -> untouched
+PURGE to trump zone -> trump flow
 ```
 
 ---
@@ -133,8 +177,9 @@ This separation is intentional.
 It means:
 
 - `PURGE` alone respects concealment
-- hidden state remains real protection
+- hidden latent remains real protection
 - `PURGE` cannot scout and strike in one move
+- a closed latent card can still rise during manifest repair
 
 Short formula:
 
@@ -145,56 +190,101 @@ PURGE judges what was already seen
 
 ---
 
-## 5. Target Zone Activation
+## 5. Column Repair Law
 
-Revealed trumps in `target zone`
-do not go to `grave`.
+`PURGE` repairs inside the column it is processing.
 
-They activate through `trump flow`
-in left-to-right slot order.
+This is load-bearing.
 
-This matters:
+If manifest slot `n` is purged,
+ordinary manifest repair happens before column `n + 1`.
 
-- activation order is fixed by slot position
-- the player triggers the cascade, but does not direct it
-- slot order remains fate
+That means:
+
+- latent `n` may rise into manifest `n`
+- if latent `n` is a trump, it routes through trump flow
+- manifest closure may pull from topdeck
+- concealed latent refill happens as usual
 
 Short formula:
 
 ```text
-slot order is fate
-not player choice
+purge manifest[n] -> repair manifest[n] -> continue
+```
+
+This makes `PURGE` feel like a six-step machine pass,
+not like a single board wipe.
+
+---
+
+## 6. Topdeck Rule
+
+Before manifest-chain columns are processed,
+`PURGE` checks topdeck.
+
+Only revealed topdeck is affected.
+
+- revealed topdeck non-trump moves to `grave`
+- revealed topdeck trump routes through `trump flow`
+- unrevealed topdeck is untouched
+
+Short formula:
+
+```text
+revealed topdeck -> grave/trump_flow
+unrevealed topdeck -> untouched
 ```
 
 ---
 
-## 6. Why This Works
+## 7. Target Zone Non-Scope
+
+`PURGE` does not work with target zone.
+
+This is intentional.
+
+Target zone is installed structure,
+not part of the manifest-chain closure pass.
+
+So even revealed target cards are untouched by `PURGE`.
+
+Short formula:
+
+```text
+target zone is outside PURGE
+```
+
+---
+
+## 8. Why This Works
 
 `PURGE` does not merely clear the table.
 
-It closes the visible phase:
+It closes each visible column:
 
-- visible non-trumps disappear into residue
-- visible target-trumps become live events
-- hidden structure remains intact
+- revealed latent is no longer safe
+- manifest is judged column by column
+- hidden underside may rise through repair
+- target zone remains installed and outside the pass
+- unrevealed structure remains intact
 
 This makes it a true XX-class event:
 
 - not violence
 - not ordinary destruction
-- but mass closure of one phase
+- but ordered closure of exposed structure
 - and forced resolution of visible installed fate
 
 Short formula:
 
 ```text
-visible phase ends
-hidden phase continues
+exposed columns close
+hidden columns continue
 ```
 
 ---
 
-## 7. Relation to UNVEIL
+## 9. Relation to UNVEIL
 
 `UNVEIL` makes hidden cards visible.
 
@@ -203,14 +293,15 @@ If `UNVEIL` resolves before `PURGE`,
 
 That means:
 
-- revealed latent is swept
-- revealed target-zone cards are judged
-- target-zone trumps can fully discharge
+- revealed topdeck is judged first
+- revealed latent is purged before manifest in its column
+- manifest repair can create new visible/hidden structure during the pass
+- target-zone cards remain installed and untouched
 
 Short formula:
 
 ```text
-UNVEIL + PURGE = total visible reset
+UNVEIL + PURGE = expose columns, then close columns
 ```
 
 This is not a special combo rule.
@@ -218,7 +309,7 @@ It is ordinary composition through normal trump ecology.
 
 ---
 
-## 8. Relation to SHUFFLE
+## 10. Relation to SHUFFLE
 
 If `SHUFFLE` resolves after `PURGE`:
 
@@ -246,7 +337,7 @@ expose -> judge -> recirculate
 
 ---
 
-## 9. Relation to GATE
+## 11. Relation to GATE
 
 `GATE` and `PURGE` are paired by function
 but separated by mechanism.
@@ -261,8 +352,9 @@ but separated by mechanism.
 
 - does not divide by key
 - does not check operator overlap
-- removes all revealed non-trumps uniformly
-- activates revealed target-trumps
+- processes columns by visibility state
+- removes exposed non-trumps through ordered repair
+- ignores target zone
 
 Short formula:
 
@@ -276,28 +368,28 @@ PURGE judges by visibility alone
 
 ---
 
-## 10. Relation to Trump Ecology
+## 12. Relation to Trump Ecology
 
 `PURGE` does not invent separate ecology.
 
 It uses:
 
 - ordinary visibility rules
-- ordinary `trump flow` for target-zone activations
+- ordinary `trump flow` for revealed topdeck and manifest-chain trumps
 - ordinary chain close handling
 - ordinary `trump zone` law for `PURGE` itself
 
 Its specificity is not in ecology.
-Its specificity is in mass routing
-of the visible field.
+Its specificity is in ordered column routing
+of the revealed field.
 
 ---
 
-## 11. Design Character
+## 13. Design Character
 
 `PURGE` should feel:
 
-- mass
+- procedural
 - final
 - impersonal
 - structural rather than violent
@@ -313,22 +405,29 @@ It should not feel:
 - targeted at one victim
 
 `PURGE` belongs to no one.
-It arrives.
+It passes through the columns.
 
 ---
 
-## 12. Minimal Canonical Text
+## 14. Minimal Canonical Text
 
 Draft rules text:
 
 ```text
-Move all revealed cards in manifest chain and latent layer to grave.
-Move the revealed top card of deck to grave, if any.
-Move all revealed non-trump cards in target zone to grave.
-Revealed trumps in target zone do not go to grave.
-Instead, they activate through trump flow in left-to-right slot order.
-PURGE does not reveal any face-down card.
-After PURGE fully resolves, it follows ordinary trump ecology.
+First check topdeck.
+If topdeck is revealed, purge it:
+non-trump to grave, trump to trump flow.
+If topdeck is not revealed, leave it untouched.
+Then process manifest-chain columns from 1 to 6.
+In each column, check latent first.
+If latent is revealed, purge it:
+non-trump to grave, trump to trump flow, then repair latent.
+Then purge the manifest card:
+non-trump to grave, trump to trump flow, then repair manifest.
+If latent is not revealed, leave it untouched and purge only manifest.
+PURGE does not work with target zone.
+PURGE does not reveal unrevealed cards.
+PURGE enters trump zone before queued trumps resolve.
 ```
 
 ---
