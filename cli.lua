@@ -1,11 +1,14 @@
 local core = require("src.core.api")
 local interaction_lib = require("src.core.interaction")
 local sim = require("src.sim.runner")
+local view = require("src.core.view")
 
 local function usage()
     io.write([[
 Usage:
   lua cli.lua snapshot
+  lua cli.lua view [seed]
+  lua cli.lua audit_view [seeds] [steps]
   lua cli.lua interaction
   lua cli.lua advance
   lua cli.lua events
@@ -461,6 +464,30 @@ local function run_play(seed)
             io.write("Unknown command. Type 'help'.\n")
         end
     end
+end
+
+if command == "view" then
+    local seed = tonumber(arg[2]) or 1
+    local viewed = core.new()
+    core.start_game(viewed, {rng = require("src.sim.rng").from_seed(seed)})
+    local observation = view.observe(viewed, {
+        interaction = core.interaction(viewed),
+        legal_action_count = #core.enumerate_legal_actions(viewed),
+    })
+    io.write(view.format(observation) .. "\n")
+    local scored = view.evaluate(observation)
+    io.write(string.format("honest score=%.2f (hidden cards on board: %d)\n",
+        scored.score, scored.hidden_count))
+    os.exit(0)
+end
+
+if command == "audit_view" then
+    local seeds = tonumber(arg[2]) or 12
+    local steps = tonumber(arg[3]) or 80
+    local audit = require("src.sim.observation_audit")
+    local report = audit.run(seeds, steps)
+    io.write(audit.format(report) .. "\n")
+    os.exit((report.ok and report.control_ok) and 0 or 2)
 end
 
 local game = core.new()
