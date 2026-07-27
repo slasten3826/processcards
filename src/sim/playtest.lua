@@ -46,7 +46,7 @@ end
 -- toggles, so re-picking the same action disarms it and the session never
 -- reaches the operator phase. The fix is to advance whenever the interaction
 -- says advancing is possible, and only arm when it is not.
-local function protocol_policy(observation, actions)
+function M.protocol_policy(observation, actions)
     local phase = observation.phase
 
     if observation.advance_enabled and phase ~= "await_operator" then
@@ -94,7 +94,7 @@ function M.run(opts)
     local seed = opts.seed or 1
     local max_steps = opts.steps or 200
     local trumps = opts.trumps or "none"
-    local policy = opts.policy or protocol_policy
+    local policy = opts.policy or M.protocol_policy
 
     local game = new_game(seed, trumps)
 

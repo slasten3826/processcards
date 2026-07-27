@@ -18,6 +18,8 @@
 local core = require("src.core.game")
 local runner = require("src.sim.runner")
 local rng = require("src.sim.rng")
+local view = require("src.core.view")
+local playtest = require("src.sim.playtest")
 
 local M = {}
 
@@ -56,17 +58,22 @@ local function run_one(mode, seed, steps, trumps)
             break
         end
 
-        local action
-        if mode == "survival" then
-            -- prefer advance, else first legal: deterministic and policy free
-            for _, candidate in ipairs(actions) do
-                if candidate.kind == "advance" then
-                    action = candidate
-                    break
-                end
-            end
+        -- The first version of this used "advance, else first legal", which
+        -- never reached the operator phase at all. That made the baselines
+        -- insensitive to operator changes: a FLOW rewrite left every trace
+        -- identical, which is a false green. Both modes now drive through the
+        -- same phase-driven policy the playtest uses, so operators are
+        -- actually played.
+        local observation = view.observe(game, {
+            interaction = core.interaction(game),
+            legal_action_count = #actions,
+        })
+        local action = playtest.protocol_policy(observation, actions)
+        if mode == "headless" then
+            action = action or actions[1]
+        else
+            action = action or actions[#actions]
         end
-        action = action or actions[1]
 
         core.apply_action(game, action)
         for _, event in ipairs(core.drain_events(game)) do

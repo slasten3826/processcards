@@ -161,9 +161,10 @@ local function clear_operator_target_phases(state)
     state.pending_unrevealed_choice = nil
 end
 
+-- FLOW no longer opens a target phase: the ring rotation takes no target and
+-- no direction, so it resolves immediately like CONNECT.
 local function operator_opens_target_phase(op_name)
-    return op_name == "FLOW"
-        or op_name == "ENCODE"
+    return op_name == "ENCODE"
         or op_name == "CHOOSE"
         or op_name == "OBSERVE"
         or op_name == "LOGIC"
@@ -356,6 +357,82 @@ local function rotate_deck(state, direction)
 
     state_lib.sync_zone_cards(state, "deck")
 end
+
+-- FLOW ring, per docs/table/OPERATOR_REVISION_PROPOSAL_2026-07-26.md 2.1
+--
+--     topdeck -> latent1 -> ... -> latent6 -> deck bottom -> ... -> topdeck
+--
+-- Only not-known cards move. known and revealed are anchors and hold the
+-- flow: a moving card travels to the next not-known position, skipping them.
+-- The target zone is not part of the ring. One direction only, because a
+-- direction choice is CHOOSE inside FLOW, and FLOW moves only cards whose
+-- identity is unknown, so the choice would have no information to stand on.
+--
+-- The ring is closed, so nothing is created or destroyed: latent6 goes under
+-- the deck and the top of the deck becomes a concealed draw into latent1.
+local function flow_ring_positions(state)
+    local positions = {}
+    local latent = state.zones.latent
+    for slot = 1, latent.slot_count do
+        positions[#positions + 1] = {zone = "latent", slot = slot}
+    end
+    local deck = state.zones.deck.cards
+    for index = 1, #deck do
+        positions[#positions + 1] = {zone = "deck", index = index}
+    end
+    return positions
+end
+
+local function ring_card_at(state, position)
+    if position.zone == "latent" then
+        return state.zones.latent.cards[position.slot]
+    end
+    return state.zones.deck.cards[position.index]
+end
+
+local function ring_set_card(state, position, card_id)
+    if position.zone == "latent" then
+        state.zones.latent.cards[position.slot] = card_id
+        return
+    end
+    state.zones.deck.cards[position.index] = card_id
+end
+
+local function flow_ring_rotate(state)
+    local movable = {}
+    for _, position in ipairs(flow_ring_positions(state)) do
+        local card_id = ring_card_at(state, position)
+        if card_id and not state_lib.is_known(state, card_id) then
+            movable[#movable + 1] = {position = position, card_id = card_id}
+        end
+    end
+
+    if #movable < 2 then
+        transition.emit(state, "flow_ring_skipped", {
+            movable = #movable,
+            reason = "not_enough_not_known_cards",
+        })
+        return 0
+    end
+
+    for index, entry in ipairs(movable) do
+        local destination = movable[index + 1] or movable[1]
+        ring_set_card(state, destination.position, entry.card_id)
+    end
+
+    state_lib.sync_zone_cards(state, "latent")
+    state_lib.sync_zone_cards(state, "deck")
+
+    transition.emit(state, "flow_ring_rotated", {
+        moved = #movable,
+        anchors = #flow_ring_positions(state) - #movable,
+    })
+    return #movable
+end
+
+-- exported so the ring law can be checked directly, without having to reach
+-- it through a full turn
+M.flow_ring_rotate = flow_ring_rotate
 
 local function flow_rotate_zone(state, zone_name, direction)
     if zone_name == "deck" then
@@ -579,20 +656,6 @@ function M.arm_operator(state, op_name)
             operator = op_name,
             legal_slots = legal_slots,
         })
-    elseif op_name == "FLOW" then
-        local legal_card_ids = legal_flow_card_ids(state)
-        state.pending_flow_choice = {
-            card_id = card_id,
-            operator = op_name,
-            legal_card_ids = legal_card_ids,
-            armed_card_id = nil,
-            armed_direction = nil,
-        }
-        transition.emit(state, "flow_choice_pending", {
-            card_id = card_id,
-            operator = op_name,
-            legal_card_ids = legal_card_ids,
-        })
     elseif op_name == "ENCODE" then
         local legal_card_ids = legal_encode_card_ids(state)
         state.pending_encode_choice = {
@@ -738,7 +801,13 @@ local function start_operator_effect(state, op_name)
         })
     end
 
-    operators.resolve(state, op_name)
+    if op_name == "FLOW" then
+        transition.emit(state, "operator_effect_begin", {operator = op_name})
+        flow_ring_rotate(state)
+        operators.finish_flow(state, "ring", "forward")
+    else
+        operators.resolve(state, op_name)
+    end
 
     move_to_grave(state, card_id)
     transition.emit(state, "play_to_grave", {
