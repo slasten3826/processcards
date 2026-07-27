@@ -141,6 +141,17 @@ Short formula:
 
 # Floor 8 — ☶ LOGIC
 
+```text
+STATUS: LEGACY as of 2026-07-27
+
+This floor distorts the old LOGIC, which swapped a revealed field card
+with a hand card. LOGIC is now a joker that legalises a move and produces
+no effect, so there is no swap left to distort.
+
+See ../table/LOGIC_JOKER_LAW.md. Floor 8 needs rewriting against the new
+operator before it can be implemented.
+```
+
 ## Circle Theme
 
 Fraud / laundering / logic as public falsification.
