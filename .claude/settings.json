@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lua cli.lua *)",
+      "Bash(lua5.4 cli.lua *)",
+      "Bash(luac -p *)",
+      "Bash(luac5.4 -p *)"
+    ]
+  }
+}
