@@ -458,8 +458,15 @@ local function operator_choices_for_card(state, card_id)
         return nil
     end
 
-    local choices = {card.op_a, card.op_b}
-    local seen = {[card.op_a] = true, [card.op_b] = true}
+    -- A double card is an ordinary minor; the only difference is that there is
+    -- nothing to choose. Without this dedupe it offered the same operator
+    -- twice as two separate options.
+    local choices = {card.op_a}
+    local seen = {[card.op_a] = true}
+    if not seen[card.op_b] then
+        choices[#choices + 1] = card.op_b
+        seen[card.op_b] = true
+    end
     for _, op_name in ipairs(runtime_granted_operators(state)) do
         if not seen[op_name] then
             choices[#choices + 1] = op_name
