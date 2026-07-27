@@ -87,9 +87,6 @@ local function perform_ordinary_world_update(state, slot, manifest_id)
 end
 
 local function resolve_dissolve_column_burn(state, slot)
-    -- read before the burial: the dissolved card is appended to the grave, so
-    -- checking afterwards would let it be raised back immediately
-    local grave_had_cards = #state.zones.grave.cards > 0
     local latent_id = state.zones.latent.cards[slot]
     if not latent_id then
         transition.emit(state, "dissolve_skipped", {
@@ -118,39 +115,9 @@ local function resolve_dissolve_column_burn(state, slot)
         })
     end
 
-    -- DISSOLVE curation, per docs/table/OPERATOR_REVISION_PROPOSAL_2026-07-26.md
-    -- 2.3, amended: the slot is refilled from the grave when the grave already
-    -- held something, otherwise from the deck as before.
-    --
-    -- The oldest grave card returns, not the newest. Taking the newest would
-    -- return the card just buried by this same resolution, making DISSOLVE a
-    -- no-op that only flips a card to known. Oldest-first also makes the grave
-    -- a queue: what was buried early comes back early, so early burials stop
-    -- being free.
-    --
-    -- There is no selection. The player decides WHEN to pump the cycle, not
-    -- WHAT comes back. A free pick over a public grave would be a tutor, would
-    -- outrank ENCODE at its own job, and would break the input ladder where
-    -- FLOW requires nothing, ENCODE requires knowledge and DISSOLVE requires
-    -- a grave.
-    if grave_had_cards then
-        local raised_id = state.zones.grave.cards[1]
-        state_lib.remove_from_current_zone(state, raised_id)
-        state_lib.set_info_state(state, raised_id, "known")
-        state_lib.place_card(state, raised_id, "latent", slot)
-        transition.emit(state, "grave_to_latent", {
-            card_id = raised_id,
-            slot = slot,
-            operator = "DISSOLVE",
-        })
-    else
-        draw.concealed_refill(state, "latent", slot)
-    end
+    draw.concealed_refill(state, "latent", slot)
     return latent_id
 end
-
--- exported so the curation law can be checked directly
-M.resolve_dissolve_column_burn = resolve_dissolve_column_burn
 
 local function operator_choice_is_legal(choices, op_name)
     for _, choice in ipairs(choices or {}) do
