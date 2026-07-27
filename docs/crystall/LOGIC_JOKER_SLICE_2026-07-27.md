@@ -144,6 +144,88 @@ trump flow                   поведение не меняется
 
 **Круг 8 Nine Circle Run** был искажением прежнего обмена LOGIC. Искажать больше нечего, круг помечается как legacy до переписывания.
 
+## 10.1. ТЗ по функциям
+
+Ниже — точные изменения. Всё, что не перечислено, не трогается.
+
+### `src/core/rules.lua`
+
+```lua
+-- НОВОЕ. Зависит от состояния, поэтому живёт отдельно от full_pair_fit.
+function M.logic_available(state, hand_card_id)
+    -- true, если карта руки несёт "LOGIC"
+    -- ИЛИ "LOGIC" входит в операторы, выданные runtime-картой
+    -- источник runtime-операторов: turn.runtime_granted_operators(state)
+end
+
+-- НОВОЕ. Единственная точка, где решается легальность хода.
+function M.move_legal(state, manifest_card, hand_card, hand_card_id)
+    return M.full_pair_fit(manifest_card, hand_card)
+        or M.logic_available(state, hand_card_id)
+end
+
+-- БЕЗ ИЗМЕНЕНИЙ
+function M.full_pair_fit(manifest_card, hand_card)
+
+-- ИЗМЕНЯЮТСЯ: обе используют move_legal вместо full_pair_fit
+function M.legal_hand_ids(state, manifest_card_id)
+function M.legal_manifest_slots_for_hand(state, hand_card_id)
+```
+
+Циклическая зависимость: `rules` не должен требовать `turn`. Функция
+`runtime_granted_operators` переносится из `turn.lua` в `rules.lua`
+либо дублируется там как локальная. Перенос предпочтительнее.
+
+### `src/core/turn.lua`
+
+```lua
+-- M.arm_operator, в месте формирования pending_operator_choice:
+--   вычислить и сохранить
+turn_context.joker_move = not rules.full_pair_fit(manifest_card, hand_card)
+
+-- operator_choices_for_card(state, card_id)
+--   получает третий аргумент joker_move
+--   если joker_move истинно -> вернуть ровно {"LOGIC"}
+--   иначе -> прежнее поведение, включая дедупликацию дубля
+--            и операторы, выданные runtime
+
+-- operator_opens_target_phase(op_name)
+--   убрать "LOGIC" из списка
+
+-- start_operator_effect(state, op_name)
+--   ветка op_name == "LOGIC":
+--     emit operator_effect_begin {operator="LOGIC", joker=joker_move}
+--     если joker_move: emit logic_joker_pass {card_id, manifest_card_id}
+--     emit operator_effect_end {operator="LOGIC"}
+--     дальше общий путь: move_to_grave, play_to_grave,
+--     clear_gameplay_selection, refresh_pending_trump
+--   НЕ вызывать operators.resolve для LOGIC
+```
+
+### Не трогается
+
+```lua
+full_pair_fit                    топология
+defer_world_update и DISSOLVE    единственное исключение по времени
+порядок хода                     мировое обновление до фазы оператора
+state.lua, interaction.lua       структура фаз
+trump.lua                        целиком
+arm_public_target / confirm_public_target
+                                 становятся недостижимы для LOGIC,
+                                 но удаляются вместе с машиной фаз
+```
+
+### Замер, выполняемый заодно
+
+```text
+доля ходов, где при непустой руке нет ни одной легальной пары
+(считается по full_pair_fit, без учёта джокера)
+```
+
+Это число определяет, несёт ли `☶` реальную нагрузку. Считать до и
+после изменения — оно не должно измениться, потому что джокер не меняет
+топологию.
+
 ## 11. Порядок реализации
 
 ```text

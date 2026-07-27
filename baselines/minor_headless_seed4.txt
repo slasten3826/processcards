@@ -7,10 +7,10 @@ manifest_to_grave
 latent_to_manifest
 concealed_refill
 operator_choice_pending
-hidden_choice_pending
 operator_armed
-hidden_target_armed
-card_became_known
+operator_phase_confirmed
+operator_effect_begin
+logic_joker_pass
 operator_effect_end
 play_to_grave
 commit_manifest
@@ -34,10 +34,12 @@ manifest_to_grave
 latent_to_manifest
 concealed_refill
 operator_choice_pending
+hidden_choice_pending
 operator_armed
-operator_phase_confirmed
-play_to_runtime
+hidden_target_armed
+card_became_known
 operator_effect_end
+play_to_grave
 commit_manifest
 arm_hand
 hand_to_play
@@ -47,7 +49,6 @@ concealed_refill
 operator_choice_pending
 operator_armed
 operator_phase_confirmed
-runtime_to_grave
 play_to_runtime
 operator_effect_end
 commit_manifest

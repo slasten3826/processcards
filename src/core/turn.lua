@@ -163,11 +163,11 @@ end
 
 -- FLOW no longer opens a target phase: the ring rotation takes no target and
 -- no direction, so it resolves immediately like CONNECT.
+-- FLOW rotates the ring and LOGIC is a pass; neither takes a target.
 local function operator_opens_target_phase(op_name)
     return op_name == "ENCODE"
         or op_name == "CHOOSE"
         or op_name == "OBSERVE"
-        or op_name == "LOGIC"
         or op_name == "MANIFEST"
 end
 
@@ -589,6 +589,10 @@ function M.resolve_turn(state, slot, hand_card_id)
 
     local manifest_id = state.committed.card_id
     local choices = operator_choices_for_card(state, hand_card_id)
+    -- LOGIC_JOKER_LAW: a move is a joker move only when it would NOT have
+    -- passed the ordinary topology check on its own. A card carrying LOGIC
+    -- whose fit closes normally keeps its full operator choice.
+    local joker_move = not rules.full_pair_fit(state.cards[manifest_id], state.cards[hand_card_id])
     local defer_world_update = choices_include(choices, "DISSOLVE")
     if not defer_world_update then
         perform_ordinary_world_update(state, slot, manifest_id)
@@ -597,12 +601,13 @@ function M.resolve_turn(state, slot, hand_card_id)
 
     state.pending_operator_choice = {
         card_id = hand_card_id,
-        choices = choices,
+        choices = joker_move and {"LOGIC"} or choices,
         armed_operator = nil,
         turn_context = {
             slot = slot,
             manifest_card_id = manifest_id,
             defer_world_update = defer_world_update,
+            joker_move = joker_move,
         },
     }
     transition.emit(state, "operator_choice_pending", {
@@ -689,24 +694,6 @@ function M.arm_operator(state, op_name)
             card_id = card_id,
             operator = op_name,
             legal_card_ids = legal_card_ids,
-        })
-    elseif op_name == "LOGIC" then
-        state.pending_pair_card_choice = {
-            card_id = card_id,
-            operator = op_name,
-            legal_public_card_ids = legal_public_minor_card_ids(state),
-            legal_hand_card_ids = {},
-            armed_public_card_id = nil,
-            armed_hand_card_id = nil,
-        }
-        for _, hand_card_id in ipairs(state.zones.hand.cards) do
-            state.pending_pair_card_choice.legal_hand_card_ids[#state.pending_pair_card_choice.legal_hand_card_ids + 1] = hand_card_id
-        end
-        transition.emit(state, "pair_card_choice_pending", {
-            card_id = card_id,
-            operator = op_name,
-            legal_public_card_ids = state.pending_pair_card_choice.legal_public_card_ids,
-            legal_hand_card_ids = state.pending_pair_card_choice.legal_hand_card_ids,
         })
     elseif op_name == "MANIFEST" then
         local legal_card_ids = legal_not_revealed_board_card_ids(state)
@@ -808,7 +795,19 @@ local function start_operator_effect(state, op_name)
         })
     end
 
-    if op_name == "FLOW" then
+    if op_name == "LOGIC" then
+        -- LOGIC_JOKER_LAW: the effect was spent by legalising the move, so
+        -- nothing resolves here. The turn still turns the machine.
+        local joker = pending.turn_context and pending.turn_context.joker_move or false
+        transition.emit(state, "operator_effect_begin", {operator = op_name, joker = joker})
+        if joker then
+            transition.emit(state, "logic_joker_pass", {
+                card_id = card_id,
+                manifest_card_id = pending.turn_context and pending.turn_context.manifest_card_id or nil,
+            })
+        end
+        transition.emit(state, "operator_effect_end", {operator = op_name})
+    elseif op_name == "FLOW" then
         transition.emit(state, "operator_effect_begin", {operator = op_name})
         flow_ring_rotate(state)
         operators.finish_flow(state, "ring", "forward")
