@@ -180,6 +180,7 @@ function M.observe(state, opts)
             observation.legal_operators[index] = operator
         end
         observation.advance_enabled = ix.advance and ix.advance.enabled or false
+        observation.advance_reason = ix.advance and ix.advance.reason or nil
     end
 
     if opts.legal_action_count then

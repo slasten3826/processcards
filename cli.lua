@@ -9,6 +9,8 @@ Usage:
   lua cli.lua snapshot
   lua cli.lua view [seed]
   lua cli.lua audit_view [seeds] [steps]
+  lua cli.lua baseline record|check
+  lua cli.lua playtest [seed] [steps] [none|full] [summary]
   lua cli.lua interaction
   lua cli.lua advance
   lua cli.lua events
@@ -479,6 +481,34 @@ if command == "view" then
     io.write(string.format("honest score=%.2f (hidden cards on board: %d)\n",
         scored.score, scored.hidden_count))
     os.exit(0)
+end
+
+if command == "baseline" then
+    local baseline = require("src.sim.baseline")
+    local sub = arg[2] or "check"
+    if sub == "record" then
+        local written, err = baseline.record()
+        if not written then
+            io.write("FAIL " .. tostring(err) .. "\n")
+            os.exit(2)
+        end
+        io.write(string.format("recorded %d baseline runs into %s/\n", written, baseline.dir))
+        os.exit(0)
+    end
+    local report = baseline.check()
+    io.write(baseline.format(report) .. "\n")
+    os.exit(report.ok and 0 or 2)
+end
+
+if command == "playtest" then
+    local playtest = require("src.sim.playtest")
+    local session = playtest.run({
+        seed = tonumber(arg[2]) or 1,
+        steps = tonumber(arg[3]) or 200,
+        trumps = arg[4] or "none",
+    })
+    io.write(playtest.format(session, {summary_only = arg[5] == "summary"}) .. "\n")
+    os.exit(#session.invariant_failures == 0 and 0 or 2)
 end
 
 if command == "audit_view" then
