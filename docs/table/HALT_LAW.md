@@ -1,5 +1,12 @@
 # Halt Law
 
+```text
+STATUS: LEGACY as of 2026-07-28
+superseded by HALT_MODE_LAW.md
+причина: HALT задаёт ёмкость очереди вместо флагов цепи
+```
+
+
 Статус:
 
 ```text

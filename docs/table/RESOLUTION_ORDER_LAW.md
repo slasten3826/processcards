@@ -1,5 +1,12 @@
 # Resolution Order Law
 
+```text
+STATUS: LEGACY as of 2026-07-28
+superseded by TURN_STEP_LAW.md
+причина: порядок резолва, момент починки и момент проверки победы заданы шагами UPDATE, TRUMP и CHECK
+```
+
+
 Статус:
 
 ```text

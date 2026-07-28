@@ -41,9 +41,16 @@ Current machine branch is built around:
 
 Core laws:
 
+- [TURN_STEP_LAW.md](./TURN_STEP_LAW.md)
+- [MOVE_FIT_LAW.md](./MOVE_FIT_LAW.md)
+- [LOGIC_JOKER_LAW.md](./LOGIC_JOKER_LAW.md)
+
+Legacy, superseded by `TURN_STEP_LAW.md`:
+
 - [TURN_LAW_V2.md](./TURN_LAW_V2.md)
 - [TURN_SEQUENCE_LAW_V2.md](./TURN_SEQUENCE_LAW_V2.md)
-- [MOVE_FIT_LAW.md](./MOVE_FIT_LAW.md)
+- [RESOLUTION_ORDER_LAW.md](./RESOLUTION_ORDER_LAW.md)
+- [OPERATOR_PHASE_LAW.md](./OPERATOR_PHASE_LAW.md)
 
 ## 3. Information model
 
@@ -84,7 +91,7 @@ Core laws:
 - [WARRANT_LAW.md](./WARRANT_LAW.md)
 - [REPEAT_LAW.md](./REPEAT_LAW.md)
 - [UNBOUND_LAW.md](./UNBOUND_LAW.md)
-- [HALT_LAW.md](./HALT_LAW.md)
+- [HALT_MODE_LAW.md](./HALT_MODE_LAW.md)
 - [EJECT_LAW.md](./EJECT_LAW.md)
 - [ORACLE_LAW.md](./ORACLE_LAW.md)
 - [RECAST_LAW.md](./RECAST_LAW.md)

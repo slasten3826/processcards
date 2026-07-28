@@ -1,5 +1,12 @@
 # Turn Sequence Law V2
 
+```text
+STATUS: LEGACY as of 2026-07-28
+superseded by TURN_STEP_LAW.md
+причина: последовательность заменена явными шагами 1-9
+```
+
+
 Статус:
 
 ```text

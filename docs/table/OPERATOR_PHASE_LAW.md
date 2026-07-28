@@ -1,5 +1,12 @@
 # Operator Phase Law
 
+```text
+STATUS: LEGACY as of 2026-07-28
+superseded by TURN_STEP_LAW.md
+причина: оператор привязан к шагу; ожидание trump flow заменено шагом TRUMP
+```
+
+
 Status:
 
 ```text
