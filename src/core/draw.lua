@@ -33,15 +33,11 @@ local function resolve_revealed_draw(state, card_id, reason)
     state_lib.reveal_card(state, card_id)
 
     if state.cards[card_id].class == "trump" then
+        -- TURN_STEP_LAW: trumps never interrupt. A revealed trump only enters
+        -- the queue; the queue drains at step 8. This is what makes CONNECT
+        -- atomic, since the first revealed trump can no longer disturb the
+        -- deck before the second and third draw procedures.
         trump.enter_trump_flow(state, card_id, reason)
-        trump.refresh_pending_trump(state)
-        if state.pending_trump then
-            local _, err = trump.resolve_pending_trump(state)
-            if err then
-                return nil, err
-            end
-            trump.refresh_pending_trump(state)
-        end
         return nil, nil
     end
 

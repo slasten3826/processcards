@@ -10,6 +10,7 @@ Usage:
   lua cli.lua view [seed]
   lua cli.lua audit_view [seeds] [steps]
   lua cli.lua check_logic [seed]
+  lua cli.lua check_steps [seeds] [steps]
   lua cli.lua baseline record|check
   lua cli.lua playtest [seed] [steps] [none|full] [summary]
   lua cli.lua interaction
@@ -515,6 +516,13 @@ end
 if command == "check_logic" then
     local checker = require("src.sim.logic_joker_check")
     local report = checker.run(tonumber(arg[2]) or 3)
+    io.write(checker.format(report) .. "\n")
+    os.exit(report.ok and 0 or 2)
+end
+
+if command == "check_steps" then
+    local checker = require("src.sim.step_invariant")
+    local report = checker.run(tonumber(arg[2]) or 20, tonumber(arg[3]) or 300)
     io.write(checker.format(report) .. "\n")
     os.exit(report.ok and 0 or 2)
 end

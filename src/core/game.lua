@@ -433,6 +433,14 @@ function M.resolve_pending_trump(state)
     transition.begin(state, "resolve_pending_trump", {})
     local card_id, err = trump.resolve_pending_trump(state)
     trump.refresh_pending_trump(state)
+    -- TURN_STEP_LAW: the queue is drained by repeated player beats; when it
+    -- empties, step 8 closes and step 9 follows.
+    if not state.pending_trump then
+        transition.emit(state, "step_trump_end", {})
+        transition.emit(state, "step_check_begin", {})
+        transition.emit(state, "step_check_end", {})
+        transition.emit(state, "turn_closed", {})
+    end
     return transition.finish(state, {
         card_id = card_id,
         error = err,

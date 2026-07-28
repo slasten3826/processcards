@@ -794,8 +794,7 @@ local function start_operator_effect(state, op_name)
 
         state.pending_operator_choice = nil
         state_lib.clear_gameplay_selection(state)
-        trump.refresh_pending_trump(state)
-
+    
         return transition.finish(state, {
             operator = op_name,
             pending_operator_choice = state.pending_operator_choice,
@@ -832,7 +831,20 @@ local function start_operator_effect(state, op_name)
 
     state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
+
+    -- TURN_STEP_LAW: step 7 SPEND closes here, step 8 TRUMP opens. This is
+    -- the only place the queue becomes visible to the interaction.
+    transition.emit(state, "step_spend_end", {})
     trump.refresh_pending_trump(state)
+    transition.emit(state, "step_trump_begin", {
+        pending_trump = state.pending_trump,
+    })
+    if not state.pending_trump then
+        transition.emit(state, "step_trump_end", {})
+        transition.emit(state, "step_check_begin", {})
+        transition.emit(state, "step_check_end", {})
+        transition.emit(state, "turn_closed", {})
+    end
 
     return transition.finish(state, {
         operator = op_name,
@@ -879,8 +891,7 @@ function M.confirm_operator_phase(state)
 
         state.pending_operator_choice = nil
         state_lib.clear_gameplay_selection(state)
-        trump.refresh_pending_trump(state)
-
+    
         return transition.finish(state, {
             operator = nil,
             board_closed = state_lib.is_board_closed(state),
@@ -908,8 +919,7 @@ function M.confirm_operator_phase(state)
 
         state.pending_operator_choice = nil
         state_lib.clear_gameplay_selection(state)
-        trump.refresh_pending_trump(state)
-
+    
         return transition.finish(state, {
             operator = op_name,
             board_closed = state_lib.is_board_closed(state),
@@ -1056,7 +1066,6 @@ function M.confirm_pair_card_target(state)
     state.pending_pair_card_choice = nil
     state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
-    trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         pending_operator_choice = state.pending_operator_choice,
@@ -1188,7 +1197,6 @@ function M.confirm_flow_target(state)
     state.pending_flow_choice = nil
     state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
-    trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         pending_operator_choice = state.pending_operator_choice,
@@ -1286,7 +1294,6 @@ function M.confirm_encode_target(state)
     state.pending_encode_choice = nil
     state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
-    trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         pending_operator_choice = state.pending_operator_choice,
@@ -1372,8 +1379,7 @@ function M.confirm_public_target(state)
         state.pending_public_choice = nil
         state.pending_operator_choice = nil
         state_lib.clear_gameplay_selection(state)
-        trump.refresh_pending_trump(state)
-
+    
         return transition.finish(state, {
             pending_operator_choice = state.pending_operator_choice,
             pending_public_choice = state.pending_public_choice,
@@ -1516,7 +1522,6 @@ function M.confirm_unrevealed_target(state)
     state.pending_unrevealed_choice = nil
     state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
-    trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         card_id = card_id,
@@ -1609,7 +1614,6 @@ function M.confirm_manifest_target(state)
     state.pending_manifest_choice = nil
     state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
-    trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         slot = slot,
@@ -1697,7 +1701,6 @@ function M.confirm_hand_target(state)
     state.pending_hand_choice = nil
     state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
-    trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         card_id = card_id,
@@ -1801,7 +1804,6 @@ function M.confirm_hidden_target(state)
     state.pending_hidden_choice = nil
     state.pending_operator_choice = nil
     state_lib.clear_gameplay_selection(state)
-    trump.refresh_pending_trump(state)
 
     return transition.finish(state, {
         card_id = card_id,
