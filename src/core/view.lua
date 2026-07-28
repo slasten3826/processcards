@@ -183,6 +183,12 @@ function M.observe(state, opts)
         observation.advance_reason = ix.advance and ix.advance.reason or nil
     end
 
+    -- which world node is committed, so a policy can tell a dead end from a
+    -- fresh choice; the slot is public, the card in it is already revealed
+    if state.committed and state.committed.slot then
+        observation.committed_slot = state.committed.slot
+    end
+
     if opts.legal_action_count then
         observation.legal_action_count = opts.legal_action_count
     end

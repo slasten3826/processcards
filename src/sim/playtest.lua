@@ -54,14 +54,27 @@ function M.protocol_policy(observation, actions)
     end
 
     if phase == "await_start" then
-        return first_of_kind(actions, "commit_manifest")
-            or first_of_kind(actions, "arm_hand")
+        -- Arm the hand card first. The protocol allows either order, but
+        -- committing first can land on a node no card fits, and then the only
+        -- legal moves are re-committing or clearing, which is a livelock.
+        -- Arming first means the commit slots offered next are exactly the
+        -- ones that fit.
+        return first_of_kind(actions, "arm_hand")
+            or first_of_kind(actions, "commit_manifest")
             or actions[1]
     end
 
     if phase == "await_complete" then
-        return first_of_kind(actions, "arm_hand")
-            or first_of_kind(actions, "commit_manifest")
+        -- With a card already armed, every offered slot fits it.
+        local committed = first_of_kind(actions, "commit_manifest")
+        if committed then
+            return committed
+        end
+        -- Armed card that fits nothing: drop it and take another.
+        return first_of_kind(actions, "clear_armed")
+            or first_of_kind(actions, "arm_hand")
+            or first_of_kind(actions, "clear_committed")
+            or first_of_kind(actions, "advance")
             or actions[1]
     end
 
