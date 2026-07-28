@@ -605,31 +605,12 @@ local function remember_chain_participant(state, card_id, parent_id)
     end
 end
 
-local function halt_trump(state, card_id, reason, parent_id)
-    remember_chain_participant(state, card_id, parent_id)
-    state.trump_chain_halted = state.trump_chain_halted or {}
-    state.trump_chain_halted[#state.trump_chain_halted + 1] = card_id
-    state_lib.reveal_card(state, card_id)
-    transition.emit(state, "halted_trump", {
-        card_id = card_id,
-        reason = reason,
-    })
-end
-
 handle_revealed_trump = function(state, card_id, reason, mode)
     if state.trump_runaway then
         return "blocked"
     end
     local parent_id = state.current_resolving_trump
     local name = trump_name(state, card_id)
-    if (state.trump_chain_halt_pending or state.trump_chain_halt_active) and name ~= "HALT" then
-        halt_trump(state, card_id, reason, parent_id)
-        return "halted"
-    end
-    if name == "HALT" then
-        state.trump_chain_halt_pending = true
-        state.trump_chain_halt_card_id = state.trump_chain_halt_card_id or card_id
-    end
     M.enter_trump_flow(state, card_id, reason)
     if name == "REPEAT" and mode == "resolve_now" then
         remember_chain_participant(state, card_id, parent_id)
@@ -654,16 +635,16 @@ local function begin_trump_chain(state)
     state.trump_chain_depth = 1
     state.trump_chain_participants = {}
     state.trump_chain_seen = {}
-    state.trump_chain_halted = {}
-    state.trump_chain_halt_pending = false
-    state.trump_chain_halt_active = false
-    state.trump_chain_halt_card_id = nil
     state.trump_parent = {}
     state.trump_chain_deferred = {}
     return true
 end
 
-local function flush_trumps_to_deck(state, card_ids, event_name)
+-- HALT_MODE_LAW section 4: displaced trumps are shuffled into the deck, and
+-- shuffling does not undo known. CARD_INFORMATION_STATE_LAW section 7 forbids
+-- a known card returning to hidden, so the player keeps the knowledge and
+-- loses only the position. flush_trumps_to_deck hides, so it cannot be reused.
+local function shuffle_into_deck_keeping_state(state, card_ids, event_name)
     if #card_ids == 0 then
         return
     end
@@ -671,7 +652,6 @@ local function flush_trumps_to_deck(state, card_ids, event_name)
         if state.cards[card_id].zone then
             state_lib.remove_from_current_zone(state, card_id)
         end
-        state_lib.hide_card(state, card_id)
         state_lib.place_card(state, card_id, "deck", nil)
     end
     shuffle_in_place(state.zones.deck.cards, state.rng)
@@ -687,25 +667,9 @@ local function finish_trump_chain(state)
         return
     end
 
-    if state.trump_chain_halt_active then
-        local halt_id = state.trump_chain_halt_card_id
-        local flushed = {}
-        for _, card_id in ipairs(state.trump_chain_halted or {}) do
-            flushed[#flushed + 1] = card_id
-        end
-        flush_trumps_to_deck(state, flushed, "halted_chain_flush")
-        if halt_id and state.cards[halt_id].zone ~= "trump" then
-            M.resolve_trump_zone_entry(state, halt_id)
-        end
-    end
-
     state.trump_chain_depth = 0
     state.trump_chain_participants = nil
     state.trump_chain_seen = nil
-    state.trump_chain_halted = nil
-    state.trump_chain_halt_pending = nil
-    state.trump_chain_halt_active = nil
-    state.trump_chain_halt_card_id = nil
     state.trump_parent = nil
     state.trump_chain_deferred = nil
     state.current_resolving_trump = nil
@@ -897,7 +861,31 @@ local function resolve_recast_effect(state)
     move_proto_hand_to_hand(state, proto_hand)
 end
 
+-- HALT_MODE_LAW. Capacity is expressed here as the number of trumps the flow
+-- itself may hold. The law states two, counting the trump currently resolving,
+-- but a resolving trump has already been removed from the flow, so the code
+-- number is one lower: while HALT sits in the flow, nothing else may join it.
+local HALT_FLOW_CAPACITY = 1
+
+local function flow_is_full(state)
+    local capacity = state.trump_flow_capacity
+    if not capacity then
+        return false
+    end
+    return #state.zones.trump_flow.cards >= capacity
+end
+
 function M.enter_trump_flow(state, card_id, reason)
+    if flow_is_full(state) then
+        state_lib.reveal_card(state, card_id)
+        transition.emit(state, "trump_flow_displaced", {
+            card_id = card_id,
+            reason = reason,
+        })
+        shuffle_into_deck_keeping_state(state, {card_id}, "halt_displaced_to_deck")
+        return
+    end
+
     state_lib.place_card(state, card_id, "trump_flow", nil)
     state_lib.reveal_card(state, card_id)
     state_lib.push_log(state, card_id .. " -> trump flow" .. (reason and (" (" .. reason .. ")") or "") .. ".")
@@ -905,6 +893,21 @@ function M.enter_trump_flow(state, card_id, reason)
         card_id = card_id,
         reason = reason,
     })
+
+    if trump_name(state, card_id) == "HALT" then
+        state.trump_flow_capacity = HALT_FLOW_CAPACITY
+        transition.emit(state, "halt_mode_begin", {
+            card_id = card_id,
+            capacity = HALT_FLOW_CAPACITY,
+        })
+        local displaced = {}
+        for _, queued_id in ipairs(state.zones.trump_flow.cards) do
+            if queued_id ~= card_id then
+                displaced[#displaced + 1] = queued_id
+            end
+        end
+        shuffle_into_deck_keeping_state(state, displaced, "halt_cleared_queue")
+    end
 end
 
 resolve_trump_card = function(state, card_id)
@@ -971,9 +974,9 @@ resolve_trump_card = function(state, card_id)
     elseif name == "PURGE" then
         resolve_purge_effect(state)
     elseif name == "HALT" then
-        state.trump_chain_halt_pending = false
-        state.trump_chain_halt_active = true
-        state.trump_chain_halt_card_id = state.trump_chain_halt_card_id or card_id
+        -- HALT_MODE_LAW section 2 point 5: it resolves empty and lifts the mode.
+        state.trump_flow_capacity = nil
+        transition.emit(state, "halt_mode_end", {card_id = card_id})
     elseif name == "REPEAT" then
         if parent_id then
             local parent_name = trump_name(state, parent_id)
@@ -1037,9 +1040,7 @@ resolve_trump_card = function(state, card_id)
         trump = name,
     })
 
-    if name ~= "HALT" or not state.trump_chain_halt_active then
-        M.resolve_trump_zone_entry(state, card_id)
-    end
+    M.resolve_trump_zone_entry(state, card_id)
 
     while state.trump_chain_deferred and #state.trump_chain_deferred > 0 do
         local deferred_id = table.remove(state.trump_chain_deferred, 1)

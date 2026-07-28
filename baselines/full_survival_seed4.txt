@@ -6,6 +6,7 @@ hand_to_play
 manifest_to_grave
 latent_trump_revealed
 trump_flow_entry
+halt_mode_begin
 manifest_closure
 concealed_refill
 operator_choice_pending
@@ -19,6 +20,7 @@ step_spend_end
 pending_trump
 step_trump_begin
 trump_effect_begin
+halt_mode_end
 trump_effect_end
 trump_zone_entry
 step_trump_end
