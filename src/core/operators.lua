@@ -3,6 +3,28 @@ local transition = require("src.core.transition")
 
 local M = {}
 
+-- TURN_STEP_LAW: every operator declares the step it resolves on.
+-- Three binding points cover all ten. An operator with no declared step
+-- binds to EFFECT.
+M.descriptors = {
+    FLOW     = {step = "EFFECT"},
+    CONNECT  = {step = "EFFECT"},
+    DISSOLVE = {step = "BURN"},
+    ENCODE   = {step = "EFFECT"},
+    CHOOSE   = {step = "EFFECT"},
+    OBSERVE  = {step = "EFFECT"},
+    LOGIC    = {step = "LEGALITY"},
+    CYCLE    = {step = "EFFECT"},
+    RUNTIME  = {step = "EFFECT"},
+    MANIFEST = {step = "EFFECT"},
+}
+
+function M.step_of(op_name)
+    local descriptor = M.descriptors[op_name]
+    return descriptor and descriptor.step or "EFFECT"
+end
+
+
 local function resolve_connect(state)
     transition.emit(state, "operator_effect_begin", {
         operator = "CONNECT",

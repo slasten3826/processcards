@@ -593,7 +593,15 @@ function M.resolve_turn(state, slot, hand_card_id)
     -- passed the ordinary topology check on its own. A card carrying LOGIC
     -- whose fit closes normally keeps its full operator choice.
     local joker_move = not rules.full_pair_fit(state.cards[manifest_id], state.cards[hand_card_id])
-    local defer_world_update = choices_include(choices, "DISSOLVE")
+    -- TURN_STEP_LAW: the world update is deferred when any available operator
+    -- binds to BURN. Same answer as the old DISSOLVE check while DISSOLVE is
+    -- the only operator on that step.
+    local defer_world_update = false
+    for _, choice_name in ipairs(choices) do
+        if operators.step_of(choice_name) == "BURN" then
+            defer_world_update = true
+        end
+    end
     if not defer_world_update then
         perform_ordinary_world_update(state, slot, manifest_id)
     end
@@ -644,7 +652,8 @@ function M.arm_operator(state, op_name)
     state_lib.set_armed_operator(state, op_name)
     clear_operator_target_phases(state)
 
-    if pending.turn_context and pending.turn_context.defer_world_update and op_name ~= nil and op_name ~= "DISSOLVE" then
+    if pending.turn_context and pending.turn_context.defer_world_update
+        and op_name ~= nil and operators.step_of(op_name) ~= "BURN" then
         perform_ordinary_world_update(state, pending.turn_context.slot, pending.turn_context.manifest_card_id)
         pending.turn_context.defer_world_update = false
     end
