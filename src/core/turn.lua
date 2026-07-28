@@ -197,27 +197,19 @@ local function runtime_granted_operators(state)
     return {runtime_card.op_a, runtime_card.op_b}
 end
 
+-- ENCODE_SWAP_LAW: the latent row entire, with no condition on information
+-- state. The topdeck and the target zone leave the operator's scope. Swapping
+-- two unknowns has zero expectation and stays legal anyway: useless is not
+-- forbidden here, the incentive does the selecting.
 local function legal_encode_card_ids(state)
     local legal = {}
-
-    local function maybe_add(card_id)
-        if not card_id then
-            return
-        end
-        if not state_lib.is_revealed(state, card_id) then
+    local zone = state.zones.latent
+    for slot = 1, zone.slot_count do
+        local card_id = zone.cards[slot]
+        if card_id then
             legal[#legal + 1] = card_id
         end
     end
-
-    maybe_add(state.zones.deck.cards[#state.zones.deck.cards])
-
-    for _, zone_name in ipairs({"targets", "latent"}) do
-        local zone = state.zones[zone_name]
-        for slot = 1, zone.slot_count do
-            maybe_add(zone.cards[slot])
-        end
-    end
-
     return legal
 end
 
