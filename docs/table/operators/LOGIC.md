@@ -1,5 +1,12 @@
 # LOGIC
 
+```text
+STATUS: LEGACY as of 2026-07-28
+superseded by ../LOGIC_JOKER_LAW.md
+причина: обмен заменён джокером в фазе проверки легальности
+```
+
+
 Symbol:
 
 ```text

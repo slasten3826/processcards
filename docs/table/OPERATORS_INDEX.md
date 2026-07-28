@@ -39,14 +39,14 @@ OPERATORS_INDEX.md
 
 ## Current status map
 
-- `▽ FLOW` — canonical family
+- `▽ FLOW` — family doc describes the pre-ring operator; the ring is specified in [OPERATOR_REVISION_PROPOSAL_2026-07-26.md](./OPERATOR_REVISION_PROPOSAL_2026-07-26.md) section 2.1 and is implemented, but has no law document yet
 - `☰ CONNECT` — canonical family
 - `☷ DISSOLVE` — canonical family
-- `☵ ENCODE` — canonical family
+- `☵ ENCODE` — superseded by [ENCODE_SWAP_LAW.md](./ENCODE_SWAP_LAW.md)
 - `☳ CHOOSE` — canonical family
 - `☴ OBSERVE` — canonical family
 - `☲ CYCLE` — canonical family
-- `☶ LOGIC` — canonical family
+- `☶ LOGIC` — superseded by [LOGIC_JOKER_LAW.md](./LOGIC_JOKER_LAW.md)
 - `☱ RUNTIME` — canonical family
 - `△ MANIFEST` — canonical family
 

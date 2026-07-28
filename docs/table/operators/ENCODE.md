@@ -1,5 +1,12 @@
 # ENCODE
 
+```text
+STATUS: LEGACY as of 2026-07-28
+superseded by ../ENCODE_SWAP_LAW.md
+причина: обмен сужен до латентного ряда, условие not-revealed снято
+```
+
+
 Symbol:
 
 ```text
