@@ -310,6 +310,56 @@ board domination
 
 ---
 
+## 10.1. Board Closure
+
+Granted columns are excluded from board closure.
+
+```text
+board is closed  <=>  the base six manifest and the base six latent are full
+granted columns are never counted
+```
+
+This is required, not tidy. A granted latent never refills, so if granted
+columns counted toward closure, an exhausted column would leave the board
+permanently unclosed. Board integrity repair runs inside the trump cycle
+and would then loop against a hole it cannot fill, ending in
+`trump_flow_runaway`.
+
+So the rule is: a granted column may be empty, dying or gone, and closure
+does not notice.
+
+## 10.2. Interaction with RECAST
+
+`RECAST` inverts the whole board, so a live granted column passes through
+it. Worked case with one grant alive:
+
+```text
+before      manifest 7, latent 7
+
+proto-hand  all 7 manifest cards leave, granted manifest included
+promote     all 7 latent cards become the manifest row,
+            the granted latent becomes the granted manifest
+deal        the shuffled hand deals into latent, but latent is base six,
+            so only 6 are placed and the granted latent is NOT refilled
+inherit     proto-hand returns to hand
+
+after       manifest 7, latent 6, hand 7
+```
+
+Two things follow.
+
+The granted column survives `RECAST` but comes out **one life shorter**: it
+now has a manifest layer with nothing under it. Consume that card and the
+column is gone. The two-cast budget is spent across the inversion rather
+than reset by it.
+
+The surplus is not lost. It returns as hand size: seven cards instead of
+six. A granted column eaten by `RECAST` comes back as material.
+
+This case is also the clearest argument for 10.1. Without it, `RECAST` on a
+granted board would leave latent at six of seven, declare the board
+unclosed and drop the trump cycle into runaway.
+
 ## 11. Relation to Trump Ecology
 
 `GRANT` does not invent a separate ecology.
