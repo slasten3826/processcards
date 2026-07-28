@@ -94,7 +94,12 @@ commands["do"] = function(args)
             return fail(text .. ": " .. tostring(parse_err))
         end
         local result = core.apply_action(game, action)
-        local apply_err = result and result.summary and result.summary.error
+        -- A missing result is a refusal that did not bother to build a
+        -- transition. Reading it as success is how an illegal move gets into
+        -- the journal and quietly does nothing.
+        local apply_err = result == nil
+            and "refused_without_transition"
+            or (result.summary and result.summary.error)
         if apply_err then
             print_position(game)
             return fail(text .. ": " .. tostring(apply_err))
@@ -156,9 +161,12 @@ function commands.trace(args)
     return 0
 end
 
+-- Reads the journal directly instead of replaying it first. A journal that no
+-- longer replays is precisely when undo is needed, so making undo depend on a
+-- clean replay would lock the session shut at the one moment it must open.
 function commands.undo(args)
     local count = tonumber(args[1]) or 1
-    local log, _, err = load_game()
+    local log, err = session.read()
     if not log then
         return fail(tostring(err))
     end

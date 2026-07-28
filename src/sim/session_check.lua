@@ -259,15 +259,22 @@ local function check_locked(results, seeds, steps)
     for seed = 1, seeds do
         local failure = walk(seed, steps, function(game)
             local metrics = readout.metrics(game)
-            if metrics.locked and not metrics.joker_available then
-                locked_seen = locked_seen + 1
-                for _, hand_card_id in ipairs(game.zones.hand.cards) do
-                    local slots = rules.legal_manifest_slots_for_hand(game, hand_card_id)
-                    if #slots > 0 then
-                        return string.format("seed %d: locked, yet %s has %d legal slots",
-                            seed, hand_card_id, #slots)
-                    end
+            local any_slot = false
+            for _, hand_card_id in ipairs(game.zones.hand.cards) do
+                if #rules.legal_manifest_slots_for_hand(game, hand_card_id) > 0 then
+                    any_slot = true
+                    break
                 end
+            end
+            if metrics.locked then
+                locked_seen = locked_seen + 1
+                if any_slot then
+                    return string.format(
+                        "seed %d: reported locked while a hand card still has a legal slot", seed)
+                end
+            elseif not any_slot then
+                return string.format(
+                    "seed %d: reported not locked while no hand card has a legal slot", seed)
             end
         end)
         if failure then

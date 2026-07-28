@@ -158,15 +158,28 @@ end
 function M.metrics(game)
     local legal_actions = #core.enumerate_legal_actions(game)
 
-    local legal_pairs = 0
+    -- Two different questions, and conflating them is how an empty hand ends
+    -- up reported as "not locked":
+    --
+    --     fitting_pairs   how much the topology actually accepts
+    --     castable_pairs  whether a move exists at all, joker included
+    --
+    -- Locked is the second one. A hand with no cards has no castable pair and
+    -- is the most locked position the game has.
+    local fitting_pairs, castable_pairs = 0, 0
     local manifest = game.zones.manifest
     for _, hand_card_id in ipairs(game.zones.hand.cards) do
         local hand_card = game.cards[hand_card_id]
         for slot = 1, manifest.slot_count do
             local manifest_card_id = manifest.cards[slot]
             local manifest_card = manifest_card_id and game.cards[manifest_card_id]
-            if manifest_card and rules.full_pair_fit(manifest_card, hand_card) then
-                legal_pairs = legal_pairs + 1
+            if manifest_card then
+                if rules.full_pair_fit(manifest_card, hand_card) then
+                    fitting_pairs = fitting_pairs + 1
+                    castable_pairs = castable_pairs + 1
+                elseif rules.move_legal(game, manifest_card, hand_card, hand_card_id) then
+                    castable_pairs = castable_pairs + 1
+                end
             end
         end
     end
@@ -214,8 +227,10 @@ function M.metrics(game)
 
     return {
         legal_actions = legal_actions,
-        legal_pairs = legal_pairs,
-        locked = legal_pairs == 0 and hand_count > 0,
+        fitting_pairs = fitting_pairs,
+        castable_pairs = castable_pairs,
+        hand = hand_count,
+        locked = castable_pairs == 0,
         joker_available = joker_available,
         trump_density = #deck > 0 and (trumps_in_deck / #deck) or 0,
         trumps_in_deck = trumps_in_deck,
@@ -232,7 +247,8 @@ local ZONE_ORDER = {
 function M.format_metrics(metrics)
     local lines = {}
     lines[#lines + 1] = string.format("legal_actions     %d", metrics.legal_actions)
-    lines[#lines + 1] = string.format("legal_pairs       %d", metrics.legal_pairs)
+    lines[#lines + 1] = string.format("fitting_pairs     %d", metrics.fitting_pairs)
+    lines[#lines + 1] = string.format("castable_pairs    %d  (hand %d)", metrics.castable_pairs, metrics.hand)
     lines[#lines + 1] = string.format("locked            %s", tostring(metrics.locked))
     lines[#lines + 1] = string.format("joker_available   %s", tostring(metrics.joker_available))
     lines[#lines + 1] = string.format(

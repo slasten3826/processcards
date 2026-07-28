@@ -69,7 +69,11 @@ local function card_public_view(state, card_id, handle)
     }
 end
 
-local function observe_slot_zone(state, zone_name, handles, next_handle)
+local function position_key(zone_name, slot)
+    return zone_name .. ":" .. tostring(slot)
+end
+
+local function observe_slot_zone(state, zone_name, handles, next_handle, at)
     local zone = state.zones[zone_name]
     local out = {}
     for slot = 1, zone.slot_count do
@@ -81,6 +85,7 @@ local function observe_slot_zone(state, zone_name, handles, next_handle)
             if not state_lib.is_known(state, card_id) then
                 handle = string.format("H%d", next_handle())
                 handles[handle] = {zone = zone_name, slot = slot}
+                at[position_key(zone_name, slot)] = handle
             end
             out[slot] = card_public_view(state, card_id, handle)
         end
@@ -88,7 +93,7 @@ local function observe_slot_zone(state, zone_name, handles, next_handle)
     return out
 end
 
-local function observe_ordered_zone(state, zone_name, handles, next_handle)
+local function observe_ordered_zone(state, zone_name, handles, next_handle, at)
     local zone = state.zones[zone_name]
     local out = {}
     for index, card_id in ipairs(zone.cards) do
@@ -96,6 +101,7 @@ local function observe_ordered_zone(state, zone_name, handles, next_handle)
         if not state_lib.is_known(state, card_id) then
             handle = string.format("H%d", next_handle())
             handles[handle] = {zone = zone_name, index = index}
+            at[position_key(zone_name, index)] = handle
         end
         out[index] = card_public_view(state, card_id, handle)
     end
@@ -103,7 +109,7 @@ local function observe_ordered_zone(state, zone_name, handles, next_handle)
 end
 
 -- Deck: the player sees the pile height and the top card only if it is known.
-local function observe_deck(state, handles, next_handle)
+local function observe_deck(state, handles, next_handle, at)
     local zone = state.zones.deck
     local count = #zone.cards
     local top_id = zone.cards[count]
@@ -113,6 +119,7 @@ local function observe_deck(state, handles, next_handle)
         if not state_lib.is_known(state, top_id) then
             handle = string.format("H%d", next_handle())
             handles[handle] = {zone = "deck", index = count}
+            at[position_key("deck", count)] = handle
         end
         top = card_public_view(state, top_id, handle)
     end
@@ -132,9 +139,14 @@ function M.observe(state, opts)
         return counter
     end
 
+    -- position -> handle, kept LOCAL. Storing card_id -> handle would put the
+    -- identity of a hidden card into the observation itself, which is the one
+    -- thing this module exists to prevent.
+    local at = {}
+
     local zones = {}
     for _, zone_name in ipairs(HANDLE_ZONE_ORDER) do
-        zones[zone_name] = observe_slot_zone(state, zone_name, handles, next_handle)
+        zones[zone_name] = observe_slot_zone(state, zone_name, handles, next_handle, at)
     end
 
     -- Own hand is fully legible to its holder regardless of info_state.
@@ -153,9 +165,9 @@ function M.observe(state, opts)
     end
     zones.hand = hand
 
-    zones.grave = observe_ordered_zone(state, "grave", handles, next_handle)
-    zones.trump_flow = observe_ordered_zone(state, "trump_flow", handles, next_handle)
-    zones.deck = observe_deck(state, handles, next_handle)
+    zones.grave = observe_ordered_zone(state, "grave", handles, next_handle, at)
+    zones.trump_flow = observe_ordered_zone(state, "trump_flow", handles, next_handle, at)
+    zones.deck = observe_deck(state, handles, next_handle, at)
 
     local observation = {
         contract = M.contract_version,
@@ -181,6 +193,46 @@ function M.observe(state, opts)
         end
         observation.advance_enabled = ix.advance and ix.advance.enabled or false
         observation.advance_reason = ix.advance and ix.advance.reason or nil
+
+        observation.legal_directions = {}
+        for index, direction in ipairs((ix.legal and ix.legal.directions) or {}) do
+            observation.legal_directions[index] = direction
+        end
+
+        -- A prompt without a list of choices is not an observation, it is a
+        -- riddle. Hidden targets are offered by HANDLE, so the player can pick
+        -- one without being told which card it is.
+        observation.legal_target_slots = {}
+        for index, slot in ipairs((ix.legal and ix.legal.targets and ix.legal.targets.slots) or {}) do
+            observation.legal_target_slots[index] = slot
+        end
+
+        observation.legal_targets = {}
+        for _, card_id in ipairs((ix.legal and ix.legal.targets and ix.legal.targets.cards) or {}) do
+            if state_lib.is_known(state, card_id) then
+                observation.legal_targets[#observation.legal_targets + 1] = card_id
+            else
+                local card = state.cards[card_id]
+                local key = card and position_key(card.zone, card.slot) or nil
+                local handle = key and at[key] or nil
+                if not handle and card and card.zone then
+                    -- targetable but standing where nothing was enumerated:
+                    -- mint a handle for the position rather than drop the option
+                    handle = string.format("H%d", next_handle())
+                    local ref = {zone = card.zone}
+                    if SLOT_ZONES[card.zone] then
+                        ref.slot = card.slot
+                    else
+                        ref.index = card.slot
+                    end
+                    handles[handle] = ref
+                    at[key] = handle
+                end
+                if handle then
+                    observation.legal_targets[#observation.legal_targets + 1] = handle
+                end
+            end
+        end
     end
 
     -- which world node is committed, so a policy can tell a dead end from a
@@ -352,8 +404,24 @@ function M.format(observation)
         format_card(observation.zones.deck.top),
         observation.zones.deck.count
     )
+    if observation.prompt then
+        lines[#lines + 1] = "prompt:   " .. tostring(observation.prompt)
+    end
     if observation.legal_operators and #observation.legal_operators > 0 then
         lines[#lines + 1] = "legal operators: " .. table.concat(observation.legal_operators, " ")
+    end
+    if observation.legal_directions and #observation.legal_directions > 0 then
+        lines[#lines + 1] = "legal directions: " .. table.concat(observation.legal_directions, " ")
+    end
+    if observation.legal_target_slots and #observation.legal_target_slots > 0 then
+        local parts = {}
+        for _, slot in ipairs(observation.legal_target_slots) do
+            parts[#parts + 1] = tostring(slot)
+        end
+        lines[#lines + 1] = "legal target slots: " .. table.concat(parts, " ")
+    end
+    if observation.legal_targets and #observation.legal_targets > 0 then
+        lines[#lines + 1] = "legal targets: " .. table.concat(observation.legal_targets, " ")
     end
     return table.concat(lines, "\n")
 end

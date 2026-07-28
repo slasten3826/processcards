@@ -317,8 +317,17 @@ function M.choose_operator(state, op_name)
     return turn.choose_operator(state, op_name)
 end
 
+-- turn.arm_operator rejects an illegal operator with a bare (nil, err) pair
+-- rather than with a transition. Every other entry point here answers with a
+-- transition, so a caller that checks result.summary.error reads the refusal
+-- as success. Normalise it at the boundary.
 function M.arm_operator(state, op_name)
-    return turn.arm_operator(state, op_name)
+    local result, err = turn.arm_operator(state, op_name)
+    if not result then
+        transition.begin(state, "arm_operator", {operator = op_name})
+        return transition.finish(state, {error = err or "arm_operator_failed"})
+    end
+    return result
 end
 
 function M.confirm_operator_phase(state)
