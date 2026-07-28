@@ -753,32 +753,6 @@ local function start_operator_effect(state, op_name)
     local pending = state.pending_operator_choice
     local card_id = pending.card_id
 
-    if op_name == "CYCLE" then
-        operators.resolve_cycle_draw(state)
-        clear_operator_target_phases(state)
-        state.pending_hand_choice = {
-            card_id = card_id,
-            operator = op_name,
-            legal_card_ids = {},
-            armed_card_id = nil,
-        }
-        for _, legal_card_id in ipairs(state.zones.hand.cards) do
-            state.pending_hand_choice.legal_card_ids[#state.pending_hand_choice.legal_card_ids + 1] = legal_card_id
-        end
-        transition.emit(state, "hand_choice_pending", {
-            card_id = card_id,
-            operator = op_name,
-            legal_card_ids = state.pending_hand_choice.legal_card_ids,
-        })
-        return transition.finish(state, {
-            operator = op_name,
-            pending_operator_choice = state.pending_operator_choice,
-            pending_hand_choice = state.pending_hand_choice,
-            pending_trump = state.pending_trump,
-            board_closed = state_lib.is_board_closed(state),
-        })
-    end
-
     if op_name == "RUNTIME" then
         if not runtime_install_allowed(state, card_id) then
             return nil, "runtime_install_not_available"
@@ -824,6 +798,24 @@ local function start_operator_effect(state, op_name)
             transition.emit(state, "logic_joker_pass", {
                 card_id = card_id,
                 manifest_card_id = pending.turn_context and pending.turn_context.manifest_card_id or nil,
+            })
+        end
+        transition.emit(state, "operator_effect_end", {operator = op_name})
+    elseif op_name == "CYCLE" then
+        -- CYCLE_ADVANCE_LAW: the committed column advances a second time, on
+        -- its NEW state. The manifest card is read from the board, not from
+        -- turn_context, which still holds the card the first advance already
+        -- sent to the grave.
+        local slot = pending.turn_context and pending.turn_context.slot
+        local current_manifest_id = slot and state.zones.manifest.cards[slot]
+        transition.emit(state, "operator_effect_begin", {operator = op_name})
+        if slot and current_manifest_id then
+            transition.emit(state, "cycle_second_advance", {slot = slot})
+            perform_ordinary_world_update(state, slot, current_manifest_id)
+        else
+            transition.emit(state, "cycle_advance_skipped", {
+                slot = slot,
+                reason = slot and "empty_manifest_slot" or "no_slot",
             })
         end
         transition.emit(state, "operator_effect_end", {operator = op_name})
@@ -1696,7 +1688,14 @@ function M.confirm_hand_target(state)
         operator = pending.operator,
     })
 
-    operators.finish_cycle(state, card_id)
+    -- This path is unreachable since LOGIC became a joker: its only creators
+    -- were the CYCLE discard, now gone, and pending_public_choice, which
+    -- nothing sets any more. Kept until the phase machine removes it wholesale,
+    -- with the generic emit so it cannot call a function that no longer exists.
+    transition.emit(state, "operator_effect_end", {
+        operator = pending.operator,
+        discarded_card_id = card_id,
+    })
 
     local play_card_id = pending.card_id
     move_to_grave(state, play_card_id)

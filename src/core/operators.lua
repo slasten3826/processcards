@@ -37,20 +37,6 @@ local function resolve_connect(state)
     })
 end
 
-function M.resolve_cycle_draw(state)
-    transition.emit(state, "operator_effect_begin", {
-        operator = "CYCLE",
-    })
-    draw.draw_to_hand(state)
-end
-
-function M.finish_cycle(state, discarded_card_id)
-    transition.emit(state, "operator_effect_end", {
-        operator = "CYCLE",
-        discarded_card_id = discarded_card_id,
-    })
-end
-
 function M.finish_observe(state, observed_card_id)
     transition.emit(state, "operator_effect_end", {
         operator = "OBSERVE",
