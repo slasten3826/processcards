@@ -45,7 +45,7 @@ OPERATORS_INDEX.md
 - `☵ ENCODE` — superseded by [ENCODE_SWAP_LAW.md](./ENCODE_SWAP_LAW.md)
 - `☳ CHOOSE` — canonical family
 - `☴ OBSERVE` — canonical family
-- `☲ CYCLE` — canonical family
+- `☲ CYCLE` — superseded by [CYCLE_ADVANCE_LAW.md](./CYCLE_ADVANCE_LAW.md)
 - `☶ LOGIC` — superseded by [LOGIC_JOKER_LAW.md](./LOGIC_JOKER_LAW.md)
 - `☱ RUNTIME` — canonical family
 - `△ MANIFEST` — canonical family

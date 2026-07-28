@@ -1,5 +1,12 @@
 # CYCLE
 
+```text
+STATUS: LEGACY as of 2026-07-28
+superseded by ../CYCLE_ADVANCE_LAW.md
+причина: тяга и сброс заменены вторым продвижением зафиксированной колонки
+```
+
+
 Symbol:
 
 ```text
