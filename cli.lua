@@ -25,6 +25,14 @@ Usage:
   lua cli.lua play [seed]
   lua cli.lua smoke [seed] [turns]
   lua cli.lua bench <name|smoke|autoplay|survival|headless> [count] [seed]
+  lua cli.lua session new <seed> [full|none]
+  lua cli.lua session show|fits|metrics|trace|drop|log
+  lua cli.lua session do <action> [<action> ...]
+  lua cli.lua session plant <card> <zone> [slot] [info_state]
+  lua cli.lua session undo [n]
+  lua cli.lua session save|load <name>
+  lua cli.lua card <card_id>
+  lua cli.lua find <OP_A>/<OP_B>
 ]])
 end
 
@@ -79,6 +87,16 @@ local command = arg[1]
 if not command then
     usage()
     os.exit(1)
+end
+
+if command == "session" then
+    local session_cli = require("src.cli.session_cli")
+    os.exit(session_cli.run({table.unpack(arg, 2)}))
+end
+
+if command == "card" or command == "find" then
+    local session_cli = require("src.cli.session_cli")
+    os.exit(session_cli.run({command, table.unpack(arg, 2)}))
 end
 
 if command == "scenario" then
@@ -523,6 +541,13 @@ end
 if command == "check_steps" then
     local checker = require("src.sim.step_invariant")
     local report = checker.run(tonumber(arg[2]) or 20, tonumber(arg[3]) or 300)
+    io.write(checker.format(report) .. "\n")
+    os.exit(report.ok and 0 or 2)
+end
+
+if command == "check_session" then
+    local checker = require("src.sim.session_check")
+    local report = checker.run(tonumber(arg[2]) or 20, tonumber(arg[3]) or 80)
     io.write(checker.format(report) .. "\n")
     os.exit(report.ok and 0 or 2)
 end
