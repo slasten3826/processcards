@@ -44,6 +44,9 @@ Core laws:
 - [TURN_STEP_LAW.md](./TURN_STEP_LAW.md)
 - [MOVE_FIT_LAW.md](./MOVE_FIT_LAW.md)
 - [LOGIC_JOKER_LAW.md](./LOGIC_JOKER_LAW.md)
+- [FLOW_RING_LAW.md](./FLOW_RING_LAW.md)
+- [ENCODE_SWAP_LAW.md](./ENCODE_SWAP_LAW.md)
+- [HALT_MODE_LAW.md](./HALT_MODE_LAW.md)
 
 Legacy, superseded by `TURN_STEP_LAW.md`:
 

@@ -39,7 +39,7 @@ OPERATORS_INDEX.md
 
 ## Current status map
 
-- `▽ FLOW` — family doc describes the pre-ring operator; the ring is specified in [OPERATOR_REVISION_PROPOSAL_2026-07-26.md](./OPERATOR_REVISION_PROPOSAL_2026-07-26.md) section 2.1 and is implemented, but has no law document yet
+- `▽ FLOW` — superseded by [FLOW_RING_LAW.md](./FLOW_RING_LAW.md)
 - `☰ CONNECT` — canonical family
 - `☷ DISSOLVE` — canonical family
 - `☵ ENCODE` — superseded by [ENCODE_SWAP_LAW.md](./ENCODE_SWAP_LAW.md)

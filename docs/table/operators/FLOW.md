@@ -1,5 +1,12 @@
 # FLOW
 
+```text
+STATUS: LEGACY as of 2026-07-28
+superseded by ../FLOW_RING_LAW.md
+причина: дека и латент объединены в одно кольцо, направление одно, known стал анкером
+```
+
+
 Symbol:
 
 ```text
