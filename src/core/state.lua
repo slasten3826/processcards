@@ -55,6 +55,8 @@ function M.new_game()
         pending_unrevealed_choice = nil,
         pending_trump = nil,
         pending_operator_choice = nil,
+        -- WIN_MODULE_LAW §3: written only by src/core/win.lua
+        outcome = nil,
     }
 
     for _, zone in pairs(state.zones) do
