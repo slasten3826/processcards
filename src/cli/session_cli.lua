@@ -50,16 +50,17 @@ local commands = {}
 function commands.new(args)
     local seed = tonumber(args[1]) or 1
     local trumps = args[2] or "full"
+    local effects = args[3] or "all"
     if trumps ~= "full" and trumps ~= "none" then
         return fail("trumps must be full or none")
     end
-    local log = session.new_log(seed, trumps)
+    local log = session.new_log(seed, trumps, effects)
     local ok, err = session.write(log)
     if not ok then
         return fail(tostring(err))
     end
     local game = session.rebuild(log)
-    out(string.format("session seed=%d trumps=%s", seed, trumps))
+    out(string.format("session seed=%d trumps=%s effects=%s", seed, trumps, effects))
     print_position(game)
     return 0
 end
@@ -226,7 +227,7 @@ function commands.log()
     if not log then
         return fail(tostring(err))
     end
-    out(string.format("# seed=%d trumps=%s", log.seed, log.trumps))
+    out(string.format("# seed=%d trumps=%s effects=%s", log.seed, log.trumps, log.effects or "all"))
     for index, entry in ipairs(log.entries) do
         out(string.format("%3d %s %s", index, entry.kind, entry.text))
     end

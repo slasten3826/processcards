@@ -60,12 +60,29 @@ end
 -- journal
 --------------------------------------------------------------------------
 
-function M.new_log(seed, trumps)
+function M.new_log(seed, trumps, effects)
     return {
         seed = seed or 1,
         trumps = trumps or "full",
+        effects = effects or "all",
         entries = {},
     }
+end
+
+-- "all" -> nil (every effect runs), "none" -> {}, "SHUFFLE,HALT" -> list.
+-- nil and the empty table are different things here, which is the whole axis.
+local function effects_option(effects)
+    if effects == nil or effects == "all" then
+        return nil
+    end
+    if effects == "none" then
+        return {}
+    end
+    local list = {}
+    for name in effects:gmatch("[^,]+") do
+        list[#list + 1] = name
+    end
+    return list
 end
 
 function M.read(name)
@@ -81,7 +98,10 @@ function M.read(name)
                 file:close()
                 return nil, "bad_header"
             end
-            log = M.new_log(tonumber(seed), trumps)
+            -- Journals written before the axis existed carry no effects field
+            -- and stay valid: absence reads as "all".
+            local effects = line:match("effects=(%S+)") or "all"
+            log = M.new_log(tonumber(seed), trumps, effects)
         elseif line ~= "" then
             local kind, text = line:match("^(%S+)%s+(.*)$")
             if kind ~= "do" and kind ~= "plant" then
@@ -104,7 +124,8 @@ function M.write(log, name)
     if not file then
         return nil, err
     end
-    file:write(string.format("# seed=%d trumps=%s\n", log.seed, log.trumps))
+    file:write(string.format("# seed=%d trumps=%s effects=%s\n",
+        log.seed, log.trumps, log.effects or "all"))
     for _, entry in ipairs(log.entries) do
         file:write(entry.kind .. " " .. entry.text .. "\n")
     end
@@ -349,6 +370,7 @@ local function start(log)
     core.start_game(game, {
         rng = rng.from_seed(log.seed),
         enabled_trumps = (log.trumps == "none") and {} or nil,
+        enabled_effects = effects_option(log.effects),
     })
     return game
 end
