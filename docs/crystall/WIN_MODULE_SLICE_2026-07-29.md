@@ -79,18 +79,7 @@ game.lua:449    внутри resolve_pending_trump
 
 Поэтому оба места заменяются одним вызовом **turn-функции**, а не win-функции: шаг принадлежит ходу.
 
-```lua
--- turn.lua
-local function step_check(state)
-    transition.emit(state, "step_check_begin", {})
-    local outcome = win.request(state, {signature = "TURN"})
-    transition.emit(state, "step_check_end", {
-        outcome = outcome and outcome.by or nil,
-    })
-end
-```
-
-Оба места — `close_turn` и `resolve_pending_trump` — вызывают `step_check`. Модуль про шаги не знает.
+Сама функция специфицирована в `STEP_CHECK_SLICE_2026-07-29 §1`, чтобы не жить в двух кристаллах сразу. Модуль про шаги не знает.
 
 Следствие, которое получается без отдельного правила: `ENOUGH §9` требует, чтобы победа обрывала остаток цепи. Очередь козырей сливается повторными действиями игрока через `apply_action`, а `apply_action` при записанном исходе отказывает (§7). Значит очередь останавливается сама.
 
