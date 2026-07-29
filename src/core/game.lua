@@ -446,8 +446,7 @@ function M.resolve_pending_trump(state)
     -- empties, step 8 closes and step 9 follows.
     if not state.pending_trump then
         transition.emit(state, "step_trump_end", {})
-        transition.emit(state, "step_check_begin", {})
-        transition.emit(state, "step_check_end", {})
+        turn.step_check(state)
         transition.emit(state, "turn_closed", {})
     end
     return transition.finish(state, {

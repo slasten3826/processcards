@@ -5,8 +5,24 @@ local repair = require("src.core.repair")
 local trump = require("src.core.trump")
 local transition = require("src.core.transition")
 local operators = require("src.core.operators")
+local win = require("src.core.win")
 
 local M = {}
+
+-- STEP_CHECK_LAW: the ninth step is the turn ASKING the win module. The turn
+-- owns the step boundaries; the module does not know steps exist.
+--
+-- Exported so game.lua can call the same function. Both places used to carry
+-- their own copy of the two emits, which is the shape that already produced a
+-- defect once: play_to_grave lived in eleven places and one path went
+-- uninstrumented.
+function M.step_check(state)
+    transition.emit(state, "step_check_begin", {})
+    local outcome = win.request(state, {signature = "TURN"})
+    transition.emit(state, "step_check_end", {
+        outcome = outcome and outcome.by or nil,
+    })
+end
 
 function M.commit_manifest(state, slot)
     local card_id = state.zones.manifest.cards[slot]
@@ -743,8 +759,7 @@ local function close_turn(state)
     })
     if not state.pending_trump then
         transition.emit(state, "step_trump_end", {})
-        transition.emit(state, "step_check_begin", {})
-        transition.emit(state, "step_check_end", {})
+        M.step_check(state)
         transition.emit(state, "turn_closed", {})
     end
 end
