@@ -1789,9 +1789,20 @@ function M.confirm_hidden_target(state)
         })
         trump.enter_trump_flow(state, card_id, "observe")
         draw.concealed_refill(state, "latent", source_slot)
-    elseif source_zone == "targets" and source_slot then
+    elseif source_zone == "targets" and source_slot and card.class == "trump" then
+        -- TARGET_ZONE_LAW §7: a trump that becomes KNOWN through observe is
+        -- the override case. It stays in its slot and turns face-up.
         repair.resolve_revealed_target_card(state, card_id, source_slot, pending.operator)
     else
+        -- OBSERVE_LAW §6: observe upgrades information state and nothing more.
+        -- It "does not by itself imply mandatory public reveal", so a minor in
+        -- targets becomes known and stays face-down where it is.
+        --
+        -- TARGET_ZONE_LAW §4 sends a non-trump target to the grave when it is
+        -- REVEALED, not when it becomes known. Routing observe through the
+        -- reveal path burned minors the law never allowed observe to touch,
+        -- and it made OBSERVE and MANIFEST behave identically in this zone
+        -- when the laws deliberately separate them.
         state_lib.know_card(state, card_id)
         transition.emit(state, "card_became_known", {
             card_id = card_id,
