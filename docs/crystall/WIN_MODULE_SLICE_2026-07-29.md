@@ -217,6 +217,8 @@ end
                  и вызывающий прочитал отказ как успех. Не повторять
 зависимости      state, transition, constants. НЕ turn, НЕ trump,
                  НЕ draw, НЕ repair, НЕ view, НЕ interaction
+                 state_lib — только читающие: is_known, is_revealed.
+                 Мутаторы из него в чёрном списке §11.3
 ```
 
 Последняя строка важна: `interaction` знает про `win` (терминальная фаза), а `win` про `interaction` не знает. Зависимость односторонняя.
