@@ -155,7 +155,7 @@ then the game compiles two possible directed six-slot readings:
 ☵☳
 ☳☱
 △☰
-☳△
+☶△
 ```
 
 ### Lower reading candidate
