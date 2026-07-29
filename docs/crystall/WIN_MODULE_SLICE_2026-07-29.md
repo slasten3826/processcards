@@ -24,17 +24,33 @@ crystall contract
 -- src/core/win.lua
 local M = {}
 
-M.predicates          -- таблица предикатов по имени
-M.check(state)        -- прогнать все, вернуть исход или nil. НЕ пишет
-M.record(state, outcome) -- единственная запись state.outcome
-M.claim(state, claim) -- заявка козыря: проверить и, если сошлось, записать
-M.close_check(state)  -- границы шага 9 плюс check плюс record
-M.is_over(state)      -- state.outcome ~= nil
+M.predicates            -- таблица предикатов по имени
+M.check(state, name)    -- прогнать предикат, вернуть исход или nil. НЕ пишет
+M.request(state, req)   -- ЕДИНСТВЕННЫЙ вход. Проверяет и, если сошлось, пишет
+M.is_over(state)        -- state.outcome ~= nil
 
 return M
 ```
 
-Разделение `check` и `record` нужно затем, чтобы предикат можно было вызвать в проверке без побочного эффекта.
+**Один вход, два просителя.**
+
+```lua
+win.request(state, {signature = "TURN"})
+win.request(state, {signature = "ENOUGH", basis = {revealed = 6, hand = 6}})
+```
+
+Шаг 9 минорной машины спрашивает «есть победа?». `ENOUGH` заявляет «я считаю, что победа». Форма обращения одна, отличается подпись.
+
+Из единственности входа следует то, что иначе держалось бы на дисциплине:
+
+```text
+проверка is_over живёт в ОДНОМ месте
+переписать уже записанный исход физически нечем
+```
+
+`check` отделён от `request` затем, чтобы предикат можно было прогнать в тесте, ничего не записывая.
+
+Модуль **не эмитит события шага 9**: они принадлежат ходу, а не судье.
 
 ## 3. Поле исхода
 
@@ -60,32 +76,22 @@ game.lua:449    внутри resolve_pending_trump
 
 Оба места — одинаковый блок из двух событий. Это ровно та форма дублирования, которая сегодня уже дала дефект: `play_to_grave` эмитился в одиннадцати местах, `pending_operator_choice = nil` в двенадцати, и один путь оказался неинструментирован.
 
-Поэтому оба места заменяются одним вызовом:
+Поэтому оба места заменяются одним вызовом **turn-функции**, а не win-функции: шаг принадлежит ходу.
 
 ```lua
-win.close_check(state)
-```
-
-```lua
-function M.close_check(state)
+-- turn.lua
+local function step_check(state)
     transition.emit(state, "step_check_begin", {})
-    -- WIN_MODULE_LAW §6: победа наступает один раз. Заявка на шаге 8
-    -- (ENOUGH) уже могла записать исход, и шаг 9 не имеет права
-    -- переписать его подписью pattern.
-    local outcome = state.outcome
-    if not outcome then
-        outcome = M.check(state)
-        if outcome then
-            M.record(state, outcome)
-        end
-    end
+    local outcome = win.request(state, {signature = "TURN"})
     transition.emit(state, "step_check_end", {
         outcome = outcome and outcome.by or nil,
     })
 end
 ```
 
-Следствие, которое отсюда получается без отдельного правила: `ENOUGH §9` требует, чтобы победа обрывала остаток цепи. Очередь козырей сливается повторными действиями игрока через `apply_action`, а `apply_action` при записанном исходе отказывает (§7). Значит очередь останавливается сама.
+Оба места — `close_turn` и `resolve_pending_trump` — вызывают `step_check`. Модуль про шаги не знает.
+
+Следствие, которое получается без отдельного правила: `ENOUGH §9` требует, чтобы победа обрывала остаток цепи. Очередь козырей сливается повторными действиями игрока через `apply_action`, а `apply_action` при записанном исходе отказывает (§7). Значит очередь останавливается сама.
 
 `turn_closed` остаётся у вызывающего: он про ход, а не про проверку.
 
@@ -147,27 +153,44 @@ matches_row(seq,"op_b") -> победа, reading = "lower"
 `WIN_MODULE_LAW §6`.
 
 ```lua
-claim = {
+request = {
     signature = "ENOUGH",
     basis = {revealed = 6, hand = 6},
 }
 ```
 
 ```lua
-function M.claim(state, claim)
+function M.request(state, req)
     if M.is_over(state) then
         return nil, "already_over"        -- победа наступает один раз
     end
-    local predicate = M.predicates[claim.signature]
-    if not predicate then
-        return nil, "unknown_claimant"
+
+    local outcome
+    if req.signature == "TURN" then
+        -- машина не заявляет, она спрашивает: прогнать безподписные предикаты
+        outcome = M.check(state, "pattern")
+    else
+        local predicate = M.predicates[req.signature]
+        if not predicate then
+            return nil, "unknown_claimant"
+        end
+        outcome = predicate(state)
+        if not outcome then
+            -- ДЕФЕКТ заявителя, а не отказ: он утверждал то, чего нет
+            transition.emit(state, "win_claim_rejected", {
+                signature = req.signature,
+                basis = req.basis,
+            })
+            return nil, "claim_not_verified"
+        end
     end
-    local outcome = predicate(state)
+
     if not outcome then
-        return nil, "claim_not_verified"  -- ДЕФЕКТ заявителя, не отказ
+        return nil
     end
-    outcome.by = claim.signature
-    M.record(state, outcome)
+    outcome.by = (req.signature == "TURN") and "pattern" or req.signature
+    state.outcome = outcome
+    transition.emit(state, "game_won", {by = outcome.by, reading = outcome.reading})
     return outcome
 end
 ```
@@ -184,7 +207,7 @@ M.predicates.ENOUGH = function(state)
 end
 ```
 
-Повторяемость получается сама: `claim` — обычный вызов, ограничение одно, `already_over`.
+Повторяемость получается сама: `request` — обычный вызов, ограничение одно, `already_over`.
 
 ## 7. Терминальность
 
@@ -252,8 +275,8 @@ GRANT             грантовые колонки и перебор шесть
 в целевом слоте СКРЫТЫЙ козырь     шаблона нет, не победа
 в манифесте дыра                   не победа (card == nil -> false)
 совпали оба ряда                   записывается upper, не ошибка
-исход уже записан                  check не вызывается повторно,
-                                   claim возвращает already_over
+исход уже записан                  request возвращает already_over
+                                   независимо от подписи
 ```
 
 Третья строка была открытым пунктом и закрыта решением автора:
@@ -307,7 +330,7 @@ state_lib.reveal_card, draw.*, repair.*, turn.*, trump.*
 ## 12. Порядок
 
 ```text
-1. state.outcome в new_game, is_over, record
+1. state.outcome в new_game, is_over
 2. предикат шаблона (§5) и его проверки 1-5
 3. close_check и схлопывание двух точек вызова в одну (§4)
 4. терминальная фаза и отказ apply_action (§7), проверки 9-10
