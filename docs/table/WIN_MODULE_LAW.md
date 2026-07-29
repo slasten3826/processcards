@@ -5,6 +5,7 @@
 ```text
 canonical table law
 давление: ../chaos/WHY_WIN_CHECK_IS_SEPARATE_2026-07-29.md
+кристалл: ../crystall/WIN_MODULE_SLICE_2026-07-29.md
 ```
 
 Этот документ называет **модуль победы**. Условие победы описывает `WIN_CHECK_LAW`; здесь названо то, что его исполняет.
