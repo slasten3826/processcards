@@ -69,15 +69,23 @@ win.close_check(state)
 ```lua
 function M.close_check(state)
     transition.emit(state, "step_check_begin", {})
-    local outcome = M.check(state)
-    if outcome then
-        M.record(state, outcome)
+    -- WIN_MODULE_LAW §6: победа наступает один раз. Заявка на шаге 8
+    -- (ENOUGH) уже могла записать исход, и шаг 9 не имеет права
+    -- переписать его подписью pattern.
+    local outcome = state.outcome
+    if not outcome then
+        outcome = M.check(state)
+        if outcome then
+            M.record(state, outcome)
+        end
     end
     transition.emit(state, "step_check_end", {
         outcome = outcome and outcome.by or nil,
     })
 end
 ```
+
+Следствие, которое отсюда получается без отдельного правила: `ENOUGH §9` требует, чтобы победа обрывала остаток цепи. Очередь козырей сливается повторными действиями игрока через `apply_action`, а `apply_action` при записанном исходе отказывает (§7). Значит очередь останавливается сама.
 
 `turn_closed` остаётся у вызывающего: он про ход, а не про проверку.
 
@@ -270,6 +278,8 @@ known — состояние, доступное козырю ТОЛЬКО в ц
 7.  ENOUGH заявляет при неравенстве    -> claim_not_verified,
                                           исход НЕ записан
 8.  повторная заявка после победы      -> already_over
+8a. ENOUGH победил на шаге 8, шаг 9
+    находит собранный шаблон           -> подпись остаётся ENOUGH
 9.  после записи исхода
     enumerate_legal_actions            -> пустой список
 10. после записи исхода apply_action   -> error = game_over
