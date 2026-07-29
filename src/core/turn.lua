@@ -410,7 +410,11 @@ local function flow_ring_rotate(state)
     local movable = {}
     for _, position in ipairs(flow_ring_positions(state)) do
         local card_id = ring_card_at(state, position)
-        if card_id and not state_lib.is_known(state, card_id) then
+        -- FLOW_RING_LAW §2: the anchor is REVEALED, not known. A known card is
+        -- identified to the player but not shown on the board, and the ring
+        -- carries it like any other. Anchoring on is_known gave OBSERVE two
+        -- jobs at once and took MANIFEST's only job in the ring away.
+        if card_id and not state_lib.is_revealed(state, card_id) then
             movable[#movable + 1] = {position = position, card_id = card_id}
         end
     end
@@ -418,7 +422,7 @@ local function flow_ring_rotate(state)
     if #movable < 2 then
         transition.emit(state, "flow_ring_skipped", {
             movable = #movable,
-            reason = "not_enough_not_known_cards",
+            reason = "not_enough_not_revealed_cards",
         })
         return 0
     end
