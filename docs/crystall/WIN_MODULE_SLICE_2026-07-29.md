@@ -25,7 +25,8 @@ crystall contract
 local M = {}
 
 M.predicates            -- таблица предикатов по имени
-M.check(state, name)    -- прогнать предикат, вернуть исход или nil. НЕ пишет
+M.check(state, name)    -- один предикат по имени. НЕ пишет
+M.check_unsigned(state) -- все безподписные, первый сработавший. НЕ пишет
 M.request(state, req)   -- ЕДИНСТВЕННЫЙ вход. Проверяет и, если сошлось, пишет
 M.is_over(state)        -- state.outcome ~= nil
 
@@ -167,8 +168,9 @@ function M.request(state, req)
 
     local outcome
     if req.signature == "TURN" then
-        -- машина не заявляет, она спрашивает: прогнать безподписные предикаты
-        outcome = M.check(state, "pattern")
+        -- машина не заявляет, она спрашивает: прогнать ВСЕ безподписные.
+        -- WIN_MODULE_LAW §4: список открыт, значит перебор, а не одно имя
+        outcome = M.check_unsigned(state)
     else
         local predicate = M.predicates[req.signature]
         if not predicate then
@@ -188,7 +190,8 @@ function M.request(state, req)
     if not outcome then
         return nil
     end
-    outcome.by = (req.signature == "TURN") and "pattern" or req.signature
+    -- безподписный предикат называет себя сам; заявитель — своей подписью
+    outcome.by = outcome.by or req.signature
     state.outcome = outcome
     transition.emit(state, "game_won", {by = outcome.by, reading = outcome.reading})
     return outcome
