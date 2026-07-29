@@ -11,6 +11,20 @@ local DEFAULT_TRUMP_GUARD = {
     max_repair_attempts = 128,
 }
 
+-- nil means every effect runs, which is the ordinary game. A table means only
+-- the named indices run; an empty table means none do.
+function M.effect_enabled(state, trump_name)
+    local enabled = state.setup_options and state.setup_options.enabled_effects
+    if enabled == nil then
+        return true
+    end
+    local index = trump_name and constants.TRUMP_NAME_TO_INDEX[trump_name]
+    if not index then
+        return false
+    end
+    return enabled[index] == true
+end
+
 local function guard_limit(state, key)
     local guard = state.trump_guard or (state.setup_options and state.setup_options.guard) or {}
     return guard[key] or DEFAULT_TRUMP_GUARD[key]
@@ -926,7 +940,16 @@ resolve_trump_card = function(state, card_id)
         trump = name,
     })
 
-    if name == "FOOL" then
+    if not M.effect_enabled(state, name) then
+        -- Stub: everything around the effect still runs. The card sat in the
+        -- deck, was revealed, entered the flow, resolves in step 8, counts for
+        -- HALT capacity and for the victory compiler, and goes on to
+        -- resolve_trump_zone_entry below. Only its own body is skipped.
+        transition.emit(state, "trump_effect_stubbed", {
+            card_id = card_id,
+            trump = name,
+        })
+    elseif name == "FOOL" then
         while true do
             local top = pop_topdeck(state)
             if not top then

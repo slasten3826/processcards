@@ -38,6 +38,18 @@ local function normalize_enabled_trumps(enabled_trumps)
     return out
 end
 
+-- Second, independent axis. enabled_trumps decides whether a trump is IN THE
+-- DECK; enabled_effects decides whether its effect body RUNS. Removing a trump
+-- from the deck changes composition, density and the shuffle oscillator, so it
+-- tests a different game. Stubbing the effect leaves the economy untouched and
+-- tests the minor machine in the presence of trumps.
+local function normalize_enabled_effects(enabled_effects)
+    if enabled_effects == nil then
+        return nil
+    end
+    return normalize_enabled_trumps(enabled_effects)
+end
+
 local function deal_from_deck(state, zone_name, slot, info_state)
     local deck = state.zones.deck.cards
     if #deck == 0 then
@@ -55,8 +67,10 @@ function M.start_game(state, opts)
     local rng = opts.rng or default_rng
     local enabled_trumps = normalize_enabled_trumps(opts.enabled_trumps)
     state.rng = rng
+    local enabled_effects = normalize_enabled_effects(opts.enabled_effects)
     state.setup_options = {
         enabled_trumps = enabled_trumps,
+        enabled_effects = enabled_effects,
         trump_mode = opts.trump_mode or (enabled_trumps and "custom" or "full"),
         guard = opts.guard,
     }
