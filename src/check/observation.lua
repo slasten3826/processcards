@@ -14,9 +14,9 @@ local audit = require("src.sim.observation_audit")
 local M = {}
 
 M.cites = {
-    "PLAYER_OBSERVATION_LAW §3",
-    "PLAYER_OBSERVATION_LAW §5",
-    "PLAYER_OBSERVATION_LAW §8",
+    "PLAYER_OBSERVATION_SLICE_2026-07-28 §2",
+    "PLAYER_OBSERVATION_SLICE_2026-07-28 §4",
+    "PLAYER_OBSERVATION_SLICE_2026-07-28 §13",
 }
 
 function M.run(opts)
@@ -26,39 +26,39 @@ function M.run(opts)
 
     if report.observations_checked == 0 then
         return {results = {registry.skip(
-            "PLAYER_OBSERVATION_LAW §3", "no observation produced")}}
+            "PLAYER_OBSERVATION_SLICE_2026-07-28 §2", "no observation produced")}}
     end
 
     local leaks = report.id_leaks + report.operator_leaks
     if leaks > 0 then
-        results[#results + 1] = registry.fail("PLAYER_OBSERVATION_LAW §3",
+        results[#results + 1] = registry.fail("PLAYER_OBSERVATION_SLICE_2026-07-28 §2",
             string.format("%d identity leaks in %d observations: %s",
                 leaks, report.observations_checked,
                 table.concat(report.examples, "; ")))
     else
-        results[#results + 1] = registry.ok("PLAYER_OBSERVATION_LAW §3",
+        results[#results + 1] = registry.ok("PLAYER_OBSERVATION_SLICE_2026-07-28 §2",
             string.format("%d observations, no identity of a hidden card exposed",
                 report.observations_checked))
     end
 
     if report.handle_resolution_failures > 0 then
-        results[#results + 1] = registry.fail("PLAYER_OBSERVATION_LAW §5",
+        results[#results + 1] = registry.fail("PLAYER_OBSERVATION_SLICE_2026-07-28 §4",
             string.format("%d handles did not resolve to their position",
                 report.handle_resolution_failures))
     else
-        results[#results + 1] = registry.ok("PLAYER_OBSERVATION_LAW §5",
+        results[#results + 1] = registry.ok("PLAYER_OBSERVATION_SLICE_2026-07-28 §4",
             "every handle resolved to the card standing at its position")
     end
 
     if report.control_snapshot_checked == 0 then
-        results[#results + 1] = registry.skip("PLAYER_OBSERVATION_LAW §8",
+        results[#results + 1] = registry.skip("PLAYER_OBSERVATION_SLICE_2026-07-28 §13",
             "control did not run")
     elseif report.control_snapshot_leaks == 0 then
-        results[#results + 1] = registry.fail("PLAYER_OBSERVATION_LAW §8",
+        results[#results + 1] = registry.fail("PLAYER_OBSERVATION_SLICE_2026-07-28 §13",
             string.format("control did not leak in %d snapshots; the audit is blind",
                 report.control_snapshot_checked))
     else
-        results[#results + 1] = registry.ok("PLAYER_OBSERVATION_LAW §8",
+        results[#results + 1] = registry.ok("PLAYER_OBSERVATION_SLICE_2026-07-28 §13",
             string.format("control leaked %d of %d snapshots, as the full surface must",
                 report.control_snapshot_leaks, report.control_snapshot_checked))
     end
