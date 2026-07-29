@@ -545,6 +545,25 @@ if command == "check_steps" then
     os.exit(report.ok and 0 or 2)
 end
 
+if command == "check" then
+    local registry = require("src.check.init")
+    local report = registry.run({
+        only = arg[2],
+        seeds = tonumber(arg[3]),
+        steps = tonumber(arg[4]),
+    })
+    io.write(registry.format(report) .. "\n")
+    os.exit(report.ok and 0 or 2)
+end
+
+if command == "coverage" then
+    local registry = require("src.check.init")
+    io.write(registry.format_coverage(registry.coverage(), {
+        covered_only = arg[2] == "covered",
+    }) .. "\n")
+    os.exit(0)
+end
+
 if command == "check_session" then
     local checker = require("src.sim.session_check")
     local report = checker.run(tonumber(arg[2]) or 20, tonumber(arg[3]) or 80)
