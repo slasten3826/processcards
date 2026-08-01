@@ -1,5 +1,21 @@
 # PAIR CARD LAW
 
+```text
+STATUS: LEGACY
+CANONICAL: NO
+SUPERSEDED_BY: DECK_LAW §4, §6
+DATE: 2026-07-31
+OWNER: slasten
+
+Предмет закона исчез. Он описывал выбор пары, когда на вершине деки
+лежала раскрытая карта, с которой можно было обменяться. По DECK_LAW §4
+зона топдека в покое пуста, а по §6 судьба раскрытой карты
+определяется её КЛАССОМ, а не выбором игрока.
+
+Механизм и так был недостижим: pending_pair_card_choice
+не присваивается нигде в src/.
+```
+
 ## Purpose
 
 This law defines the selection model

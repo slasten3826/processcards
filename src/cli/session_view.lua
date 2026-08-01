@@ -229,8 +229,11 @@ function M.metrics(game)
         legal_actions = legal_actions,
         fitting_pairs = fitting_pairs,
         castable_pairs = castable_pairs,
+        -- WIN_MODULE_SLICE §12: the COUNT above is a tool metric, but the
+        -- judgement "locked" is the defeat condition, and that is a rule of the
+        -- game. It comes from the core, not from this loop.
+        locked = not rules.any_legal_move(game),
         hand = hand_count,
-        locked = castable_pairs == 0,
         joker_available = joker_available,
         trump_density = #deck > 0 and (trumps_in_deck / #deck) or 0,
         trumps_in_deck = trumps_in_deck,

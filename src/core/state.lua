@@ -47,7 +47,6 @@ function M.new_game()
         armed_hand = nil,
         pending_flow_choice = nil,
         pending_encode_choice = nil,
-        pending_pair_card_choice = nil,
         pending_public_choice = nil,
         pending_hidden_choice = nil,
         pending_hand_choice = nil,

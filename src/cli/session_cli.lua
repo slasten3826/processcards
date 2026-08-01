@@ -51,16 +51,24 @@ function commands.new(args)
     local seed = tonumber(args[1]) or 1
     local trumps = args[2] or "full"
     local effects = args[3] or "all"
+    -- DEV_CLI_LAW §8: the fourth argument is the draw axis and defaults to the
+    -- real game. free_draw makes the empty-hand defeat unreachable, so it has
+    -- to be asked for out loud.
+    local draw_axis = args[4] or "turn"
     if trumps ~= "full" and trumps ~= "none" then
         return fail("trumps must be full or none")
     end
-    local log = session.new_log(seed, trumps, effects)
+    if draw_axis ~= "turn" and draw_axis ~= "free" then
+        return fail("draw must be turn or free")
+    end
+    local log = session.new_log(seed, trumps, effects, draw_axis)
     local ok, err = session.write(log)
     if not ok then
         return fail(tostring(err))
     end
     local game = session.rebuild(log)
-    out(string.format("session seed=%d trumps=%s effects=%s", seed, trumps, effects))
+    out(string.format("session seed=%d trumps=%s effects=%s draw=%s",
+        seed, trumps, effects, draw_axis))
     print_position(game)
     return 0
 end

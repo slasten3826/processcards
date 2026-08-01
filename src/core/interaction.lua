@@ -189,59 +189,6 @@ function M.read(state)
         return ix
     end
 
-    if state.pending_pair_card_choice then
-        local pending = state.pending_pair_card_choice
-        local armed_public = target_ref_for_card(state, pending.armed_public_card_id)
-        local armed_hand = target_ref_for_card(state, pending.armed_hand_card_id)
-
-        ix.phase = "await_target"
-        ix.legal.targets.kind = "pair_card"
-        append_target_ref(ix.armed.targets, armed_public)
-        append_target_ref(ix.armed.targets, armed_hand)
-        ix.armed.target = ix.armed.targets[1]
-
-        if pending.armed_public_card_id and pending.armed_hand_card_id then
-            ix.prompt = "Confirm the selected pair."
-            ix.advance.enabled = true
-            ix.advance.reason = "confirm_target"
-            ix.advance.label = "Confirm pair"
-            return ix
-        end
-
-        if pending.armed_public_card_id then
-            ix.prompt = "Choose one hand card."
-            ix.legal.targets.cards = pending.legal_hand_card_ids or {}
-            ix.legal.targets.zones.hand = (#ix.legal.targets.cards > 0)
-            return ix
-        end
-
-        if pending.armed_hand_card_id then
-            ix.prompt = "Choose one revealed minor card."
-            ix.legal.targets.cards = pending.legal_public_card_ids or {}
-            ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
-            if ix.legal.targets.zones.grave then
-                ix.overlays.grave_select_mode = true
-            end
-            return ix
-        end
-
-        ix.prompt = "Choose the first card of the pair."
-        for _, card_id in ipairs(pending.legal_public_card_ids or {}) do
-            ix.legal.targets.cards[#ix.legal.targets.cards + 1] = card_id
-        end
-        for _, card_id in ipairs(pending.legal_hand_card_ids or {}) do
-            ix.legal.targets.cards[#ix.legal.targets.cards + 1] = card_id
-        end
-        ix.legal.targets.zones = zone_flags_from_cards(state, ix.legal.targets.cards)
-        if #(pending.legal_hand_card_ids or {}) > 0 then
-            ix.legal.targets.zones.hand = true
-        end
-        if ix.legal.targets.zones.grave then
-            ix.overlays.grave_select_mode = true
-        end
-        return ix
-    end
-
     if state.pending_manifest_choice then
         ix.phase = "await_target"
         ix.prompt = "Choose one revealed manifest card."

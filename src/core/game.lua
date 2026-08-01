@@ -133,9 +133,6 @@ function M.advance(state)
         if state.pending_encode_choice then
             return M.confirm_encode_target(state)
         end
-        if state.pending_pair_card_choice then
-            return M.confirm_pair_card_target(state)
-        end
         if state.pending_manifest_choice then
             return M.confirm_manifest_target(state)
         end
@@ -221,9 +218,6 @@ function M.apply_action(state, action)
         if state.pending_encode_choice then
             return M.arm_encode_target(state, target.card_id)
         end
-        if state.pending_pair_card_choice then
-            return M.arm_pair_card_target(state, target.card_id)
-        end
         if state.pending_manifest_choice then
             return M.arm_manifest_target(state, target.slot)
         end
@@ -246,6 +240,13 @@ function M.apply_action(state, action)
         return M.advance(state)
     end
     if kind == "draw" then
+        -- DEV_CLI_LAW §8. The gate sits on the ACTION, not inside
+        -- M.draw_to_hand: position builders call the function directly and
+        -- answer to §7 instead, the same way plant does.
+        if not (state.setup_options and state.setup_options.free_draw) then
+            transition.begin(state, "apply_action", {kind = "draw"})
+            return transition.finish(state, {error = "free_draw_disabled"})
+        end
         return M.draw_to_hand(state)
     end
     if kind == "resolve_pending_trump" then
@@ -354,18 +355,6 @@ function M.arm_public_target(state, card_id)
     return turn.arm_public_target(state, card_id)
 end
 
-function M.choose_pair_card_target(state, card_id)
-    return turn.choose_pair_card_target(state, card_id)
-end
-
-function M.arm_pair_card_target(state, card_id)
-    return turn.arm_pair_card_target(state, card_id)
-end
-
-function M.confirm_pair_card_target(state)
-    return turn.confirm_pair_card_target(state)
-end
-
 function M.arm_flow_target(state, card_id)
     return turn.arm_flow_target(state, card_id)
 end
@@ -443,10 +432,11 @@ function M.resolve_pending_trump(state)
     local card_id, err = trump.resolve_pending_trump(state)
     trump.refresh_pending_trump(state)
     -- TURN_STEP_LAW: the queue is drained by repeated player beats; when it
-    -- empties, step 8 closes and step 9 follows.
+    -- empties, step 8 closes and steps 9 and 10 follow, in that order.
     if not state.pending_trump then
         transition.emit(state, "step_trump_end", {})
-        turn.step_check(state)
+        turn.step_win_check(state)
+        turn.step_lose_check(state)
         transition.emit(state, "turn_closed", {})
     end
     return transition.finish(state, {

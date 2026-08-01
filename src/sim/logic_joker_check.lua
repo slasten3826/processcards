@@ -148,8 +148,23 @@ function M.run(seed)
             local result = play_turn(game, card, slot)
             check("1 joker move offers only LOGIC", only(result.offered, "LOGIC"),
                 table.concat(result.offered, ","))
-            check("1b no target phase opened",
-                not result.events:find("pair_card_choice_pending"), result.events)
+            -- LOGIC_JOKER_LAW: a joker move opens NO TARGET phase. The operator
+            -- choice is not a target phase and is expected, so it is excluded
+            -- by name rather than by pattern.
+            local target_phases = {
+                "encode_choice_pending", "hand_choice_pending",
+                "hidden_choice_pending", "manifest_choice_pending",
+                "unrevealed_choice_pending",
+            }
+            local opened = nil
+            for _, event_name in ipairs(target_phases) do
+                if result.events:find(event_name, 1, true) then
+                    opened = event_name
+                    break
+                end
+            end
+            check("1b no target phase opened", opened == nil,
+                opened or result.events)
             check("1c logic_joker_pass emitted",
                 result.events:find("logic_joker_pass") ~= nil, result.events)
             check("6a committed card to grave", result.committed_zone == "grave", result.committed_zone)

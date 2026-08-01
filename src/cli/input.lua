@@ -156,16 +156,9 @@ local function parse_target(state, interaction, raw)
         return nil
     end
 
-    if target_kind == "pair_card" then
-        local hand_card_id = hand_card_by_key(state, raw)
-        if hand_card_id and list_contains(interaction.legal.targets.cards, hand_card_id) then
-            return { kind = "arm_target", target = { zone = "hand", card_id = hand_card_id } }
-        end
-    end
-
     local ref = parse_zone_target_ref(state, raw)
     if ref then
-        if target_kind == "pair_card" or list_contains(interaction.legal.targets.cards, ref.card_id) then
+        if list_contains(interaction.legal.targets.cards, ref.card_id) then
             return {
                 kind = "arm_target",
                 target = {

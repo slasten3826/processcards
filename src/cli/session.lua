@@ -60,11 +60,12 @@ end
 -- journal
 --------------------------------------------------------------------------
 
-function M.new_log(seed, trumps, effects)
+function M.new_log(seed, trumps, effects, draw_axis)
     return {
         seed = seed or 1,
         trumps = trumps or "full",
         effects = effects or "all",
+        draw = draw_axis or "turn",
         entries = {},
     }
 end
@@ -101,7 +102,9 @@ function M.read(name)
             -- Journals written before the axis existed carry no effects field
             -- and stay valid: absence reads as "all".
             local effects = line:match("effects=(%S+)") or "all"
-            log = M.new_log(tonumber(seed), trumps, effects)
+            -- DEV_CLI_LAW §8: absence reads as "turn", the real game.
+            local draw_axis = line:match("draw=(%S+)") or "turn"
+            log = M.new_log(tonumber(seed), trumps, effects, draw_axis)
         elseif line ~= "" then
             local kind, text = line:match("^(%S+)%s+(.*)$")
             if kind ~= "do" and kind ~= "plant" then
@@ -124,8 +127,8 @@ function M.write(log, name)
     if not file then
         return nil, err
     end
-    file:write(string.format("# seed=%d trumps=%s effects=%s\n",
-        log.seed, log.trumps, log.effects or "all"))
+    file:write(string.format("# seed=%d trumps=%s effects=%s draw=%s\n",
+        log.seed, log.trumps, log.effects or "all", log.draw or "turn"))
     for _, entry in ipairs(log.entries) do
         file:write(entry.kind .. " " .. entry.text .. "\n")
     end
@@ -371,6 +374,7 @@ local function start(log)
         rng = rng.from_seed(log.seed),
         enabled_trumps = (log.trumps == "none") and {} or nil,
         enabled_effects = effects_option(log.effects),
+        free_draw = (log.draw == "free"),
     })
     return game
 end

@@ -24,6 +24,9 @@
 
 local state_lib = require("src.core.state")
 local transition = require("src.core.transition")
+-- WIN_MODULE_SLICE §12: rules is pure topology and moves nothing, so reading it
+-- keeps the read-only guarantee. It was never on the §11.3 forbidden list.
+local rules = require("src.core.rules")
 
 local M = {}
 
@@ -34,6 +37,12 @@ M.predicates = {}
 -- order they are tried. WIN_MODULE_LAW §4 calls the list of ways to win open,
 -- so this is a set and not one hardcoded name.
 M.unsigned = {"pattern"}
+
+-- Unsigned DEFEAT predicates, in the order they are tried. A separate list from
+-- M.unsigned on purpose: victory and defeat must never share a queue, because
+-- then precedence would be one editable line again. Precedence lives in the
+-- order the turn calls the two steps -- TURN_STEP_LAW §11.
+M.terminal = {"no_legal_move"}
 
 function M.is_over(state)
     return state.outcome ~= nil
@@ -129,6 +138,25 @@ function M.check(state, name)
     return predicate(state)
 end
 
+-- TURN_STEP_LAW §11. An empty hand is a special case of this and needs no
+-- branch: rules.any_legal_move returns false for it through the same loop.
+M.predicates.no_legal_move = function(state)
+    if rules.any_legal_move(state) then
+        return nil
+    end
+    return {kind = "defeat", by = "no_legal_move"}
+end
+
+function M.check_terminal(state)
+    for _, name in ipairs(M.terminal) do
+        local outcome = M.check(state, name)
+        if outcome then
+            return outcome
+        end
+    end
+    return nil
+end
+
 function M.check_unsigned(state)
     for _, name in ipairs(M.unsigned) do
         local outcome = M.check(state, name)
@@ -154,9 +182,13 @@ function M.request(state, req)
     end
 
     local outcome
-    if signature == "TURN" then
+    if signature == "TURN_WIN" then
         -- The machine does not claim, it asks.
         outcome = M.check_unsigned(state)
+    elseif signature == "TURN_LOSE" then
+        -- A separate list, deliberately. Mixing them would put precedence back
+        -- into row order after it was moved into step order.
+        outcome = M.check_terminal(state)
     else
         local predicate = M.predicates[signature]
         if not predicate then
@@ -184,7 +216,7 @@ function M.request(state, req)
     outcome.seq = state.transition_seq
 
     state.outcome = outcome
-    transition.emit(state, "game_won", {
+    transition.emit(state, outcome.kind == "defeat" and "game_lost" or "game_won", {
         by = outcome.by,
         reading = outcome.reading,
     })

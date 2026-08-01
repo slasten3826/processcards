@@ -57,10 +57,13 @@ or do nothing
 It means the already-entered law is still held in machine reality.
 The parent trump's force has not yet dissipated.
 
-`☲ CYCLE` here is not ordinary hand filtering.
+`☲ CYCLE` here is not column advance.
 
 It means the entered trump-effect passes once more through the machine.
 A second echo of the same disturbance.
+
+<!-- reviewed 2026-07-30: phrasing detached from old CYCLE (hand filtering);
+     new CYCLE (column advance) comparison still holds -->
 
 So this trump reads as:
 

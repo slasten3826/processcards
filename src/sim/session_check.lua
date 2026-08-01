@@ -186,8 +186,14 @@ local function check_no_leak(results, seeds, steps)
         local failure = walk(seed, steps, function(game)
             positions = positions + 1
             local text = view.format(session.observe(game))
+            -- MACHINE_CLI_SLICE §12.6: whole token, not substring. MINOR-3 is a
+            -- prefix of MINOR-34, so find() reported a leak that was not one.
+            local shown = {}
+            for token in text:gmatch("%u+%-%d+") do
+                shown[token] = true
+            end
             for card_id, card in pairs(game.cards) do
-                if card.info_state == "hidden" and text:find(card_id, 1, true) then
+                if card.info_state == "hidden" and shown[card_id] then
                     return string.format("seed %d leaked %s", seed, card_id)
                 end
             end

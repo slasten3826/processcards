@@ -4,6 +4,14 @@
 
 ## 0. Status
 
+```text
+revision 2, 2026-07-31
+  proto hand instead of holding six cards nowhere
+  all six return; number 6 becomes the topdeck
+  ends with an ordinary draw
+  superseded wording kept and marked in §3, §4, §7, §10
+```
+
 Working trump draft.
 
 Legacy breadcrumb:
@@ -92,44 +100,80 @@ near-future shaping by selective sight
 
 When `ORACLE` becomes known:
 
-1. Look at the top `6` cards of the deck.
-2. Choose `1` of those cards and put it into hand.
-3. Put the remaining `5` cards back on top of the deck in any order.
-4. After `ORACLE` fully resolves, it follows ordinary trump ecology.
+1. Take the top `6` cards of the deck into the **proto hand**.
+2. Each card there carries a number, `1` to `6`.
+3. The player rearranges the numbers freely.
+4. All six return to the deck by number. Number `6` becomes the topdeck.
+5. Draw one card by the ordinary method.
+6. After `ORACLE` fully resolves, it follows ordinary trump ecology.
 
 Short formula:
 
 ```text
-top 6 -> inspect
-choose 1 -> hand
-rest -> top of deck in chosen order
+top 6 -> proto hand, numbered
+player reorders
+all 6 -> back to deck by number, 6 = topdeck
+ordinary draw
 ORACLE -> ordinary trump ecology
 ```
 
----
-
-## 4. Look Is Not Observe
-
-This distinction is load-bearing.
-
-Look here means:
-
-- private inspection for selection
-- no state upgrade
-- no `hidden -> known`
-- no `known -> revealed`
-- no automatic trump trigger just because a trump was seen
-
-So if one of the `6` viewed cards is a trump,
-that trump does not automatically resolve
-unless it is the card chosen and moved into hand
-under ordinary later law.
-
-Short formula:
+The proto hand is a **transient zone**: `TRANSIENT_ZONE_LAW`. It is occupied only while `ORACLE` resolves and is empty at rest.
 
 ```text
-look does not change machine truth-state
+consequence, not extra wording
 ```
+
+Cards `1`-`5` return to the **body** of the deck and enter it hidden by `DECK_LAW §2`: their identity is lost with their position. Card `6` returns to the **topdeck**, where `known` is lawful by `DECK_LAW §3`.
+
+So the player looks at six and **remembers exactly one**. The choice is not only what to take but what to keep knowing.
+
+```text
+STATUS: LEGACY
+CANONICAL: NO
+SUPERSEDED_BY: this section, revision 2
+REVISION: 1
+
+1. Look at the top 6 cards of the deck.
+2. Choose 1 of those cards and put it into hand.
+3. Put the remaining 5 cards back on top of the deck in any order.
+4. After ORACLE fully resolves, it follows ordinary trump ecology.
+```
+
+Revision 1 had the six cards nowhere: taken from the deck, not in any zone, held in view. Revision 2 puts them in a zone, because a card is always somewhere.
+
+---
+
+## 4. Looking Leaves No Lasting State
+
+Revision 2 keeps the intent of revision 1 and reaches it differently.
+
+The player does see the six cards: they are in the proto hand. But the state does not survive:
+
+```text
+cards 1-5 -> deck body -> hidden by DECK_LAW §2
+card 6    -> topdeck   -> known is lawful there, DECK_LAW §3
+```
+
+```text
+looking costs nothing PERMANENT
+```
+
+A trump among the six does not resolve on being seen. It resolves only if it becomes the drawn card, under ordinary trump draw law.
+
+```text
+STATUS: LEGACY
+CANONICAL: NO
+SUPERSEDED_BY: this section, revision 2
+REVISION: 1
+
+Look here means: private inspection for selection, no state upgrade,
+no hidden -> known, no known -> revealed, no automatic trump trigger
+just because a trump was seen.
+
+Short formula: look does not change machine truth-state
+```
+
+Revision 1 forbade the state change outright. Revision 2 allows it and **undoes it on return**, which reaches the same place without an exception to `CARD_INFORMATION_STATE_LAW §7`: nothing is re-hidden by special rule, the deck body simply is closed information.
 
 ---
 
@@ -153,10 +197,9 @@ without turning it into total future sterilization.
 
 ---
 
-## 6. Why Remaining Cards Stay On Top
+## 6. Why The Six Return To The Top
 
-The remaining `5` cards return to the top of deck
-in chosen order.
+All six return to the top of the deck in the chosen order, and number `6` becomes the topdeck, which the ordinary draw then takes.
 
 This is intentional.
 
@@ -187,10 +230,21 @@ bottoming no
 `ORACLE` does not:
 
 - send viewed cards to the bottom of deck
-- create `known` by looking
 - auto-resolve trumps seen among the six
 - access arbitrary deck-depth beyond the top six
 - count as ordinary `OBSERVE`
+- leave the proto hand occupied, `TRANSIENT_ZONE_LAW §3`
+
+```text
+STATUS: LEGACY
+CANONICAL: NO
+SUPERSEDED_BY: §3 and §4, revision 2
+REVISION: 1
+
+- create `known` by looking
+```
+
+Revision 1 forbade `known` outright. Under revision 2 the player does see the six, and card `6` may stay `known` on the topdeck by `DECK_LAW §3`. Cards `1`-`5` lose it on entering the deck body by `DECK_LAW §2`. The restriction is replaced by the mechanism, not by permission.
 
 ---
 
@@ -234,6 +288,19 @@ This is intentional.
 Draft rules text:
 
 ```text
+Take the top 6 cards into the proto hand, numbered 1 to 6.
+Rearrange the numbers as you like.
+Return all six to the deck by number; number 6 becomes the topdeck.
+Draw one card.
+After ORACLE fully resolves, it follows ordinary trump ecology.
+```
+
+```text
+STATUS: LEGACY
+CANONICAL: NO
+SUPERSEDED_BY: this section, revision 2
+REVISION: 1
+
 Look at the top 6 cards of the deck.
 Choose 1 and put it into hand.
 Put the rest back on top of the deck in any order.

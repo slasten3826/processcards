@@ -305,14 +305,23 @@ fully close against the committed manifest card
 В текущей ветке зафиксировано одно базовое условие поражения:
 
 ```text
-if you must take a normal turn and your hand is empty, you lose
+if you must take a normal turn and you cannot begin one, you lose
 ```
 
 То есть:
 
 - если игра требует от тебя обычного minor turn
-- а в `hand` нет карт
+- а легальной пары «карта руки -> колонка манифеста» нет ни одной,
+  ни по совпадению, ни по джокеру
 - партия проиграна
+
+Пустая рука — **частный случай**: у неё легальных пар нет по построению. Рука, ни одна карта которой никуда не ложится, проигрывает так же.
+
+<!-- reviewed 2026-07-30: первая редакция говорила «your hand is empty»,
+     то есть описывала частный случай. Расширено по TURN_STEP_LAW §11,
+     давление LOSS_IS_ITS_OWN_STEP_2026-07-30 §2 -->
+
+Проверяется на десятом шаге хода, после проверки победы: `TURN_STEP_LAW §11`.
 
 Другие loss-условия могут появиться позже,
 но current branch пока фиксирует именно это как базовый проигрыш.
@@ -395,7 +404,9 @@ manifest must embody it
 
 #### `☵ ENCODE`
 
-Работа со скрытой / not-revealed структурой и её перестановкой.
+Обмен двух карт в латентном ряду местами. Без ограничений на информационное состояние.
+
+<!-- reviewed 2026-07-30: aligned with ENCODE_SWAP_LAW -->
 
 #### `☳ CHOOSE`
 
@@ -407,11 +418,15 @@ manifest must embody it
 
 #### `☶ LOGIC`
 
-Перекомпоновка уже surfaced материи через pair-card swap.
+Джокер: легализует ход без топологического fit. Не производит эффекта, не открывает целевую фазу.
+
+<!-- reviewed 2026-07-30: aligned with LOGIC_JOKER_LAW -->
 
 #### `☲ CYCLE`
 
-Обновление hand-state через draw + controlled discard.
+Второе продвижение зафиксированной колонки: manifest→grave, latent→manifest, deck→latent повторно.
+
+<!-- reviewed 2026-07-30: aligned with CYCLE_ADVANCE_LAW -->
 
 #### `☱ RUNTIME`
 
@@ -553,16 +568,18 @@ floor = circle pathology x operator law
 ### Текущая shape of the run
 
 - **Circle 9 / ☱ RUNTIME**: runtime начинает тикать автоматически
-- **Circle 8 / ☶ LOGIC**: grave становится публичной реальностью
-- **Circle 7 / ☲ CYCLE**: cycle превращается в повтор stored trump-force
+- **Circle 8 / ☶ LOGIC**: LEGACY — grave становится публичной реальностью (см. LOGIC_JOKER_LAW)
+- **Circle 7 / ☲ CYCLE**: LEGACY — cycle превращается в повтор stored trump-force (см. CYCLE_ADVANCE_LAW)
 - **Circle 6 / ☴ OBSERVE**: знание становится ересью и заменой
 - **Circle 5 / ☳ CHOOSE**: выбор превращается в прямую manifest-replacement логику
-- **Circle 4 / ☵ ENCODE**: hidden encode схлопывается в visible burden swap
+- **Circle 4 / ☵ ENCODE**: LEGACY — hidden encode схлопывается в visible burden swap (см. ENCODE_SWAP_LAW)
 - **Circle 3 / ☷ DISSOLVE**: Cerberus ест весь latent row
 - **Circle 2 / ☰ CONNECT**: draw идёт из grave
 - **Circle 1 / ▽ FLOW**: скрытая подложка отказывается стабилизироваться
 
 Важно:
+
+<!-- reviewed 2026-07-30: floors 8, 7, 4 require rewrite against new operator laws -->
 
 ```text
 Nine Circle Run is a current design branch

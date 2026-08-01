@@ -93,7 +93,7 @@ When `CANON` becomes known:
 1. Reveal the top card of `deck`.
 2. If the revealed card is a trump, stop the `CANON` chain and resolve that trump by ordinary trump draw law.
 3. If the revealed card is a minor card carrying `☰` or `☵`, draw it into `hand` and repeat from step `1`.
-4. Otherwise stop. The revealed card remains revealed on top of `deck`.
+4. Otherwise stop. The revealed minor goes to `grave`.
 5. After `CANON` fully resolves, it follows ordinary trump ecology.
 
 Short formula:
@@ -102,11 +102,22 @@ Short formula:
 reveal top
 trump -> ordinary trump law, CANON ends
 minor with ☰ or ☵ -> hand, continue
-other minor -> remains revealed, stop
+other minor -> grave, stop
 ```
 
-The revealed top card left by `CANON`
+```text
+STATUS: LEGACY
+CANONICAL: NO
+SUPERSEDED_BY: DECK_LAW §4, §7
+REVISION: 1
+
+4. Otherwise stop. The revealed card remains revealed on top of deck.
+
+The revealed top card left by CANON
 counts as visible for later visibility-based effects.
+```
+
+Revision 1 left a card revealed on top of the deck as a lasting state. `DECK_LAW §4` makes the topdeck zone empty at rest, so that state cannot exist. `CANON` therefore no longer leaves information behind; the feature is lost deliberately, not by oversight.
 
 ---
 
@@ -258,8 +269,17 @@ Draft rules text:
 Reveal the top card of deck.
 If it is a trump, resolve it by ordinary trump draw law and stop CANON.
 If it is a minor card carrying ☰ or ☵, draw it into hand and repeat this process.
-Otherwise stop. That card remains revealed on top of deck.
+Otherwise stop. That minor goes to grave.
 After CANON fully resolves, it follows ordinary trump ecology.
+```
+
+```text
+STATUS: LEGACY
+CANONICAL: NO
+SUPERSEDED_BY: DECK_LAW §4, §7
+REVISION: 1
+
+Otherwise stop. That card remains revealed on top of deck.
 ```
 
 ---

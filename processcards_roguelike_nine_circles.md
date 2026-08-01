@@ -217,6 +217,12 @@ Short formula:
 
 # Floor 7 — ☲ CYCLE
 
+```text
+STATUS: LEGACY as of 2026-07-30
+причина: ☲ CYCLE переписан CYCLE_ADVANCE_LAW — теперь это второе продвижение
+         колонки, а не draw+discard. Floor 7 требует пересборки.
+```
+
 ## Circle Theme
 
 Violence / repeated force / stored blow fired again.
@@ -412,6 +418,13 @@ Short formula:
 ---
 
 # Floor 4 — ☵ ENCODE
+
+```text
+STATUS: LEGACY as of 2026-07-30
+причина: ☵ ENCODE переписан ENCODE_SWAP_LAW — теперь это обмен двух карт
+         в латентном ряду, без ограничений на информационное состояние.
+         Floor 4 требует пересборки.
+```
 
 ## Circle Theme
 
@@ -680,13 +693,15 @@ Short formula:
 
 # Current Floor Summary
 
+<!-- reviewed 2026-07-30: floors 8, 7, 4 marked LEGACY due to operator rewrites -->
+
 ```text
 9 ☱ RUNTIME  — automatic runtime tick before chosen operator
-8 ☶ LOGIC    — grave ↔ manifest laundering, no hand
-7 ☲ CYCLE    — repeat latest Trump Zone effect; Trump Zone capacity 3
+8 ☶ LOGIC    — LEGACY (see LOGIC_JOKER_LAW)
+7 ☲ CYCLE    — LEGACY (see CYCLE_ADVANCE_LAW)
 6 ☴ OBSERVE  — doctrine-check; mismatch becomes heresy and replacement
 5 ☳ CHOOSE   — played card replaces chosen manifest card
-4 ☵ ENCODE   — swap + flip two revealed manifest cards
+4 ☵ ENCODE   — LEGACY (see ENCODE_SWAP_LAW)
 3 ☷ DISSOLVE — Cerberus consumes latent row left-to-right
 2 ☰ CONNECT  — draw from top grave only; cannot draw itself
 1 ▽ FLOW     — forced hidden-layer motion after failed win check
@@ -697,15 +712,15 @@ Run direction:
 ```text
 START: 9 ☱ RUNTIME
 ↓
-8 ☶ LOGIC
+8 ☶ LOGIC    — LEGACY
 ↓
-7 ☲ CYCLE
+7 ☲ CYCLE    — LEGACY
 ↓
 6 ☴ OBSERVE
 ↓
 5 ☳ CHOOSE
 ↓
-4 ☵ ENCODE
+4 ☵ ENCODE   — LEGACY
 ↓
 3 ☷ DISSOLVE
 ↓

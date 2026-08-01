@@ -9,17 +9,37 @@ local win = require("src.core.win")
 
 local M = {}
 
--- STEP_CHECK_LAW: the ninth step is the turn ASKING the win module. The turn
--- owns the step boundaries; the module does not know steps exist.
+-- STEP_CHECK_LAW: steps nine and ten are the turn ASKING the module -- nine
+-- about victory, ten about whether a next turn is possible. The turn owns the
+-- step boundaries; the module does not know steps exist.
 --
--- Exported so game.lua can call the same function. Both places used to carry
--- their own copy of the two emits, which is the shape that already produced a
+-- STEP_CHECK_SLICE §1. Two steps, two functions, identical in shape: both only
+-- ask. The signature is the only thing that tells the module what is being
+-- asked about.
+--
+-- Exported so game.lua can call the same functions. Both places used to carry
+-- their own copy of the emits, which is the shape that already produced a
 -- defect once: play_to_grave lived in eleven places and one path went
 -- uninstrumented.
-function M.step_check(state)
-    transition.emit(state, "step_check_begin", {})
-    local outcome = win.request(state, {signature = "TURN"})
-    transition.emit(state, "step_check_end", {
+--
+-- One emit site PER STEP, not one for both: a single name over two steps cannot
+-- say which of them asked.
+function M.step_win_check(state)
+    transition.emit(state, "step_win_check_begin", {})
+    local outcome = win.request(state, {signature = "TURN_WIN"})
+    transition.emit(state, "step_win_check_end", {
+        outcome = outcome and outcome.by or nil,
+    })
+end
+
+-- Does not test is_over itself: that guard sits at the module's single entrance
+-- (WIN_MODULE_SLICE §7), and a copy here would be a second such place. When
+-- step 9 has already recorded a victory this returns already_over and the step
+-- runs empty -- the normal path, and what makes precedence structural.
+function M.step_lose_check(state)
+    transition.emit(state, "step_lose_check_begin", {})
+    local outcome = win.request(state, {signature = "TURN_LOSE"})
+    transition.emit(state, "step_lose_check_end", {
         outcome = outcome and outcome.by or nil,
     })
 end
@@ -169,7 +189,6 @@ end
 local function clear_operator_target_phases(state)
     state.pending_flow_choice = nil
     state.pending_encode_choice = nil
-    state.pending_pair_card_choice = nil
     state.pending_public_choice = nil
     state.pending_hidden_choice = nil
     state.pending_hand_choice = nil
@@ -398,10 +417,20 @@ local function ring_card_at(state, position)
     return state.zones.deck.cards[position.index]
 end
 
+-- Implements DECK_LAW_SLICE_2026-07-31 §2, authorised by DECK_LAW §2 and §3.
+-- The rule belongs to the POSITION, not to the operator, so it lives here: this
+-- is the only place a card lands in a ring position, and an operator added
+-- later inherits it for free.
 local function ring_set_card(state, position, card_id)
     if position.zone == "latent" then
         state.zones.latent.cards[position.slot] = card_id
         return
+    end
+    -- The body of the deck is closed information (DECK_LAW §2). The topdeck is
+    -- excluded: known is lawful there and it is the player's only window into
+    -- the deck (DECK_LAW §3).
+    if position.index ~= #state.zones.deck.cards then
+        state_lib.hide_card(state, card_id)
     end
     state.zones.deck.cards[position.index] = card_id
 end
@@ -739,7 +768,6 @@ function M.arm_operator(state, op_name)
     return transition.finish(state, {
         card_id = card_id,
         pending_operator_choice = state.pending_operator_choice,
-        pending_pair_card_choice = state.pending_pair_card_choice,
         pending_public_choice = state.pending_public_choice,
         pending_hidden_choice = state.pending_hidden_choice,
         pending_hand_choice = state.pending_hand_choice,
@@ -763,7 +791,9 @@ local function close_turn(state)
     })
     if not state.pending_trump then
         transition.emit(state, "step_trump_end", {})
-        M.step_check(state)
+        -- Order carries precedence and must not be swapped: TURN_STEP_LAW §11.
+        M.step_win_check(state)
+        M.step_lose_check(state)
         transition.emit(state, "turn_closed", {})
     end
 end
@@ -955,7 +985,6 @@ function M.choose_operator(state, op_name)
     if state.pending_public_choice
         or state.pending_flow_choice
         or state.pending_encode_choice
-        or state.pending_pair_card_choice
         or state.pending_hidden_choice
         or state.pending_manifest_choice
         or state.pending_unrevealed_choice
@@ -963,137 +992,6 @@ function M.choose_operator(state, op_name)
         return armed
     end
     return M.confirm_operator_phase(state)
-end
-
-function M.arm_pair_card_target(state, card_id)
-    local pending = state.pending_pair_card_choice
-    if not pending then
-        return nil, "no_pending_pair_card_choice"
-    end
-
-    local is_public = card_choice_is_legal(pending.legal_public_card_ids, card_id)
-    local is_hand = card_choice_is_legal(pending.legal_hand_card_ids, card_id)
-    if not is_public and not is_hand then
-        return nil, "illegal_pair_card_choice"
-    end
-
-    transition.begin(state, "arm_pair_card_target", {
-        card_id = card_id,
-        source_card_id = pending.card_id,
-        operator = pending.operator,
-    })
-
-    if is_public then
-        if pending.armed_public_card_id == card_id then
-            pending.armed_public_card_id = nil
-        else
-            pending.armed_public_card_id = card_id
-        end
-    elseif is_hand then
-        if pending.armed_hand_card_id == card_id then
-            pending.armed_hand_card_id = nil
-        else
-            pending.armed_hand_card_id = card_id
-        end
-    end
-
-    transition.emit(state, "pair_card_target_armed", {
-        operator = pending.operator,
-        source_card_id = pending.card_id,
-        armed_public_card_id = pending.armed_public_card_id,
-        armed_hand_card_id = pending.armed_hand_card_id,
-    })
-
-    return transition.finish(state, {
-        pending_pair_card_choice = state.pending_pair_card_choice,
-        pending_trump = state.pending_trump,
-        board_closed = state_lib.is_board_closed(state),
-    })
-end
-
-function M.confirm_pair_card_target(state)
-    local pending = state.pending_pair_card_choice
-    if not pending then
-        return nil, "no_pending_pair_card_choice"
-    end
-    if not pending.armed_public_card_id or not pending.armed_hand_card_id then
-        return nil, "incomplete_pair_card_choice"
-    end
-
-    local target_card_id = pending.armed_public_card_id
-    local hand_card_id = pending.armed_hand_card_id
-    local target_zone = state.cards[target_card_id].zone
-    local target_slot = state.cards[target_card_id].slot
-
-    transition.begin(state, "confirm_pair_card_target", {
-        public_card_id = target_card_id,
-        hand_card_id = hand_card_id,
-        source_card_id = pending.card_id,
-        operator = pending.operator,
-    })
-
-    state_lib.remove_from_current_zone(state, target_card_id)
-    state_lib.reveal_card(state, target_card_id)
-    state_lib.place_card(state, target_card_id, "hand", nil)
-    transition.emit(state, "public_to_hand", {
-        card_id = target_card_id,
-        zone = target_zone,
-        slot = target_slot,
-        operator = pending.operator,
-    })
-
-    state_lib.remove_from_current_zone(state, hand_card_id)
-    state_lib.reveal_card(state, hand_card_id)
-    if target_zone == "deck" then
-        state_lib.place_card(state, hand_card_id, "deck", nil)
-        transition.emit(state, "hand_to_deck_top", {
-            card_id = hand_card_id,
-            operator = pending.operator,
-        })
-    elseif target_zone == "grave" then
-        state_lib.place_card(state, hand_card_id, "grave", nil)
-        transition.emit(state, "hand_to_grave", {
-            card_id = hand_card_id,
-            operator = pending.operator,
-        })
-    else
-        state_lib.place_card(state, hand_card_id, target_zone, target_slot)
-        transition.emit(state, "hand_to_public", {
-            card_id = hand_card_id,
-            zone = target_zone,
-            slot = target_slot,
-            operator = pending.operator,
-        })
-    end
-
-    operators.finish_logic(state, target_card_id, hand_card_id)
-
-    local play_card_id = pending.card_id
-    move_to_grave(state, play_card_id)
-    transition.emit(state, "play_to_grave", {
-        card_id = play_card_id,
-        operator = pending.operator,
-    })
-
-    state.pending_pair_card_choice = nil
-    state.pending_operator_choice = nil
-    state_lib.clear_gameplay_selection(state)
-    close_turn(state)
-
-    return transition.finish(state, {
-        pending_operator_choice = state.pending_operator_choice,
-        pending_pair_card_choice = state.pending_pair_card_choice,
-        pending_trump = state.pending_trump,
-        board_closed = state_lib.is_board_closed(state),
-    })
-end
-
-function M.choose_pair_card_target(state, card_id)
-    local armed, err = M.arm_pair_card_target(state, card_id)
-    if not armed and err then
-        return nil, err
-    end
-    return M.confirm_pair_card_target(state)
 end
 
 function M.arm_flow_target(state, card_id)
@@ -1520,6 +1418,16 @@ function M.confirm_unrevealed_target(state)
                 state_lib.remove_from_current_zone(state, card_id)
             end
             trump.enter_trump_flow(state, card_id, "manifest")
+        elseif source_zone == "deck" then
+            -- Implements DECK_LAW_SLICE_2026-07-31 §4, authorised by
+            -- DECK_LAW §6-§7. The topdeck zone is empty at rest, so a revealed
+            -- minor cannot stay there. This is what lets MANIFEST spend the
+            -- deck one card per turn, and DECK_LAW §7 names that deliberate.
+            move_to_grave(state, card_id)
+            transition.emit(state, "deck_reveal_to_grave", {
+                card_id = card_id,
+                reason = "MANIFEST topdeck",
+            })
         end
     end
 

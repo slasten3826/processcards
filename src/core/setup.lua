@@ -72,6 +72,10 @@ function M.start_game(state, opts)
         enabled_trumps = enabled_trumps,
         enabled_effects = enabled_effects,
         trump_mode = opts.trump_mode or (enabled_trumps and "custom" or "full"),
+        -- DEV_CLI_LAW §8: drawing outside a turn is a cheat, so the axis that
+        -- turns it on changes the game and lives in the journal header. The
+        -- default is the real game, exactly like effects=all.
+        free_draw = opts.free_draw and true or false,
         guard = opts.guard,
     }
     state.trump_guard = opts.guard

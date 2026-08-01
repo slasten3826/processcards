@@ -58,10 +58,22 @@ local function leaks_in_table(state, payload)
     return found
 end
 
+-- Implements MACHINE_CLI_SLICE_2026-07-28 §12.6: an identifier is a WHOLE
+-- TOKEN. Substring matching reported MINOR-3 as leaked whenever MINOR-34 was
+-- lawfully shown, because one id is a prefix of the other.
+local function shown_tokens(text)
+    local shown = {}
+    for token in text:gmatch("%u+%-%d+") do
+        shown[token] = true
+    end
+    return shown
+end
+
 local function leaks_in_text(state, text)
     local found = {}
+    local shown = shown_tokens(text)
     for _, id in ipairs(hidden_ids(state)) do
-        if text:find(id, 1, true) then
+        if shown[id] then
             found[#found + 1] = id
         end
     end

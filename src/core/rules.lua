@@ -90,6 +90,30 @@ function M.legal_hand_ids(state, manifest_card_id)
     return result
 end
 
+-- TURN_STEP_LAW §11 via WIN_MODULE_SLICE §12. The defeat condition is a rule of
+-- the game, so the aggregate lives here and not in a tool: src/cli/session_view
+-- used to count this itself.
+--
+-- An empty hand goes through the same loop and returns false without a branch
+-- of its own. It is a special case of "no legal move", and coding it separately
+-- would make two conditions that drift apart. The joker is already inside
+-- move_legal through logic_available, so it is not rechecked either.
+function M.any_legal_move(state)
+    for slot = 1, state.zones.manifest.slot_count do
+        local manifest_card_id = state.zones.manifest.cards[slot]
+        local manifest_card = manifest_card_id and state.cards[manifest_card_id]
+        if manifest_card then
+            for _, hand_card_id in ipairs(state.zones.hand.cards) do
+                if M.move_legal(state, manifest_card,
+                                state.cards[hand_card_id], hand_card_id) then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 function M.legal_manifest_slots_for_hand(state, hand_card_id)
     local result = {}
     local hand_card = state.cards[hand_card_id]

@@ -18,27 +18,6 @@ local function legal_slot_set(list)
     return set
 end
 
-local function pending_pair_card_set(app)
-    local set = {}
-    local pending = app.game and app.game.pending_pair_card_choice or nil
-    if not pending then
-        return set
-    end
-    for _, card_id in ipairs(pending.legal_public_card_ids or {}) do
-        set[card_id] = true
-    end
-    for _, card_id in ipairs(pending.legal_hand_card_ids or {}) do
-        set[card_id] = true
-    end
-    if pending.armed_public_card_id then
-        set[pending.armed_public_card_id] = true
-    end
-    if pending.armed_hand_card_id then
-        set[pending.armed_hand_card_id] = true
-    end
-    return set
-end
-
 function M.pick_card(app, x, y)
     local views = layout_lib.card_views(app.layout, app.game.zones)
     local ordered = {}
@@ -318,17 +297,9 @@ function M.click(app, x, y)
             return
         end
 
-        local legal_cards
-        if ix.legal.targets.kind == "pair_card" then
-            legal_cards = pending_pair_card_set(app)
-        else
-            legal_cards = legal_card_set(ix.legal.targets.cards)
-        end
+        local legal_cards = legal_card_set(ix.legal.targets.cards)
         if legal_cards[card_id] then
-            if ix.legal.targets.kind == "pair_card" then
-                local zone = app.game.cards[card_id] and app.game.cards[card_id].zone or "-"
-                app:trace("pair_card_target_click", "card=" .. tostring(card_id) .. " zone=" .. tostring(zone))
-            elseif ix.legal.targets.kind == "hand_card" then
+            if ix.legal.targets.kind == "hand_card" then
                 app:trace("hand_target_click", "card=" .. tostring(card_id))
             elseif ix.legal.targets.kind == "public_minor_card" then
                 app:trace("public_target_click", "card=" .. tostring(card_id))

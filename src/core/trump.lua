@@ -449,7 +449,16 @@ local function unveil_topdeck(state)
         card_id = card_id,
     })
 
+    -- Implements DECK_LAW_SLICE_2026-07-31 §4, authorised by DECK_LAW §6-§7.
+    -- The topdeck zone is empty at rest, so a revealed minor cannot stay.
+    --
+    -- The card is still IN the deck here: reveal_minor_to_grave assumes its
+    -- caller already popped it (FOOL does), so removal has to happen first.
+    -- Without it the card is listed in both zones and pop_topdeck can never
+    -- drain the deck, which hangs open_manifest_closure.
     if not class_is(state, card_id, "trump") then
+        state_lib.remove_from_current_zone(state, card_id)
+        reveal_minor_to_grave(state, card_id, "UNVEIL topdeck")
         return
     end
 
@@ -654,11 +663,17 @@ local function begin_trump_chain(state)
     return true
 end
 
--- HALT_MODE_LAW section 4: displaced trumps are shuffled into the deck, and
--- shuffling does not undo known. CARD_INFORMATION_STATE_LAW section 7 forbids
--- a known card returning to hidden, so the player keeps the knowledge and
--- loses only the position. flush_trumps_to_deck hides, so it cannot be reused.
-local function shuffle_into_deck_keeping_state(state, card_ids, event_name)
+-- Implements DECK_LAW_SLICE_2026-07-31 §3, authorised by HALT_MODE_LAW §4
+-- revision 2 and DECK_LAW §2.
+--
+-- Revision 1 preserved the information state, citing CARD_INFORMATION_STATE_LAW
+-- section 7. It was wrong twice: the displaced cards are trumps and therefore
+-- revealed, not known, and a revealed card inside the deck is an anchor by
+-- FLOW_RING_LAW section 2 -- the ring covers the whole deck body, so every HALT
+-- permanently reduced the ring's mobility.
+--
+-- HALT displacement and trump-zone overflow now do the same thing.
+local function shuffle_into_deck(state, card_ids, event_name)
     if #card_ids == 0 then
         return
     end
@@ -666,6 +681,7 @@ local function shuffle_into_deck_keeping_state(state, card_ids, event_name)
         if state.cards[card_id].zone then
             state_lib.remove_from_current_zone(state, card_id)
         end
+        state_lib.hide_card(state, card_id)
         state_lib.place_card(state, card_id, "deck", nil)
     end
     shuffle_in_place(state.zones.deck.cards, state.rng)
@@ -896,7 +912,7 @@ function M.enter_trump_flow(state, card_id, reason)
             card_id = card_id,
             reason = reason,
         })
-        shuffle_into_deck_keeping_state(state, {card_id}, "halt_displaced_to_deck")
+        shuffle_into_deck(state, {card_id}, "halt_displaced_to_deck")
         return
     end
 
@@ -920,7 +936,7 @@ function M.enter_trump_flow(state, card_id, reason)
                 displaced[#displaced + 1] = queued_id
             end
         end
-        shuffle_into_deck_keeping_state(state, displaced, "halt_cleared_queue")
+        shuffle_into_deck(state, displaced, "halt_cleared_queue")
     end
 end
 
