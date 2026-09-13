@@ -10,6 +10,13 @@ crystall contract
           ../table/TARGET_ZONE_LAW.md §6.1
 давление: ../chaos/DECK_MODULE_2026-07-31.md
           ../chaos/ARCHITECTURE_MIGRATION_2026-07-31.md
+
+REVISION: 2, 2026-08-02
+OWNER: slasten
+REPLACES: §3, DISPATCH козыря; §10, проверка 3
+REASON: источник изменён — DECK_MODULE_LAW §5.1a. Модуль козыря
+        не отправляет; иначе стрелка deck -> trump замыкает цикл
+        с trump -> deck и воспроизводит причину трёх копий
 ```
 
 Первый модуль новой архитектуры. Пишется **рядом** со старым кодом; старые пути удаляются только после приёмки.
@@ -30,6 +37,8 @@ return M
 ```
 
 Модуль не требует `turn`, `trump`, `repair`, `win`. Зависимости только вниз: `state`, `transition`.
+
+Это **несущее** свойство, а не гигиена импортов: на нём стоит возможность козырной машины требовать модуль, а значит и смерть трёх копий. `DECK_MODULE_LAW §5.1a`.
 
 ```text
 чтение зон снаружи НЕ запрещено. DECK_MODULE_LAW §2
@@ -69,17 +78,35 @@ DISPATCH  только если STATE дал revealed
 **Возврат:**
 
 ```text
-успех                card_id
-выдать нечем         nil, "deck_exhausted"
-не назван asker      nil, "unsigned_request"
+успех, минор          card_id, nil, "minor"
+успех, козырь         card_id, nil, "trump"
+выдать нечем          nil, "deck_exhausted"
+не назван asker       nil, "unsigned_request"
 reveal без назначения nil, "destination_required"
 ```
 
+Третье значение — **класс** — обязательная часть контракта, а не удобство: на нём стоит маршрутизация козыря у просителя. При `reveal = false` класс всё равно возвращается: он известен после `TAKE`, а прятать его значит заставить просителя лезть в `state.cards` самому.
+
 Отказ громкий и **не** в виде голой пары на границе действия: вызывающий оборачивает его в переход, `TRANSITION_LAW §7`. Внутри модуля пара допустима — это не граница действия.
 
-**DISPATCH по классу**, `DECK_LAW §6`:
+**DISPATCH по классу**, `DECK_LAW §6` и `DECK_MODULE_LAW §5.1a`:
 
 ```text
+минор   -> request.destination. Кладёт МОДУЛЬ
+козырь  -> модуль НЕ отправляет. Возвращает card_id и класс "trump";
+           маршрутизирует ПРОСИТЕЛЬ одним вызовом
+```
+
+Поэтому `deck.lua` не требует `trump`: стрелка `deck -> trump` замкнула бы цикл с `trump -> deck`, а козырная машина обращается к модулю постоянно — `FOOL`, `ORACLE`, `RUSH` берут, `HALT` и разряд камеры возвращают. Тот же цикл `draw -> trump` уже породил три копии операций деки внутри `trump.lua`, `§9`.
+
+```text
+STATUS: LEGACY
+CANONICAL: NO
+SUPERSEDED_BY: настоящий раздел, редакция 2
+REVISION: 1
+
+успех   card_id
+
 козырь  -> enter_trump_flow. Модуль вызывает козырную машину ОДНИМ вызовом
 минор   -> request.destination
 ```
@@ -152,7 +179,7 @@ STATE   все, кроме последней, -> hide_card
 ## 7. События
 
 ```text
-deck_take              card_id, asker, zone, slot, revealed
+deck_take              card_id, asker, zone, slot, revealed, class
 deck_exhausted         asker, zone, slot
 deck_give_back         cards, shuffled, reason
 deck_ring_rotated      moved, anchors
@@ -192,7 +219,8 @@ ring_set_card существует в ОДНОМ месте: src/core/deck.lua
 ```text
 1.  take с reveal=false          карта скрыта, DISPATCH не выполнялся
 2.  take с reveal=true, минор    ушёл в request.destination
-3.  take с reveal=true, козырь   вошёл в поток, destination не нужен
+3.  take с reveal=true, козырь   ВОЗВРАЩЁН с классом "trump", в поток
+                                 НЕ вошёл, destination не нужен
 4.  take без asker               nil, "unsigned_request"
 5.  take с reveal без назначения nil, "destination_required"
 6.  take при пустой деке         nil, "deck_exhausted" для ВСЕХ трёх asker
@@ -218,7 +246,9 @@ ring_set_card существует в ОДНОМ месте: src/core/deck.lua
 Что ловит каждая:
 
 ```text
-1, 3     вход в зону топдека по РАСКРЫТИЮ, а не по извлечению. DECK_LAW §5
+1        вход в зону топдека по РАСКРЫТИЮ, а не по извлечению. DECK_LAW §5
+3        то же, плюс односторонность DISPATCH: модуль козыря НЕ отправляет.
+         Ловит возврат стрелки deck -> trump, то есть причину трёх копий
 2, 5     умолчание назначения, запрещённое DECK_LAW §7
 6, 7     политика по просителю. Седьмая — контроль: без неё правило
          «дека не может -> поражение» распространилось бы на игрока
